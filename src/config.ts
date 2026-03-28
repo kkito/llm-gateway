@@ -14,9 +14,19 @@ export interface ProviderConfig {
   desc?: string;
 }
 
+/**
+ * 用户 API Key 配置
+ */
+export interface UserApiKey {
+  name: string;
+  apikey: string;
+  desc?: string;
+}
+
 export interface ProxyConfig {
   models: ProviderConfig[];
   adminPassword?: string; // SHA256 哈希值
+  userApiKeys?: UserApiKey[];
 }
 
 const REQUIRED_FIELDS = ['customModel', 'realModel', 'apiKey', 'baseUrl', 'provider'] as const;
@@ -45,6 +55,13 @@ export function verifyPassword(password: string, digest: string): boolean {
  */
 export function getProxyDir(): string {
   return join(homedir(), '.llm-gateway');
+}
+
+/**
+ * 获取配置文件路径（默认）
+ */
+export function getConfigPath(): string {
+  return join(getProxyDir(), 'config.json');
 }
 
 /**
@@ -142,7 +159,8 @@ export function loadFullConfig(configPath: string): ProxyConfig {
     validateModelsArray(config.models);
     return {
       models: config.models,
-      adminPassword: config.adminPassword
+      adminPassword: config.adminPassword,
+      userApiKeys: config.userApiKeys
     };
   }
 
