@@ -58,6 +58,13 @@ export function getProxyDir(): string {
 }
 
 /**
+ * 获取配置文件路径（默认）
+ */
+export function getConfigPath(): string {
+  return join(getProxyDir(), 'config.json');
+}
+
+/**
  * 验证配置项是否包含所有必需字段
  */
 function validateProviderConfig(config: any, index: number): void {
@@ -152,7 +159,8 @@ export function loadFullConfig(configPath: string): ProxyConfig {
     validateModelsArray(config.models);
     return {
       models: config.models,
-      adminPassword: config.adminPassword
+      adminPassword: config.adminPassword,
+      userApiKeys: config.userApiKeys
     };
   }
 
