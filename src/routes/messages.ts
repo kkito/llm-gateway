@@ -13,6 +13,7 @@ import {
   type OpenAIToAnthropicStreamState
 } from '../converters/openai-to-anthropic.js';
 import { getCurrentUser } from '../user/middleware/auth.js';
+import { RateLimiter } from '../lib/rate-limiter.js';
 
 /**
  * 解析 OpenAI SSE 块并转换为 Anthropic 格式
@@ -43,9 +44,11 @@ export function createMessagesRoute(
   config: ProviderConfig[] | (() => ProviderConfig[]),
   logger: Logger,
   detailLogger: DetailLogger,
-  timeoutMs: number
+  timeoutMs: number,
+  logDir: string
 ) {
   const router = new Hono();
+  const rateLimiter = new RateLimiter(logDir);
 
   // 处理函数
   const handler = async (c: any, endpoint: string) => {
@@ -87,6 +90,19 @@ export function createMessagesRoute(
       }
 
       console.log(`   ✓ 匹配 provider: ${provider.customModel} -> ${provider.realModel} (${provider.provider})`);
+
+      // 检查使用限制
+      try {
+        const limitResult = await rateLimiter.checkLimits(provider, logDir);
+        if (limitResult.exceeded) {
+          console.log(`   ⚠️  [限制触发] ${limitResult.message}`);
+          const errorResponse = rateLimiter.createErrorResponse(limitResult.message!);
+          return c.json(errorResponse, 429);
+        }
+      } catch (error: any) {
+        console.log(`   ❌ [限制检查错误] ${error.message}`);
+        return c.json({ error: { message: error.message } }, 500);
+      }
 
       // 根据 provider 类型处理请求
       let upstreamBody: any;
@@ -166,6 +182,13 @@ export function createMessagesRoute(
             logEntry.totalTokens = responseData.usage?.input_tokens + responseData.usage?.output_tokens;
             logEntry.cachedTokens = responseData.usage?.input_tokens_details?.cached_tokens ?? null;
             logger.log(logEntry);
+            // 记录用量
+            const pricing = provider.inputPricePer1M !== undefined && provider.outputPricePer1M !== undefined && provider.cachedPricePer1M !== undefined ? {
+              inputPricePer1M: provider.inputPricePer1M,
+              outputPricePer1M: provider.outputPricePer1M,
+              cachedPricePer1M: provider.cachedPricePer1M
+            } : undefined;
+            rateLimiter.recordUsage(model, logEntry, pricing);
             return c.json(responseData);
           }
         } catch {
@@ -246,6 +269,14 @@ export function createMessagesRoute(
 
                   // 记录流式请求的日志（包含 Token 信息）
                   logger.log(logEntry);
+
+                  // 记录用量
+                  const pricing = provider.inputPricePer1M !== undefined && provider.outputPricePer1M !== undefined && provider.cachedPricePer1M !== undefined ? {
+                    inputPricePer1M: provider.inputPricePer1M,
+                    outputPricePer1M: provider.outputPricePer1M,
+                    cachedPricePer1M: provider.cachedPricePer1M
+                  } : undefined;
+                  rateLimiter.recordUsage(model, logEntry, pricing);
 
                   // 记录流式响应到文件
                   detailLogger.logStreamResponse(requestId, chunks);

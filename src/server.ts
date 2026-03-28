@@ -24,6 +24,7 @@ import { createUsersRoute } from './admin/routes/users.js';
 import { authMiddleware, isPasswordConfigured, sessions } from './admin/middleware/auth.js';
 import { createUserAuthMiddleware } from './user/middleware/auth.js';
 import { loadFullConfig } from './config.js';
+import { join as pathJoin } from 'path';
 
 // 获取当前模块目录 (用于静态文件服务)
 const __filename = fileURLToPath(import.meta.url);
@@ -37,6 +38,9 @@ export function createServer(
   configPath?: string
 ): Hono {
   const app = new Hono();
+
+  // 从 logger 获取 logDir
+  const logDir = pathJoin(logger.getFilePath(), '..');
 
   // 可变配置引用，用于热加载
   let currentConfig = config;
@@ -136,7 +140,8 @@ export function createServer(
     () => currentConfig,
     logger,
     detailLogger,
-    timeoutMs
+    timeoutMs,
+    logDir
   ));
 
   // 消息路由
@@ -144,7 +149,8 @@ export function createServer(
     () => currentConfig,
     logger,
     detailLogger,
-    timeoutMs
+    timeoutMs,
+    logDir
   ));
 
   // 登录路由（无需认证）

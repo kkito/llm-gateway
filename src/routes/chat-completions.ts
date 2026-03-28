@@ -12,6 +12,8 @@ import {
   type StreamConverterState
 } from '../converters/anthropic-to-openai.js';
 import { getCurrentUser } from '../user/middleware/auth.js';
+import { RateLimiter } from '../lib/rate-limiter.js';
+import { getProxyDir } from '../config.js';
 
 /**
  * 从 SSE chunks 构建完整的 OpenAI 响应
@@ -99,9 +101,11 @@ export function createChatCompletionsRoute(
   config: ProviderConfig[] | (() => ProviderConfig[]),
   logger: Logger,
   detailLogger: DetailLogger,
-  timeoutMs: number
+  timeoutMs: number,
+  logDir: string
 ) {
   const router = new Hono();
+  const rateLimiter = new RateLimiter(logDir);
 
   // 处理函数
   const handler = async (c: any, endpoint: string) => {
@@ -143,6 +147,19 @@ export function createChatCompletionsRoute(
       }
 
       console.log(`   ✓ 匹配 provider: ${provider.customModel} -> ${provider.realModel} (${provider.provider})`);
+
+      // 检查使用限制
+      try {
+        const limitResult = await rateLimiter.checkLimits(provider, logDir);
+        if (limitResult.exceeded) {
+          console.log(`   ⚠️  [限制触发] ${limitResult.message}`);
+          const errorResponse = rateLimiter.createErrorResponse(limitResult.message!);
+          return c.json(errorResponse, 429);
+        }
+      } catch (error: any) {
+        console.log(`   ❌ [限制检查错误] ${error.message}`);
+        return c.json({ error: { message: error.message } }, 500);
+      }
 
       // 根据 provider 类型处理请求
       let upstreamBody: any;
@@ -219,6 +236,13 @@ export function createChatCompletionsRoute(
             logEntry.cachedTokens = responseData.usage?.cache_read_input_tokens ?? null;
             console.log(`   🔄 [Anthropic→OpenAI 转换]`);
             logger.log(logEntry);
+            // 记录用量
+            const pricing = provider.inputPricePer1M !== undefined && provider.outputPricePer1M !== undefined && provider.cachedPricePer1M !== undefined ? {
+              inputPricePer1M: provider.inputPricePer1M,
+              outputPricePer1M: provider.outputPricePer1M,
+              cachedPricePer1M: provider.cachedPricePer1M
+            } : undefined;
+            rateLimiter.recordUsage(model, logEntry, pricing);
             return c.json(openaiResponse);
           } else {
             // OpenAI provider: 直接透传
@@ -228,6 +252,13 @@ export function createChatCompletionsRoute(
             // OpenAI 返回 prompt_tokens_details.cached_tokens
             logEntry.cachedTokens = responseData.usage?.prompt_tokens_details?.cached_tokens ?? null;
             logger.log(logEntry);
+            // 记录用量
+            const pricing = provider.inputPricePer1M !== undefined && provider.outputPricePer1M !== undefined && provider.cachedPricePer1M !== undefined ? {
+              inputPricePer1M: provider.inputPricePer1M,
+              outputPricePer1M: provider.outputPricePer1M,
+              cachedPricePer1M: provider.cachedPricePer1M
+            } : undefined;
+            rateLimiter.recordUsage(model, logEntry, pricing);
             return c.json(responseData);
           }
         } catch {
@@ -323,6 +354,14 @@ export function createChatCompletionsRoute(
 
                   // 记录流式请求的日志（包含 Token 信息）
                   logger.log(logEntry);
+
+                  // 记录用量
+                  const pricing = provider.inputPricePer1M !== undefined && provider.outputPricePer1M !== undefined && provider.cachedPricePer1M !== undefined ? {
+                    inputPricePer1M: provider.inputPricePer1M,
+                    outputPricePer1M: provider.outputPricePer1M,
+                    cachedPricePer1M: provider.cachedPricePer1M
+                  } : undefined;
+                  rateLimiter.recordUsage(model, logEntry, pricing);
 
                   controller.close();
                   break;
