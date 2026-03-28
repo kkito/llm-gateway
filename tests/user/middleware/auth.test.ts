@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Hono } from 'hono';
-import { userAuthMiddleware, getCurrentUser } from '../../../src/user/middleware/auth.js';
+import { userAuthMiddleware, getCurrentUser, loginUserSession, userSessions } from '../../../src/user/middleware/auth.js';
 
 // Mock config
 vi.mock('../../../src/config.js', () => ({
@@ -75,7 +75,7 @@ describe('userAuthMiddleware', () => {
       models: [],
       userApiKeys: [{ name: '用户 A', apikey: 'sk-lg-valid12345678901234' }]
     });
-    
+
     app.use('*', userAuthMiddleware);
     app.get('/test', (c) => c.json({ success: true }));
 
@@ -83,5 +83,105 @@ describe('userAuthMiddleware', () => {
       headers: { 'Authorization': 'Bearer sk-lg-valid12345678901234' }
     });
     expect(res.status).toBe(200);
+  });
+});
+
+describe('getCurrentUser', () => {
+  it('should get user from Authorization header', async () => {
+    vi.mocked(loadFullConfig).mockReturnValue({
+      models: [],
+      userApiKeys: [{ name: '用户 A', apikey: 'sk-lg-valid12345678901234' }]
+    });
+
+    let capturedUser: any = null;
+    const testApp = new Hono();
+    testApp.get('/test', (c) => {
+      capturedUser = getCurrentUser(c);
+      return c.json({ user: capturedUser });
+    });
+
+    await testApp.request('/test', {
+      headers: { 'Authorization': 'Bearer sk-lg-valid12345678901234' }
+    });
+    expect(capturedUser).toEqual({ name: '用户 A', apikey: 'sk-lg-valid12345678901234' });
+  });
+
+  it('should get user from x-api-key header', async () => {
+    vi.mocked(loadFullConfig).mockReturnValue({
+      models: [],
+      userApiKeys: [{ name: '用户 A', apikey: 'sk-lg-valid12345678901234' }]
+    });
+
+    let capturedUser: any = null;
+    const testApp = new Hono();
+    testApp.get('/test', (c) => {
+      capturedUser = getCurrentUser(c);
+      return c.json({ user: capturedUser });
+    });
+
+    await testApp.request('/test', {
+      headers: { 'x-api-key': 'sk-lg-valid12345678901234' }
+    });
+    expect(capturedUser).toEqual({ name: '用户 A', apikey: 'sk-lg-valid12345678901234' });
+  });
+
+  it('should get user from session', async () => {
+    const userApiKey = { name: '用户 A', apikey: 'sk-lg-valid12345678901234' };
+    userSessions.clear();
+    userSessions.set('test-session-id', userApiKey);
+    vi.mocked(loadFullConfig).mockReturnValue({
+      models: [],
+      userApiKeys: [userApiKey]
+    });
+
+    let capturedUser: any = null;
+    const testApp = new Hono();
+    testApp.get('/test', (c) => {
+      capturedUser = getCurrentUser(c);
+      return c.json({ user: capturedUser });
+    });
+
+    await testApp.request('/test', {
+      headers: { 'Cookie': 'user_session=test-session-id' }
+    });
+    expect(capturedUser).toEqual(userApiKey);
+  });
+
+  it('should return null when no auth provided', async () => {
+    vi.mocked(loadFullConfig).mockReturnValue({
+      models: [],
+      userApiKeys: []
+    });
+
+    let capturedUser: any = null;
+    const testApp = new Hono();
+    testApp.get('/test', (c) => {
+      capturedUser = getCurrentUser(c);
+      return c.json({ user: capturedUser });
+    });
+
+    await testApp.request('/test');
+    expect(capturedUser).toBeNull();
+  });
+});
+
+describe('loginUserSession', () => {
+  it('should create session for valid API key', () => {
+    vi.mocked(loadFullConfig).mockReturnValue({
+      models: [],
+      userApiKeys: [{ name: '用户 A', apikey: 'sk-lg-valid12345678901234' }]
+    });
+    const sessionId = loginUserSession('sk-lg-valid12345678901234');
+    expect(sessionId).toBeDefined();
+    expect(userSessions.has(sessionId!)).toBe(true);
+  });
+
+  it('should return null for invalid API key', () => {
+    vi.mocked(loadFullConfig).mockReturnValue({
+      models: [],
+      userApiKeys: [{ name: '用户 A', apikey: 'sk-lg-valid12345678901234' }]
+    });
+    const sessionId = loginUserSession('sk-lg-invalid');
+    expect(sessionId).toBeNull();
   });
 });
