@@ -15,6 +15,8 @@ import { createModelFormRoute } from './admin/routes/model-form.js';
 import { createStatsRoute } from './admin/routes/stats.js';
 import { createStatsApiRoute } from './admin/routes/stats-api.js';
 import { createHomeRoute } from './user/routes/home.js';
+import { loginRoute } from './user/routes/login.js';
+import { statsRoute } from './user/routes/stats.js';
 import { createLoginRoute } from './admin/routes/login.js';
 import { createPasswordRoute } from './admin/routes/password.js';
 import { authMiddleware, isPasswordConfigured, sessions } from './admin/middleware/auth.js';
@@ -208,6 +210,12 @@ export function createServer(
 
   // 用户首页路由
   app.route('', createHomeRoute(() => currentConfig));
+
+  // 用户登录路由
+  app.route('/user/login', loginRoute);
+
+  // 用户统计路由
+  app.route('/user/stats', statsRoute);
 
   return app;
 }
