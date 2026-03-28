@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { loadConfig, findProvider, getProxyDir, ProviderConfig } from '../src/config.js';
+import { loadConfig, findProvider, getProxyDir, ProviderConfig, hashPassword, verifyPassword } from '../src/config.js';
 import { writeFileSync, unlinkSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -118,6 +118,64 @@ describe('config', () => {
     it('should return default proxy directory in home', () => {
       const proxyDir = getProxyDir();
       expect(proxyDir).toContain('.llm-gateway');
+    });
+  });
+
+  describe('hashPassword', () => {
+    it('should return SHA256 hash of password', () => {
+      const password = 'test123';
+      const hash = hashPassword(password);
+      expect(hash).toBeDefined();
+      expect(hash).toHaveLength(64); // SHA256 hex length
+    });
+
+    it('should return same hash for same password', () => {
+      const password = 'mySecretPassword';
+      const hash1 = hashPassword(password);
+      const hash2 = hashPassword(password);
+      expect(hash1).toBe(hash2);
+    });
+
+    it('should return different hashes for different passwords', () => {
+      const hash1 = hashPassword('password1');
+      const hash2 = hashPassword('password2');
+      expect(hash1).not.toBe(hash2);
+    });
+
+    it('should include salt in hash', async () => {
+      const password = 'test';
+      const hash = hashPassword(password);
+      // Hash should be different from plain SHA256
+      const crypto = await import('crypto');
+      const plainHash = crypto.createHash('sha256').update(password).digest('hex');
+      expect(hash).not.toBe(plainHash);
+    });
+  });
+
+  describe('verifyPassword', () => {
+    it('should return true for correct password', () => {
+      const password = 'correctPassword123';
+      const hash = hashPassword(password);
+      expect(verifyPassword(password, hash)).toBe(true);
+    });
+
+    it('should return false for incorrect password', () => {
+      const password = 'correctPassword123';
+      const hash = hashPassword(password);
+      expect(verifyPassword('wrongPassword', hash)).toBe(false);
+    });
+
+    it('should return false for empty password', () => {
+      const password = 'somePassword';
+      const hash = hashPassword(password);
+      expect(verifyPassword('', hash)).toBe(false);
+    });
+
+    it('should handle special characters in password', () => {
+      const password = 'p@$$w0rd!#$%^&*()';
+      const hash = hashPassword(password);
+      expect(verifyPassword(password, hash)).toBe(true);
+      expect(verifyPassword('wrong password', hash)).toBe(false);
     });
   });
 });
