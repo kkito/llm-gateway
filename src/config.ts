@@ -5,6 +5,16 @@ import { join } from 'path';
 
 export type ProviderType = 'openai' | 'anthropic';
 
+/**
+ * 模型使用限制配置
+ */
+export interface ModelLimit {
+  type: 'requests' | 'input_tokens' | 'cost';
+  period: 'day' | 'hours' | 'week' | 'month';
+  periodValue?: number;  // 当 period='hours' 时，指定小时数
+  max: number;           // 最大限制值
+}
+
 export interface ProviderConfig {
   customModel: string;
   realModel: string;
@@ -12,6 +22,10 @@ export interface ProviderConfig {
   baseUrl: string;
   provider: ProviderType;
   desc?: string;
+  inputPricePer1M?: number;    // 输入 token 每百万价格（美元）
+  outputPricePer1M?: number;   // 输出 token 每百万价格（美元）
+  cachedPricePer1M?: number;   // 缓存 token 每百万价格（美元）
+  limits?: ModelLimit[];       // 使用限制配置
 }
 
 /**
@@ -76,6 +90,30 @@ function validateProviderConfig(config: any, index: number): void {
 }
 
 /**
+ * 验证 ModelLimit 配置
+ */
+function validateModelLimit(limit: any, index: number, modelIndex: number): void {
+  const validTypes = ['requests', 'input_tokens', 'cost'];
+  const validPeriods = ['day', 'hours', 'week', 'month'];
+  
+  if (!validTypes.includes(limit.type)) {
+    throw new Error(`Invalid limit type "${limit.type}" at model ${modelIndex}, limit ${index}. Valid types: ${validTypes.join(', ')}`);
+  }
+  
+  if (!validPeriods.includes(limit.period)) {
+    throw new Error(`Invalid limit period "${limit.period}" at model ${modelIndex}, limit ${index}. Valid periods: ${validPeriods.join(', ')}`);
+  }
+  
+  if (limit.period === 'hours' && typeof limit.periodValue !== 'number') {
+    throw new Error(`Missing periodValue for hours period at model ${modelIndex}, limit ${index}`);
+  }
+  
+  if (typeof limit.max !== 'number') {
+    throw new Error(`Missing or invalid max value at model ${modelIndex}, limit ${index}`);
+  }
+}
+
+/**
  * 验证 models 数组
  */
 function validateModelsArray(models: any): ProviderConfig[] {
@@ -85,6 +123,16 @@ function validateModelsArray(models: any): ProviderConfig[] {
 
   models.forEach((item: any, index: number) => {
     validateProviderConfig(item, index);
+    
+    // 验证 limits
+    if (item.limits) {
+      if (!Array.isArray(item.limits)) {
+        throw new Error(`limits must be an array at model ${index}`);
+      }
+      item.limits.forEach((limit: any, limitIndex: number) => {
+        validateModelLimit(limit, limitIndex, index);
+      });
+    }
   });
 
   return models as ProviderConfig[];
