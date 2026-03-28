@@ -22,7 +22,7 @@ pnpm build
 
 ### 配置
 
-创建配置文件 `~/.llmproxy/config.json`:
+创建配置文件 `~/.llm-gateway/config.json`:
 
 ```json
 {

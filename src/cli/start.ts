@@ -24,7 +24,7 @@ interface CliOptions {
 
 /**
  * 解析配置目录
- * 优先级：--config/--log-dir 指定值 > --dir 指定值 > 默认 ~/.llmproxy/
+ * 优先级：--config/--log-dir 指定值 > --dir 指定值 > 默认 ~/.llm-gateway/
  */
 function resolvePaths(options: CliOptions) {
   const defaultDir = getProxyDir();
@@ -169,7 +169,7 @@ function main() {
   program
     .name('llm-gateway-start')
     .description('启动 LLM 代理服务器')
-    .option('-d, --dir <path>', '工作目录 (默认 ~/.llmproxy/)')
+    .option('-d, --dir <path>', '工作目录 (默认 ~/.llm-gateway/)')
     .option('-c, --config <path>', '配置文件路径')
     .option('-l, --log-dir <path>', '日志目录')
     .option('-p, --port <number>', '服务端口', '4000')

@@ -16,7 +16,7 @@ LLM Proxy 是一个简单的代理服务器，帮你统一管理多个大模型 
 
 ### 第 1 步：写配置文件
 
-创建配置文件（默认路径 `~/.llmproxy/config.json`）：
+创建配置文件（默认路径 `~/.llm-gateway/config.json`）：
 
 ```json
 {
@@ -132,21 +132,21 @@ llm-gateway-start [选项]
 
 | 参数 | 简写 | 默认值 | 说明 |
 |------|------|--------|------|
-| `--dir` | `-d` | `~/.llmproxy/` | 工作目录 |
-| `--config` | `-c` | `~/.llmproxy/config.json` | 配置文件路径 |
-| `--log-dir` | `-l` | `~/.llmproxy/logs/proxy` | 日志存放目录 |
+| `--dir` | `-d` | `~/.llm-gateway/` | 工作目录 |
+| `--config` | `-c` | `~/.llm-gateway/config.json` | 配置文件路径 |
+| `--log-dir` | `-l` | `~/.llm-gateway/logs/proxy` | 日志存放目录 |
 | `--port` | `-p` | `4000` | 服务端口 |
 | `--timeout` | `-t` | `300000` | 请求超时时间（毫秒） |
 | `--daemon` | `-D` | - | 后台启动（守护进程模式） |
 | `--debug` | - | - | 启用详细日志（记录完整请求/响应内容到文件） |
 | `--stop` | - | - | 停止后台运行的服务 |
 
-**优先级**：`--config` / `--log-dir` > `--dir` > 默认 `~/.llmproxy/`
+**优先级**：`--config` / `--log-dir` > `--dir` > 默认 `~/.llm-gateway/`
 
 **示例**：
 
 ```bash
-# 使用默认目录 ~/.llmproxy/
+# 使用默认目录 ~/.llm-gateway/
 llm-gateway-start
 
 # 指定自定义工作目录
@@ -298,10 +298,10 @@ llm-gateway-stats --log-dir ./logs/proxy --json
 
 ## 日志文件
 
-日志存放在 `--log-dir` 指定的目录（默认 `~/.llmproxy/logs/proxy`），按天存储：
+日志存放在 `--log-dir` 指定的目录（默认 `~/.llm-gateway/logs/proxy`），按天存储：
 
 ```
-~/.llmproxy/logs/proxy/
+~/.llm-gateway/logs/proxy/
 ├── proxy-2026-03-21.log
 ├── proxy-2026-03-22.log
 └── proxy-2026-03-23.log
@@ -365,7 +365,7 @@ llm-gateway-start --daemon -p 8080
 curl http://localhost:4000/health
 ```
 
-或者查看 PID 文件（`~/.llmproxy/llm-proxy.pid`）确认服务是否在运行。
+或者查看 PID 文件（`~/.llm-gateway/llm-proxy.pid`）确认服务是否在运行。
 
 ---
 

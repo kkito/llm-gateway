@@ -117,7 +117,7 @@ describe('config', () => {
   describe('getProxyDir', () => {
     it('should return default proxy directory in home', () => {
       const proxyDir = getProxyDir();
-      expect(proxyDir).toContain('.llmproxy');
+      expect(proxyDir).toContain('.llm-gateway');
     });
   });
 });

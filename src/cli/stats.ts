@@ -135,7 +135,7 @@ function main() {
   program
     .name('llm-gateway-stats')
     .description('查看代理服务器统计')
-    .option('-d, --dir <path>', '工作目录 (默认 ~/.llmproxy/)')
+    .option('-d, --dir <path>', '工作目录 (默认 ~/.llm-gateway/)')
     .option('-l, --log-dir <path>', '日志目录')
     .option('--date <date>', '指定日期 (YYYY-MM-DD)')
     .option('--week <week>', '指定周 (YYYY-Www，如 2026-W13)')

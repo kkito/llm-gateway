@@ -23,7 +23,7 @@ const REQUIRED_FIELDS = ['customModel', 'realModel', 'apiKey', 'baseUrl', 'provi
  * 获取默认代理配置目录
  */
 export function getProxyDir(): string {
-  return join(homedir(), '.llmproxy');
+  return join(homedir(), '.llm-gateway');
 }
 
 /**
