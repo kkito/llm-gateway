@@ -20,6 +20,7 @@ import { statsRoute } from './user/routes/stats.js';
 import { createLoginRoute } from './admin/routes/login.js';
 import { createPasswordRoute } from './admin/routes/password.js';
 import { authMiddleware, isPasswordConfigured, sessions } from './admin/middleware/auth.js';
+import { userAuthMiddleware } from './user/middleware/auth.js';
 import { loadFullConfig } from './config.js';
 
 // 获取当前模块目录 (用于静态文件服务)
@@ -189,6 +190,10 @@ export function createServer(
       await next();
     });
   }
+
+  // 用户认证中间件 - 应用到 /user/* 和 /v1/* 路由
+  app.use('/user/*', userAuthMiddleware);
+  app.use('/v1/*', userAuthMiddleware);
 
   // 模型列表路由
   app.route('', createModelsRoute(() => currentConfig));
