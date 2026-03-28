@@ -74,7 +74,7 @@ function validateModelsArray(models: any): ProviderConfig[] {
 }
 
 /**
- * 加载并验证配置文件
+ * 加载并验证配置文件（返回 models 数组）
  */
 export function loadConfig(configPath: string): ProviderConfig[] {
   if (!existsSync(configPath)) {
@@ -104,6 +104,46 @@ export function loadConfig(configPath: string): ProviderConfig[] {
       throw new Error('Config must have a "models" array');
     }
     return validateModelsArray(config.models);
+  }
+
+  throw new Error('Config must be an array or an object with "models" array');
+}
+
+/**
+ * 加载完整配置（包括 adminPassword）
+ */
+export function loadFullConfig(configPath: string): ProxyConfig {
+  if (!existsSync(configPath)) {
+    throw new Error(`Config file not found: ${configPath}`);
+  }
+
+  const content = readFileSync(configPath, 'utf-8');
+
+  let config: any;
+  try {
+    config = JSON.parse(content);
+  } catch (error) {
+    throw new Error(`Invalid JSON in config file: ${error}`);
+  }
+
+  // 向后兼容：如果配置是数组，自动转换为新格式
+  if (Array.isArray(config)) {
+    config.forEach((item: any, index: number) => {
+      validateProviderConfig(item, index);
+    });
+    return { models: config };
+  }
+
+  // 新格式：对象，包含 models 数组
+  if (typeof config === 'object' && config !== null) {
+    if (!config.models) {
+      throw new Error('Config must have a "models" array');
+    }
+    validateModelsArray(config.models);
+    return {
+      models: config.models,
+      adminPassword: config.adminPassword
+    };
   }
 
   throw new Error('Config must be an array or an object with "models" array');
