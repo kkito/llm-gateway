@@ -7,3 +7,5 @@ dist
 .llmproxy
 .qwen
 AGENTS.md
+.agents
+skills-lock.json
