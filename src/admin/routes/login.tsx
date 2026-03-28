@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { LoginPage } from '../views/login.js';
-import { hashPassword, verifyPassword, loadConfig, saveConfig, ProxyConfig } from '../../config.js';
+import { hashPassword, verifyPassword, loadFullConfig, saveConfig } from '../../config.js';
 import { setSession, isPasswordConfigured } from '../middleware/auth.js';
 
 interface RouteDeps {
@@ -18,11 +18,10 @@ export function createLoginRoute(deps: RouteDeps) {
   // 显示登录页
   app.get('/admin/login', (c) => {
     try {
-      const config = loadConfig(configPath);
-      const proxyConfig: ProxyConfig = Array.isArray(config) ? { models: config } : config;
+      const proxyConfig = loadFullConfig(configPath);
       const isSetup = !isPasswordConfigured(proxyConfig.adminPassword);
       return c.html(<LoginPage isSetup={isSetup} />);
-    } catch (error) {
+    } catch (error: any) {
       return c.html(<LoginPage error="配置加载失败" />);
     }
   });
@@ -30,8 +29,7 @@ export function createLoginRoute(deps: RouteDeps) {
   // 处理登录
   app.post('/admin/login', async (c) => {
     try {
-      const config = loadConfig(configPath);
-      const proxyConfig: ProxyConfig = Array.isArray(config) ? { models: config } : config;
+      const proxyConfig = loadFullConfig(configPath);
       const body = await c.req.parseBody();
       const password = body.password as string;
 
@@ -43,14 +41,14 @@ export function createLoginRoute(deps: RouteDeps) {
       if (!isPasswordConfigured(proxyConfig.adminPassword)) {
         const digest = hashPassword(password);
         proxyConfig.adminPassword = digest;
-        
+
         // 保存配置
-        saveConfig(configPath, proxyConfig.models);
-        
+        saveConfig(configPath, proxyConfig.models, digest);
+
         // 设置 Session
         const sessionId = generateSessionId();
         setSession(sessionId);
-        
+
         // 重定向到模型列表
         const newRes = c.redirect('/admin/models');
         newRes.headers.set('Set-Cookie', `session=${sessionId}; Path=/; HttpOnly`);

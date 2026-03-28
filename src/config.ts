@@ -159,12 +159,15 @@ export function findProvider(config: ProviderConfig[], model: string): ProviderC
 /**
  * 保存配置到文件
  */
-export function saveConfig(configPath: string, config: ProviderConfig[]): void {
+export function saveConfig(configPath: string, config: ProviderConfig[], adminPassword?: string): void {
   const dir = join(configPath, '..');
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
   }
   const proxyConfig: ProxyConfig = { models: config };
+  if (adminPassword) {
+    proxyConfig.adminPassword = adminPassword;
+  }
   writeFileSync(configPath, JSON.stringify(proxyConfig, null, 2), 'utf-8');
 }
 
