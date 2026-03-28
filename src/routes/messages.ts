@@ -52,6 +52,8 @@ export function createMessagesRoute(
     const startTime = Date.now();
     const requestId = uuidv4();
     let customModel = 'unknown';
+    
+    // 获取当前用户
     const currentUser = getCurrentUser(c);
 
     try {
