@@ -16,6 +16,7 @@ export interface LogEntry {
   completionTokens?: number;
   totalTokens?: number;
   cachedTokens?: number;
+  userName?: string;  // 新增：用户名称
   error?: {
     message: string;
     type?: string;

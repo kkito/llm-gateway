@@ -11,6 +11,7 @@ import {
   createStreamConverterState,
   type StreamConverterState
 } from '../converters/anthropic-to-openai.js';
+import { getCurrentUser } from '../user/middleware/auth.js';
 
 /**
  * 从 SSE chunks 构建完整的 OpenAI 响应
@@ -107,6 +108,7 @@ export function createChatCompletionsRoute(
     const startTime = Date.now();
     const requestId = uuidv4();
     let customModel = 'unknown';
+    const currentUser = getCurrentUser(c);
 
     try {
       const body = await c.req.json();
@@ -132,6 +134,7 @@ export function createChatCompletionsRoute(
           statusCode: 404,
           durationMs: Date.now() - startTime,
           isStreaming: !!stream,
+          userName: currentUser?.name,
           error: { message: 'Model not found' }
         });
         return c.json({ error: { message: 'Model not found' } }, 404);
@@ -195,7 +198,8 @@ export function createChatCompletionsRoute(
         method: 'POST',
         statusCode: response.status,
         durationMs: Date.now() - startTime,
-        isStreaming: !!stream
+        isStreaming: !!stream,
+        userName: currentUser?.name
       };
 
       // 处理非流式响应
@@ -391,6 +395,7 @@ export function createChatCompletionsRoute(
         statusCode: 500,
         durationMs: Date.now() - startTime,
         isStreaming: false,
+        userName: currentUser?.name,
         error: { message: error.message || 'Internal error', type: error.name }
       });
 
