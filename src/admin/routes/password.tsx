@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { PasswordPage } from '../views/password.js';
 import { hashPassword, verifyPassword, loadFullConfig, saveConfig } from '../../config.js';
-import { isPasswordConfigured } from '../middleware/auth.js';
+import { isPasswordConfigured, sessions } from '../middleware/auth.js';
 
 interface RouteDeps {
   configPath: string;
@@ -16,6 +16,35 @@ export function createPasswordRoute(deps: RouteDeps) {
     try {
       const proxyConfig = loadFullConfig(configPath);
       const hasPassword = isPasswordConfigured(proxyConfig.adminPassword);
+
+      // 已设置密码时，需要认证才能访问
+      if (hasPassword) {
+        // 从 Cookie 获取 Session
+        let sessionId: string | undefined;
+        const cookieHeader = c.req.header('Cookie');
+        if (cookieHeader) {
+          sessionId = cookieHeader.split(';').find(cookie => cookie.trim().startsWith('session='))?.split('=')[1];
+        }
+
+        // 从 Authorization Header 获取
+        if (!sessionId) {
+          const authHeader = c.req.header('Authorization');
+          if (authHeader && authHeader.startsWith('Bearer ')) {
+            sessionId = authHeader.substring(7);
+          }
+        }
+
+        // 从 Query 参数获取
+        if (!sessionId) {
+          sessionId = c.req.query('session');
+        }
+
+        // 未登录，重定向到登录页
+        if (!sessionId || !sessions.has(sessionId)) {
+          return c.redirect('/admin/login');
+        }
+      }
+
       return c.html(<PasswordPage hasPassword={hasPassword} />);
     } catch (error: any) {
       return c.html(<PasswordPage error={`加载失败：${error.message}`} hasPassword={false} />);

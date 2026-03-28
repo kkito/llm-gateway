@@ -135,8 +135,8 @@ export function createServer(
   // 为 /admin/* 路由添加认证中间件（仅在已配置密码时）
   if (configPath) {
     app.use('/admin/*', async (c, next) => {
-      // 登录页和密码页无需认证（它们内部处理认证）
-      if (c.req.path === '/admin/login' || c.req.path === '/admin/password') {
+      // 登录页无需认证
+      if (c.req.path === '/admin/login') {
         await next();
         return;
       }
@@ -147,7 +147,7 @@ export function createServer(
         const hasPassword = isPasswordConfigured(config.adminPassword);
 
         if (hasPassword) {
-          // 已设置密码，需要认证
+          // 已设置密码，需要认证（密码页也不例外）
           // 支持多种 Session 传递方式：Cookie、Authorization Header、Query 参数
           let sessionId: string | undefined;
 

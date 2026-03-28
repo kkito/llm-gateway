@@ -40,31 +40,29 @@ export const PasswordPage: FC<Props> = (props) => {
         {props.hasPassword && (
           <>
             <label htmlFor="currentPassword">当前密码</label>
-            <input 
-              type="password" 
-              id="currentPassword" 
-              name="currentPassword" 
-              required 
+            <input
+              type="password"
+              id="currentPassword"
+              name="currentPassword"
+              required
               placeholder="请输入当前密码"
             />
           </>
         )}
-        
+
         <label htmlFor="newPassword">新密码</label>
-        <input 
-          type="password" 
-          id="newPassword" 
-          name="newPassword" 
-          required 
+        <input
+          type="password"
+          id="newPassword"
+          name="newPassword"
           placeholder="请输入新密码"
         />
-        
+
         <label htmlFor="confirmPassword">确认新密码</label>
-        <input 
-          type="password" 
-          id="confirmPassword" 
-          name="confirmPassword" 
-          required 
+        <input
+          type="password"
+          id="confirmPassword"
+          name="confirmPassword"
           placeholder="请再次输入新密码"
         />
         

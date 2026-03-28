@@ -69,7 +69,8 @@ describe('Admin 认证 E2E 测试', () => {
       const response = await app.request('/admin/password');
       expect(response.status).toBe(200);
       const html = await response.text();
-      expect(html).toContain('修改密码');
+      // 未设置密码时，显示设置密码表单
+      expect(html).toContain('设置密码');
     });
   });
 
@@ -152,13 +153,11 @@ describe('Admin 认证 E2E 测试', () => {
     });
 
     it('应该拦截未认证的 /admin/password 访问', async () => {
-      // 注意：/admin/password 路由在认证中间件之前注册，它内部处理认证逻辑
-      // 未认证时访问会显示登录表单（通过 isPasswordConfigured 判断）
-      // 所以这个测试改为验证页面可以访问（无需登录）
       sessions.clear();
       const response = await app.request('/admin/password');
-      // 密码页面本身不需要认证，但操作时需要验证当前密码
-      expect(response.status).toBe(200);
+      // 已设置密码时，未认证访问应该被重定向到登录页
+      expect(response.status).toBe(302);
+      expect(response.headers.get('Location')).toBe('/admin/login');
     });
 
     it('应该允许通过 Session Cookie 访问受保护页面', async () => {
@@ -265,7 +264,7 @@ describe('Admin 认证 E2E 测试', () => {
         },
         body: 'password=testpassword123'
       });
-      
+
       const loginResponse = await app.request('/admin/login', {
         method: 'POST',
         headers: {
@@ -274,6 +273,26 @@ describe('Admin 认证 E2E 测试', () => {
         body: 'password=testpassword123'
       });
       sessionCookie = loginResponse.headers.get('Set-Cookie') || '';
+    });
+
+    it('应该拦截未登录的 /admin/password 访问', async () => {
+      // 清除 Session 模拟未登录状态
+      sessions.clear();
+      const response = await app.request('/admin/password');
+      expect(response.status).toBe(302);
+      expect(response.headers.get('Location')).toBe('/admin/login');
+    });
+
+    it('应该允许已登录用户访问 /admin/password 页面', async () => {
+      const response = await app.request('/admin/password', {
+        headers: {
+          Cookie: sessionCookie
+        }
+      });
+
+      expect(response.status).toBe(200);
+      const html = await response.text();
+      expect(html).toContain('修改密码');
     });
 
     it('应该显示密码管理页面', async () => {
@@ -387,6 +406,23 @@ describe('Admin 认证 E2E 测试', () => {
           Cookie: sessionCookie
         },
         body: 'action=delete&currentPassword=testpassword123'
+      });
+
+      // 删除成功后返回 200 并显示成功消息
+      expect(response.status).toBe(200);
+      const html = await response.text();
+      expect(html).toContain('密码已删除');
+    });
+
+    it('删除密码时不需要提供新密码字段', async () => {
+      // 模拟表单提交时包含空的新密码字段（修复前的行为会导致 HTML5 验证失败）
+      const response = await app.request('/admin/password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Cookie: sessionCookie
+        },
+        body: 'action=delete&currentPassword=testpassword123&newPassword=&confirmPassword='
       });
 
       // 删除成功后返回 200 并显示成功消息
