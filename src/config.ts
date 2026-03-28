@@ -14,9 +14,19 @@ export interface ProviderConfig {
   desc?: string;
 }
 
+/**
+ * 用户 API Key 配置
+ */
+export interface UserApiKey {
+  name: string;
+  apikey: string;
+  desc?: string;
+}
+
 export interface ProxyConfig {
   models: ProviderConfig[];
   adminPassword?: string; // SHA256 哈希值
+  userApiKeys?: UserApiKey[];
 }
 
 const REQUIRED_FIELDS = ['customModel', 'realModel', 'apiKey', 'baseUrl', 'provider'] as const;
