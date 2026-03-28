@@ -2,26 +2,35 @@ import { Hono } from 'hono';
 import { LoginView } from '../views/login.js';
 import { loginUserSession } from '../middleware/auth.js';
 
-export const loginRoute = new Hono();
+interface RouteDeps {
+  configPath: string;
+}
 
-loginRoute.get('/', (c) => {
-  return c.html(<LoginView />);
-});
+export function createLoginRoute(deps: RouteDeps) {
+  const { configPath } = deps;
+  const app = new Hono();
 
-loginRoute.post('/', async (c) => {
-  const body = await c.req.parseBody();
-  const apiKey = body.apikey as string;
+  app.get('/', (c) => {
+    return c.html(<LoginView />);
+  });
 
-  if (!apiKey) {
-    return c.html(<LoginView error="请输入 API Key" />, 400);
-  }
+  app.post('/', async (c) => {
+    const body = await c.req.parseBody();
+    const apiKey = body.apikey as string;
 
-  const sessionId = loginUserSession(apiKey);
-  if (!sessionId) {
-    return c.html(<LoginView error="无效的 API Key" />, 401);
-  }
+    if (!apiKey) {
+      return c.html(<LoginView error="请输入 API Key" />, 200);
+    }
 
-  // 设置 Session Cookie
-  c.header('Set-Cookie', `user_session=${sessionId}; Path=/; HttpOnly`);
-  return c.redirect('/user/main');
-});
+    const sessionId = loginUserSession(apiKey, configPath);
+    if (!sessionId) {
+      return c.html(<LoginView error="无效的 API Key" />, 200);
+    }
+
+    // 设置 Session Cookie
+    c.header('Set-Cookie', `user_session=${sessionId}; Path=/; HttpOnly`);
+    return c.redirect('/user/main');
+  });
+
+  return app;
+}

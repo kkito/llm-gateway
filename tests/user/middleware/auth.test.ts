@@ -1,16 +1,17 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Hono } from 'hono';
-import { userAuthMiddleware, getCurrentUser, loginUserSession, userSessions } from '../../../src/user/middleware/auth.js';
+import { createUserAuthMiddleware, getCurrentUser, loginUserSession, userSessions } from '../../../src/user/middleware/auth.js';
 
 // Mock config
 vi.mock('../../../src/config.js', () => ({
   loadFullConfig: vi.fn(),
-  getConfigPath: vi.fn(() => '/test/config.json')
 }));
 
 import { loadFullConfig } from '../../../src/config.js';
 
-describe('userAuthMiddleware', () => {
+const TEST_CONFIG_PATH = '/test/config.json';
+
+describe('createUserAuthMiddleware', () => {
   let app: Hono;
 
   beforeEach(() => {
@@ -20,8 +21,8 @@ describe('userAuthMiddleware', () => {
 
   it('should allow access when userApiKeys is not configured', async () => {
     vi.mocked(loadFullConfig).mockReturnValue({ models: [] });
-    
-    app.use('*', userAuthMiddleware);
+
+    app.use('*', createUserAuthMiddleware(TEST_CONFIG_PATH));
     app.get('/test', (c) => c.json({ success: true }));
 
     const res = await app.request('/test');
@@ -30,8 +31,8 @@ describe('userAuthMiddleware', () => {
 
   it('should allow access when userApiKeys is empty', async () => {
     vi.mocked(loadFullConfig).mockReturnValue({ models: [], userApiKeys: [] });
-    
-    app.use('*', userAuthMiddleware);
+
+    app.use('*', createUserAuthMiddleware(TEST_CONFIG_PATH));
     app.get('/test', (c) => c.json({ success: true }));
 
     const res = await app.request('/test');
@@ -43,8 +44,8 @@ describe('userAuthMiddleware', () => {
       models: [],
       userApiKeys: [{ name: '用户 A', apikey: 'sk-lg-test12345678901234' }]
     });
-    
-    app.use('*', userAuthMiddleware);
+
+    app.use('*', createUserAuthMiddleware(TEST_CONFIG_PATH));
     app.get('/test', (c) => c.json({ success: true }));
 
     const res = await app.request('/test');
@@ -58,8 +59,8 @@ describe('userAuthMiddleware', () => {
       models: [],
       userApiKeys: [{ name: '用户 A', apikey: 'sk-lg-valid12345678901234' }]
     });
-    
-    app.use('*', userAuthMiddleware);
+
+    app.use('*', createUserAuthMiddleware(TEST_CONFIG_PATH));
     app.get('/test', (c) => c.json({ success: true }));
 
     const res = await app.request('/test', {
@@ -76,7 +77,7 @@ describe('userAuthMiddleware', () => {
       userApiKeys: [{ name: '用户 A', apikey: 'sk-lg-valid12345678901234' }]
     });
 
-    app.use('*', userAuthMiddleware);
+    app.use('*', createUserAuthMiddleware(TEST_CONFIG_PATH));
     app.get('/test', (c) => c.json({ success: true }));
 
     const res = await app.request('/test', {
@@ -96,7 +97,7 @@ describe('getCurrentUser', () => {
     let capturedUser: any = null;
     const testApp = new Hono();
     testApp.get('/test', (c) => {
-      capturedUser = getCurrentUser(c);
+      capturedUser = getCurrentUser(c, TEST_CONFIG_PATH);
       return c.json({ user: capturedUser });
     });
 
@@ -115,7 +116,7 @@ describe('getCurrentUser', () => {
     let capturedUser: any = null;
     const testApp = new Hono();
     testApp.get('/test', (c) => {
-      capturedUser = getCurrentUser(c);
+      capturedUser = getCurrentUser(c, TEST_CONFIG_PATH);
       return c.json({ user: capturedUser });
     });
 
@@ -137,7 +138,7 @@ describe('getCurrentUser', () => {
     let capturedUser: any = null;
     const testApp = new Hono();
     testApp.get('/test', (c) => {
-      capturedUser = getCurrentUser(c);
+      capturedUser = getCurrentUser(c, TEST_CONFIG_PATH);
       return c.json({ user: capturedUser });
     });
 
@@ -156,7 +157,7 @@ describe('getCurrentUser', () => {
     let capturedUser: any = null;
     const testApp = new Hono();
     testApp.get('/test', (c) => {
-      capturedUser = getCurrentUser(c);
+      capturedUser = getCurrentUser(c, TEST_CONFIG_PATH);
       return c.json({ user: capturedUser });
     });
 
@@ -171,7 +172,7 @@ describe('loginUserSession', () => {
       models: [],
       userApiKeys: [{ name: '用户 A', apikey: 'sk-lg-valid12345678901234' }]
     });
-    const sessionId = loginUserSession('sk-lg-valid12345678901234');
+    const sessionId = loginUserSession('sk-lg-valid12345678901234', TEST_CONFIG_PATH);
     expect(sessionId).toBeDefined();
     expect(userSessions.has(sessionId!)).toBe(true);
   });
@@ -181,7 +182,7 @@ describe('loginUserSession', () => {
       models: [],
       userApiKeys: [{ name: '用户 A', apikey: 'sk-lg-valid12345678901234' }]
     });
-    const sessionId = loginUserSession('sk-lg-invalid');
+    const sessionId = loginUserSession('sk-lg-invalid', TEST_CONFIG_PATH);
     expect(sessionId).toBeNull();
   });
 });
