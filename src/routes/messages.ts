@@ -12,6 +12,7 @@ import {
   createOpenAIToAnthropicStreamState,
   type OpenAIToAnthropicStreamState
 } from '../converters/openai-to-anthropic.js';
+import { getCurrentUser } from '../user/middleware/auth.js';
 
 /**
  * 解析 OpenAI SSE 块并转换为 Anthropic 格式
@@ -51,6 +52,9 @@ export function createMessagesRoute(
     const startTime = Date.now();
     const requestId = uuidv4();
     let customModel = 'unknown';
+    
+    // 获取当前用户
+    const currentUser = getCurrentUser(c);
 
     try {
       const body = await c.req.json();
@@ -76,6 +80,7 @@ export function createMessagesRoute(
           statusCode: 404,
           durationMs: Date.now() - startTime,
           isStreaming: !!stream,
+          userName: currentUser?.name,
           error: { message: 'Model not found' }
         });
         return c.json({ error: { message: 'Model not found' } }, 404);
@@ -135,7 +140,8 @@ export function createMessagesRoute(
         method: 'POST',
         statusCode: response.status,
         durationMs: Date.now() - startTime,
-        isStreaming: !!stream
+        isStreaming: !!stream,
+        userName: currentUser?.name
       };
 
       // 处理非流式响应
@@ -311,6 +317,7 @@ export function createMessagesRoute(
         statusCode: 500,
         durationMs: Date.now() - startTime,
         isStreaming: false,
+        userName: currentUser?.name,
         error: { message: error.message || 'Internal error', type: error.name }
       });
 
