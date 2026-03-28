@@ -32,14 +32,16 @@ pnpm build
       "realModel": "gpt-4",
       "apiKey": "sk-你的 OpenAI 密钥",
       "provider": "openai",
-      "baseUrl": "https://api.openai.com"
+      "baseUrl": "https://api.openai.com",
+      "desc": "用于日常对话的 GPT-4 模型"
     },
     {
       "customModel": "my-claude",
       "realModel": "claude-3-5-sonnet-20241022",
       "apiKey": "sk-ant-你的 Anthropic 密钥",
       "provider": "anthropic",
-      "baseUrl": "https://api.anthropic.com"
+      "baseUrl": "https://api.anthropic.com",
+      "desc": "用于长文本处理的 Claude 模型"
     }
   ]
 }
