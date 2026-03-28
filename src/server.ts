@@ -15,6 +15,10 @@ import { createModelFormRoute } from './admin/routes/model-form.js';
 import { createStatsRoute } from './admin/routes/stats.js';
 import { createStatsApiRoute } from './admin/routes/stats-api.js';
 import { createHomeRoute } from './user/routes/home.js';
+import { createLoginRoute } from './admin/routes/login.js';
+import { createPasswordRoute } from './admin/routes/password.js';
+import { authMiddleware, isPasswordConfigured } from './admin/middleware/auth.js';
+import { loadFullConfig } from './config.js';
 
 // 获取当前模块目录 (用于静态文件服务)
 const __filename = fileURLToPath(import.meta.url);
@@ -121,6 +125,11 @@ export function createServer(
   // 模型列表路由
   app.route('', createModelsRoute(() => currentConfig));
 
+  // 登录路由（无需认证）
+  if (configPath) {
+    app.route('', createLoginRoute({ configPath }));
+  }
+
   // 模型表单路由
   if (configPath) {
     app.route('', createModelFormRoute({
@@ -130,11 +139,51 @@ export function createServer(
     }));
   }
 
+  // 为 /admin/* 路由添加认证中间件（仅在已配置密码时）
+  if (configPath) {
+    app.use('/admin/*', async (c, next) => {
+      // 登录页和密码设置页无需认证
+      if (c.req.path === '/admin/login' || c.req.path === '/admin/password') {
+        await next();
+        return;
+      }
+      
+      // 检查是否已配置密码
+      try {
+        const config = loadFullConfig(configPath);
+        const hasPassword = isPasswordConfigured(config.adminPassword);
+        
+        if (hasPassword) {
+          // 需要认证
+          const sessionId = c.req.header('Cookie')?.split(';').find(cookie => cookie.trim().startsWith('session='))?.split('=')[1];
+          if (!sessionId) {
+            return c.redirect('/admin/login');
+          }
+          
+          // 简单的 session 验证（使用内存中的 session）
+          const { sessions } = await import('./admin/middleware/auth.js');
+          if (!sessions.has(sessionId)) {
+            return c.redirect('/admin/login');
+          }
+        }
+      } catch (error) {
+        console.error('认证检查失败:', error);
+      }
+      
+      await next();
+    });
+  }
+
   // 统计页面路由
   app.route('', createStatsRoute());
 
   // 统计 API 路由
   app.route('', createStatsApiRoute());
+
+  // 密码管理路由（需要认证）
+  if (configPath) {
+    app.route('', createPasswordRoute({ configPath }));
+  }
 
   // 用户首页路由
   app.route('', createHomeRoute(() => currentConfig));

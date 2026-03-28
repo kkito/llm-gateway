@@ -1,7 +1,7 @@
 import { Context, Next } from 'hono';
 
 // 简单的内存 Session 存储
-const sessions = new Set<string>();
+export const sessions = new Set<string>();
 
 /**
  * 生成 Session ID
