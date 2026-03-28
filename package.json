@@ -1,0 +1,36 @@
+{
+  "name": "llm-gateway",
+  "version": "1.0.0",
+  "description": "LLM Proxy Gateway - 统一管理多个大模型 API",
+  "type": "module",
+  "bin": {
+    "llm-gateway-start": "dist/cli/start.js",
+    "llm-gateway-stats": "dist/cli/stats.js"
+  },
+  "scripts": {
+    "build": "tsc && npm run copy-assets",
+    "copy-assets": "tsx scripts/copy-assets.ts",
+    "prepare": "npm run build",
+    "dev": "tsc --watch",
+    "start": "node dist/cli/start.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.11",
+    "@picocss/pico": "^2.1.1",
+    "commander": "^14.0.3",
+    "hono": "^4.12.8",
+    "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.4.0",
+    "@types/uuid": "^11.0.0",
+    "fs-extra": "^11.3.4",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.2"
+  },
+  "packageManager": "pnpm@10.18.2"
+}

@@ -1,0 +1,123 @@
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { loadConfig, findProvider, getProxyDir, ProviderConfig } from '../src/config.js';
+import { writeFileSync, unlinkSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
+
+describe('config', () => {
+  const testConfigPath = join(tmpdir(), 'test-proxy-config.json');
+  
+  const testConfig: ProviderConfig[] = [
+    {
+      customModel: 'my-gpt4',
+      realModel: 'gpt-4',
+      apiKey: 'sk-test-key',
+      baseUrl: 'https://api.openai.com',
+      provider: 'openai'
+    },
+    {
+      customModel: 'my-claude',
+      realModel: 'claude-3-5-sonnet-20241022',
+      apiKey: 'sk-ant-test-key',
+      baseUrl: 'https://api.anthropic.com',
+      provider: 'anthropic'
+    }
+  ];
+
+  beforeEach(() => {
+    writeFileSync(testConfigPath, JSON.stringify(testConfig, null, 2));
+  });
+
+  afterEach(() => {
+    try {
+      unlinkSync(testConfigPath);
+    } catch {}
+  });
+
+  describe('loadConfig', () => {
+    it('should load valid config from file', () => {
+      const config = loadConfig(testConfigPath);
+      expect(config).toHaveLength(2);
+      expect(config[0].customModel).toBe('my-gpt4');
+    });
+
+    it('should throw error for invalid JSON', () => {
+      // 先删除文件再重新创建，避免 beforeEach 的影响
+      unlinkSync(testConfigPath);
+      writeFileSync(testConfigPath, 'invalid json');
+      expect(() => loadConfig(testConfigPath)).toThrow('Invalid JSON');
+    });
+
+    it('should throw error for missing required fields', () => {
+      unlinkSync(testConfigPath);
+      writeFileSync(testConfigPath, JSON.stringify([{ customModel: 'test' }]));
+      expect(() => loadConfig(testConfigPath)).toThrow('Missing required field');
+    });
+
+    it('should throw error for non-array config', () => {
+      unlinkSync(testConfigPath);
+      writeFileSync(testConfigPath, JSON.stringify({ customModel: 'test' }));
+      expect(() => loadConfig(testConfigPath)).toThrow('Config must have a "models" array');
+    });
+
+    it('should throw error for file not found', () => {
+      expect(() => loadConfig('/nonexistent/path/config.json')).toThrow('Config file not found');
+    });
+
+    it('should load new format config with models array', () => {
+      unlinkSync(testConfigPath);
+      const newFormatConfig = {
+        models: [
+          {
+            customModel: 'my-gpt4',
+            realModel: 'gpt-4',
+            apiKey: 'sk-test-key',
+            baseUrl: 'https://api.openai.com',
+            provider: 'openai' as const
+          }
+        ]
+      };
+      writeFileSync(testConfigPath, JSON.stringify(newFormatConfig));
+      const config = loadConfig(testConfigPath);
+      expect(config).toHaveLength(1);
+      expect(config[0].customModel).toBe('my-gpt4');
+    });
+
+    it('should maintain backward compatibility with array format', () => {
+      unlinkSync(testConfigPath);
+      const arrayConfig = [
+        {
+          customModel: 'my-gpt4',
+          realModel: 'gpt-4',
+          apiKey: 'sk-test-key',
+          baseUrl: 'https://api.openai.com',
+          provider: 'openai' as const
+        }
+      ];
+      writeFileSync(testConfigPath, JSON.stringify(arrayConfig));
+      const config = loadConfig(testConfigPath);
+      expect(config).toHaveLength(1);
+      expect(config[0].customModel).toBe('my-gpt4');
+    });
+  });
+
+  describe('findProvider', () => {
+    it('should find provider by customModel', () => {
+      const provider = findProvider(testConfig, 'my-gpt4');
+      expect(provider).toBeDefined();
+      expect(provider?.realModel).toBe('gpt-4');
+    });
+
+    it('should return null for unknown model', () => {
+      const provider = findProvider(testConfig, 'unknown-model');
+      expect(provider).toBeNull();
+    });
+  });
+
+  describe('getProxyDir', () => {
+    it('should return default proxy directory in home', () => {
+      const proxyDir = getProxyDir();
+      expect(proxyDir).toContain('.llmproxy');
+    });
+  });
+});
