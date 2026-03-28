@@ -9,6 +9,7 @@ import {
   getWeekRange,
   getMonthRange,
   formatDateRange,
+  loadStats,
   type StatsEntry,
   type StatsOptions,
 } from './stats-core.js';
@@ -191,6 +192,59 @@ describe('stats-core', () => {
     it('应该格式化日期范围', () => {
       expect(formatDateRange({ date: '2026-03-28' })).toBe('2026-03-28');
       expect(formatDateRange({})).toBe('今日');
+    });
+  });
+
+  describe('loadStats with user filtering', () => {
+    it('应该支持按用户名称过滤', () => {
+      // 模拟日志条目
+      const entries: StatsEntry[] = [
+        {
+          timestamp: '2026-03-28T10:00:00Z',
+          customModel: 'qwen-plus',
+          provider: 'dashscope',
+          statusCode: 200,
+          promptTokens: 100,
+          completionTokens: 50,
+          totalTokens: 150,
+          cachedTokens: 0,
+          userName: 'user1',
+        },
+        {
+          timestamp: '2026-03-28T11:00:00Z',
+          customModel: 'qwen-max',
+          provider: 'dashscope',
+          statusCode: 200,
+          promptTokens: 200,
+          completionTokens: 100,
+          totalTokens: 300,
+          cachedTokens: 0,
+          userName: 'user2',
+        },
+        {
+          timestamp: '2026-03-28T12:00:00Z',
+          customModel: 'qwen-plus',
+          provider: 'dashscope',
+          statusCode: 200,
+          promptTokens: 150,
+          completionTokens: 75,
+          totalTokens: 225,
+          cachedTokens: 0,
+          userName: 'user1',
+        },
+      ];
+
+      // 测试过滤 user1
+      const stats1 = calculateStats(entries.filter(e => e.userName === 'user1'), {});
+      expect(stats1.totalRequests).toBe(2);
+      expect(stats1.totalInputTokens).toBe(250);
+      expect(stats1.totalOutputTokens).toBe(125);
+
+      // 测试过滤 user2
+      const stats2 = calculateStats(entries.filter(e => e.userName === 'user2'), {});
+      expect(stats2.totalRequests).toBe(1);
+      expect(stats2.totalInputTokens).toBe(200);
+      expect(stats2.totalOutputTokens).toBe(100);
     });
   });
 });

@@ -10,6 +10,7 @@ export interface StatsEntry {
   completionTokens?: number;
   totalTokens?: number;
   cachedTokens?: number;
+  userName?: string;
 }
 
 export interface ModelStats {
@@ -41,6 +42,7 @@ export interface StatsOptions {
   week?: string;      // YYYY-Www
   month?: string;     // YYYY-MM
   byHour?: boolean;
+  userName?: string;  // 筛选特定用户
 }
 
 export function parseLogFile(filePath: string): StatsEntry[] {
@@ -255,11 +257,16 @@ export function formatDateRange(options: StatsOptions): string {
 
 export function loadStats(logDir: string, options: StatsOptions = {}): Stats {
   const logFiles = getLogFilesForRange(logDir, options);
-  
+
   let entries: StatsEntry[] = [];
   for (const file of logFiles) {
     entries = entries.concat(parseLogFile(file));
   }
-  
+
+  // 如果指定了 userName，过滤日志
+  if (options.userName) {
+    entries = entries.filter(e => e.userName === options.userName);
+  }
+
   return calculateStats(entries, options);
 }
