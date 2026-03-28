@@ -365,7 +365,7 @@ llm-gateway-start --daemon -p 8080
 curl http://localhost:4000/health
 ```
 
-或者查看 PID 文件（`~/.llm-gateway/llm-proxy.pid`）确认服务是否在运行。
+或者查看 PID 文件（`~/.llm-gateway/llm-gateway.pid`）确认服务是否在运行。
 
 ---
 

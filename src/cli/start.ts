@@ -52,7 +52,7 @@ function resolvePaths(options: CliOptions) {
  * 获取 PID 文件路径
  */
 function getPidFile(userDir: string): string {
-  return join(userDir, 'llm-proxy.pid');
+  return join(userDir, 'llm-gateway.pid');
 }
 
 /**
