@@ -8,4 +8,5 @@ dist
 .qwen
 AGENTS.md
 .agents
+.config
 skills-lock.json

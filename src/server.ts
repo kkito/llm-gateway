@@ -127,10 +127,15 @@ export function createServer(
     app.route('', createLoginRoute({ configPath }));
   }
 
+  // 密码管理路由（需在认证中间件之前注册，因为它内部处理认证逻辑）
+  if (configPath) {
+    app.route('', createPasswordRoute({ configPath }));
+  }
+
   // 为 /admin/* 路由添加认证中间件（仅在已配置密码时）
   if (configPath) {
     app.use('/admin/*', async (c, next) => {
-      // 登录页和密码设置页无需认证
+      // 登录页和密码页无需认证（它们内部处理认证）
       if (c.req.path === '/admin/login' || c.req.path === '/admin/password') {
         await next();
         return;
@@ -142,8 +147,29 @@ export function createServer(
         const hasPassword = isPasswordConfigured(config.adminPassword);
 
         if (hasPassword) {
-          // 需要认证
-          const sessionId = c.req.header('Cookie')?.split(';').find(cookie => cookie.trim().startsWith('session='))?.split('=')[1];
+          // 已设置密码，需要认证
+          // 支持多种 Session 传递方式：Cookie、Authorization Header、Query 参数
+          let sessionId: string | undefined;
+
+          // 1. 从 Cookie 获取
+          const cookieHeader = c.req.header('Cookie');
+          if (cookieHeader) {
+            sessionId = cookieHeader.split(';').find(cookie => cookie.trim().startsWith('session='))?.split('=')[1];
+          }
+
+          // 2. 从 Authorization Header 获取
+          if (!sessionId) {
+            const authHeader = c.req.header('Authorization');
+            if (authHeader && authHeader.startsWith('Bearer ')) {
+              sessionId = authHeader.substring(7);
+            }
+          }
+
+          // 3. 从 Query 参数获取
+          if (!sessionId) {
+            sessionId = c.req.query('session');
+          }
+
           if (!sessionId) {
             return c.redirect('/admin/login');
           }
@@ -153,6 +179,7 @@ export function createServer(
             return c.redirect('/admin/login');
           }
         }
+        // 未设置密码时，允许访问所有 admin 页面（包括首次设置密码）
       } catch (error) {
         console.error('认证检查失败:', error);
       }
@@ -171,11 +198,6 @@ export function createServer(
       configPath,
       onConfigChange
     }));
-  }
-
-  // 密码管理路由
-  if (configPath) {
-    app.route('', createPasswordRoute({ configPath }));
   }
 
   // 统计页面路由
