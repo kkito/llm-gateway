@@ -17,6 +17,13 @@ export const Layout: FC<Props> = (props) => {
         />
       </head>
       <body>
+        <nav class="container-fluid">
+          <ul>
+            <li><a href="/admin/models">模型管理</a></li>
+            <li><a href="/admin/stats">统计 Dashboard</a></li>
+            <li><a href="/admin/password">密码设置</a></li>
+          </ul>
+        </nav>
         <main class="container">{props.children}</main>
       </body>
     </html>
