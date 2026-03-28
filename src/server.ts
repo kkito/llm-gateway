@@ -17,6 +17,7 @@ import { createStatsApiRoute } from './admin/routes/stats-api.js';
 import { createHomeRoute } from './user/routes/home.js';
 import { createLoginRoute } from './admin/routes/login.js';
 import { createPasswordRoute } from './admin/routes/password.js';
+import { createUsersRoute } from './admin/routes/users.js';
 import { authMiddleware, isPasswordConfigured, sessions } from './admin/middleware/auth.js';
 import { loadFullConfig } from './config.js';
 
@@ -205,6 +206,11 @@ export function createServer(
 
   // 统计 API 路由
   app.route('', createStatsApiRoute());
+
+  // 用户管理路由
+  if (configPath) {
+    app.route('', createUsersRoute());
+  }
 
   // 用户首页路由
   app.route('', createHomeRoute(() => currentConfig));

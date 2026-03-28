@@ -43,7 +43,7 @@ export function createLoginRoute(deps: RouteDeps) {
         proxyConfig.adminPassword = digest;
 
         // 保存配置
-        saveConfig(configPath, proxyConfig.models, digest);
+        saveConfig(proxyConfig, configPath);
 
         // 设置 Session
         const sessionId = generateSessionId();

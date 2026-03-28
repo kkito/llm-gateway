@@ -177,7 +177,19 @@ export function findProvider(config: ProviderConfig[], model: string): ProviderC
 /**
  * 保存配置到文件
  */
-export function saveConfig(configPath: string, config: ProviderConfig[], adminPassword?: string): void {
+export function saveConfig(config: ProxyConfig, configPath: string): void {
+  const dir = join(configPath, '..');
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
+  writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
+}
+
+/**
+ * 保存配置到文件（旧版本，保持向后兼容）
+ * @deprecated 请使用 saveConfig(config, configPath)
+ */
+export function saveConfigLegacy(configPath: string, config: ProviderConfig[], adminPassword?: string): void {
   const dir = join(configPath, '..');
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
@@ -194,7 +206,8 @@ export function saveConfig(configPath: string, config: ProviderConfig[], adminPa
  */
 export function createDefaultConfig(configPath: string): void {
   const defaultConfig: ProviderConfig[] = [];
-  saveConfig(configPath, defaultConfig);
+  const proxyConfig: ProxyConfig = { models: defaultConfig };
+  saveConfig(proxyConfig, configPath);
 }
 
 /**

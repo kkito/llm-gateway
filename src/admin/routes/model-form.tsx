@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import type { ProviderConfig } from '../../config.js';
+import type { ProviderConfig, ProxyConfig } from '../../config.js';
 import { saveConfig, loadConfig, updateConfigEntry, deleteConfigEntry } from '../../config.js';
 import { ModelFormPage } from '../views/model-form.js';
 import { ModelsPage } from '../views/models.js';
@@ -62,7 +62,8 @@ export function createModelFormRoute(deps: RouteDeps) {
 
       // 保存到文件
       const newConfigList = [...currentConfig, newConfig];
-      saveConfig(configPath, newConfigList);
+      const proxyConfig: ProxyConfig = { models: newConfigList };
+      saveConfig(proxyConfig, configPath);
 
       // 触发配置更新回调
       onConfigChange(newConfigList);
@@ -135,7 +136,8 @@ export function createModelFormRoute(deps: RouteDeps) {
       };
 
       const newConfigList = updateConfigEntry(currentConfig, oldModel, newEntry);
-      saveConfig(configPath, newConfigList);
+      const proxyConfig: ProxyConfig = { models: newConfigList };
+      saveConfig(proxyConfig, configPath);
 
       // 触发配置更新回调
       onConfigChange(newConfigList);
@@ -154,7 +156,8 @@ export function createModelFormRoute(deps: RouteDeps) {
 
     try {
       const newConfigList = deleteConfigEntry(currentConfig, modelParam);
-      saveConfig(configPath, newConfigList);
+      const proxyConfig: ProxyConfig = { models: newConfigList };
+      saveConfig(proxyConfig, configPath);
 
       // 触发配置更新回调
       onConfigChange(newConfigList);
@@ -198,7 +201,8 @@ export function createModelFormRoute(deps: RouteDeps) {
       newConfigList[currentIndex] = newConfigList[newIndex];
       newConfigList[newIndex] = temp;
 
-      saveConfig(configPath, newConfigList);
+      const proxyConfig: ProxyConfig = { models: newConfigList };
+      saveConfig(proxyConfig, configPath);
 
       // 触发配置更新回调
       onConfigChange(newConfigList);
