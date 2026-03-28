@@ -87,10 +87,14 @@ curl http://localhost:4000/v1/messages \
 - **首页**: http://localhost:4000/user/main
 - **模型管理**: http://localhost:4000/admin/models
 - **统计 Dashboard**: http://localhost:4000/admin/stats
+- **密码管理**: http://localhost:4000/admin/password
+
+> 🔐 首次访问管理后台时会自动提示设置密码，保护管理界面不被未授权访问。
 
 ## 文档
 
-详细使用教程请参考 [docs/README.md](docs/README.md)
+- 详细使用教程：[docs/user-guide.md](docs/user-guide.md)
+- Admin 密码认证功能：[docs/admin-password.md](docs/admin-password.md)
 
 ## License
 

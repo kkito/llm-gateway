@@ -407,7 +407,14 @@ llm-gateway-start -p 8080
 
 ---
 
+## 管理后台
+
+详细的管理后台使用说明和密码认证功能请参考：[admin-password.md](admin-password.md)
+
+---
+
 ## 下一步
 
-- 查看设计文档：`docs/superpowers/specs/2026-03-21-llm-proxy-design.md`
-- 查看格式转换说明：`src/proxy/docs/myproxy_anthropic_openai_conversion.md`
+- 查看设计文档：`superpowers/specs/2026-03-21-llm-proxy-design.md`
+- 查看格式转换说明：`../src/proxy/docs/myproxy_anthropic_openai_conversion.md`
+- 查看管理后台文档：[admin-password.md](admin-password.md)
