@@ -4,10 +4,13 @@ import type { ProviderConfig } from '../../config.js';
 
 interface Props {
   models: ProviderConfig[];
+  userName?: string;
 }
 
 export const HomePage: FC<Props> = (props) => {
   const firstModel = props.models.length > 0 ? props.models[0].customModel : '';
+  // 未启用认证时，userName 为 undefined，不显示欢迎信息
+  const userName = props.userName;
 
   return (
     <Layout title="LLM Gateway - 配置信息">
@@ -390,10 +393,25 @@ export const HomePage: FC<Props> = (props) => {
 
       {/* Hero 区域 */}
       <div class="hero">
-        <h1>🚀 LLM Gateway</h1>
-        <p class="hero-subtitle">
-          公司内部免费大模型 API · 支持 OpenAI / Anthropic 格式
-        </p>
+        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem'}}>
+          <div>
+            <h1>🚀 LLM Gateway</h1>
+            <p class="hero-subtitle">
+              公司内部免费大模型 API · 支持 OpenAI / Anthropic 格式
+            </p>
+          </div>
+          {userName && (
+            <div style={{textAlign: 'right'}}>
+              <p style={{margin: '0', fontSize: '0.85rem', color: 'var(--text-secondary)'}}>
+                欢迎，<strong style={{color: 'var(--primary)'}}>{userName}</strong>
+              </p>
+              <div style={{marginTop: '0.5rem'}}>
+                <a href="/user/stats" style={{color: 'var(--primary)', textDecoration: 'none', marginRight: '0.75rem', fontSize: '0.8rem'}}>统计</a>
+                <a href="/user/logout" style={{color: 'var(--primary)', textDecoration: 'none', fontSize: '0.8rem'}}>登出</a>
+              </div>
+            </div>
+          )}
+        </div>
         <div class="hero-notice">
           欢迎贡献 · <strong>账号被封概不负责</strong>
         </div>

@@ -71,7 +71,7 @@ export function createPasswordRoute(deps: RouteDeps) {
           
           // 删除密码
           delete proxyConfig.adminPassword;
-          saveConfig(configPath, proxyConfig.models);
+          saveConfig(proxyConfig, configPath);
 
           return c.html(<PasswordPage success="密码已删除" hasPassword={false} />);
         }
@@ -103,7 +103,7 @@ export function createPasswordRoute(deps: RouteDeps) {
 
         // 设置新密码
         proxyConfig.adminPassword = hashPassword(newPassword);
-        saveConfig(configPath, proxyConfig.models, proxyConfig.adminPassword);
+        saveConfig(proxyConfig, configPath);
 
         return c.html(<PasswordPage success="密码已更新" hasPassword={true} />);
       }

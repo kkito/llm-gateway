@@ -61,9 +61,9 @@ describe('API Key management', () => {
           updatedAt: 1700000000000
         }
       ];
-      
-      saveConfig(testConfigPath, [], undefined, apiKeys);
-      
+
+      saveConfig({ models: [], apiKeys }, testConfigPath);
+
       const config = loadFullConfig(testConfigPath);
       expect(config.apiKeys).toHaveLength(1);
       expect(config.apiKeys?.[0].name).toBe('New Key');

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { loadConfig, findProvider, getProxyDir, ProviderConfig, hashPassword, verifyPassword, ApiKey, addApiKey, getApiKey, updateApiKey, deleteApiKey, getApiKeyOptions } from '../src/config.js';
+import { loadConfig, findProvider, getProxyDir, ProviderConfig, hashPassword, verifyPassword, ApiKey, addApiKey, getApiKey, updateApiKey, deleteApiKey, getApiKeyOptions, UserApiKey, ProxyConfig } from '../src/config.js';
 import { writeFileSync, unlinkSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -255,6 +255,34 @@ describe('config', () => {
         expect(result[0]).toHaveProperty('name');
         expect(result[0]).toHaveProperty('provider');
       });
+    });
+  });
+
+  describe('UserApiKey config', () => {
+    it('should accept valid userApiKeys config', () => {
+      const config: ProxyConfig = {
+        models: [],
+        userApiKeys: [
+          { name: '用户 A', apikey: 'sk-lg-abc123def456', desc: '测试用' },
+          { name: '用户 B', apikey: 'sk-lg-xyz789uvw012' }
+        ]
+      };
+      expect(config.userApiKeys).toHaveLength(2);
+    });
+
+    it('should accept empty userApiKeys array', () => {
+      const config: ProxyConfig = {
+        models: [],
+        userApiKeys: []
+      };
+      expect(config.userApiKeys).toHaveLength(0);
+    });
+
+    it('should accept undefined userApiKeys', () => {
+      const config: ProxyConfig = {
+        models: []
+      };
+      expect(config.userApiKeys).toBeUndefined();
     });
   });
 });

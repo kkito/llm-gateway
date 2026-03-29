@@ -11,6 +11,9 @@ import {
   createStreamConverterState,
   type StreamConverterState
 } from '../converters/anthropic-to-openai.js';
+import { getCurrentUser } from '../user/middleware/auth.js';
+import { RateLimiter } from '../lib/rate-limiter.js';
+import { getProxyDir } from '../config.js';
 
 /**
  * 从 SSE chunks 构建完整的 OpenAI 响应
@@ -98,15 +101,20 @@ export function createChatCompletionsRoute(
   config: ProviderConfig[] | (() => ProviderConfig[]),
   logger: Logger,
   detailLogger: DetailLogger,
-  timeoutMs: number
+  timeoutMs: number,
+  logDir: string
 ) {
   const router = new Hono();
+  const rateLimiter = new RateLimiter(logDir);
 
   // 处理函数
   const handler = async (c: any, endpoint: string) => {
     const startTime = Date.now();
     const requestId = uuidv4();
     let customModel = 'unknown';
+    
+    // 获取当前用户
+    const currentUser = (c as any).currentUser || getCurrentUser(c);
 
     try {
       const body = await c.req.json();
@@ -132,12 +140,26 @@ export function createChatCompletionsRoute(
           statusCode: 404,
           durationMs: Date.now() - startTime,
           isStreaming: !!stream,
+          userName: currentUser?.name,
           error: { message: 'Model not found' }
         });
         return c.json({ error: { message: 'Model not found' } }, 404);
       }
 
       console.log(`   ✓ 匹配 provider: ${provider.customModel} -> ${provider.realModel} (${provider.provider})`);
+
+      // 检查使用限制
+      try {
+        const limitResult = await rateLimiter.checkLimits(provider, logDir);
+        if (limitResult.exceeded) {
+          console.log(`   ⚠️  [限制触发] ${limitResult.message}`);
+          const errorResponse = rateLimiter.createErrorResponse(limitResult.message!);
+          return c.json(errorResponse, 429);
+        }
+      } catch (error: any) {
+        console.log(`   ❌ [限制检查错误] ${error.message}`);
+        return c.json({ error: { message: error.message } }, 500);
+      }
 
       // 根据 provider 类型处理请求
       let upstreamBody: any;
@@ -195,8 +217,26 @@ export function createChatCompletionsRoute(
         method: 'POST',
         statusCode: response.status,
         durationMs: Date.now() - startTime,
-        isStreaming: !!stream
+        isStreaming: !!stream,
+        userName: currentUser?.name
       };
+
+      // 如果启用了用户认证但未认证用户调用，直接返回错误
+      if ((c as any).userAuthEnabled && !currentUser) {
+        logger.log({
+          timestamp: new Date().toISOString(),
+          requestId,
+          customModel: model,
+          endpoint,
+          method: 'POST',
+          statusCode: 401,
+          durationMs: Date.now() - startTime,
+          isStreaming: !!stream,
+          userName: currentUser?.name,
+          error: { message: 'Authentication required' }
+        });
+        return c.json({ error: { message: 'Authentication required' } }, 401);
+      }
 
       // 处理非流式响应
       if (response.ok && !stream) {
@@ -213,6 +253,13 @@ export function createChatCompletionsRoute(
             logEntry.cachedTokens = responseData.usage?.cache_read_input_tokens ?? null;
             console.log(`   🔄 [Anthropic→OpenAI 转换]`);
             logger.log(logEntry);
+            // 记录用量
+            const pricing = provider.inputPricePer1M !== undefined && provider.outputPricePer1M !== undefined && provider.cachedPricePer1M !== undefined ? {
+              inputPricePer1M: provider.inputPricePer1M,
+              outputPricePer1M: provider.outputPricePer1M,
+              cachedPricePer1M: provider.cachedPricePer1M
+            } : undefined;
+            rateLimiter.recordUsage(model, logEntry, pricing);
             return c.json(openaiResponse);
           } else {
             // OpenAI provider: 直接透传
@@ -222,6 +269,13 @@ export function createChatCompletionsRoute(
             // OpenAI 返回 prompt_tokens_details.cached_tokens
             logEntry.cachedTokens = responseData.usage?.prompt_tokens_details?.cached_tokens ?? null;
             logger.log(logEntry);
+            // 记录用量
+            const pricing = provider.inputPricePer1M !== undefined && provider.outputPricePer1M !== undefined && provider.cachedPricePer1M !== undefined ? {
+              inputPricePer1M: provider.inputPricePer1M,
+              outputPricePer1M: provider.outputPricePer1M,
+              cachedPricePer1M: provider.cachedPricePer1M
+            } : undefined;
+            rateLimiter.recordUsage(model, logEntry, pricing);
             return c.json(responseData);
           }
         } catch {
@@ -318,6 +372,14 @@ export function createChatCompletionsRoute(
                   // 记录流式请求的日志（包含 Token 信息）
                   logger.log(logEntry);
 
+                  // 记录用量
+                  const pricing = provider.inputPricePer1M !== undefined && provider.outputPricePer1M !== undefined && provider.cachedPricePer1M !== undefined ? {
+                    inputPricePer1M: provider.inputPricePer1M,
+                    outputPricePer1M: provider.outputPricePer1M,
+                    cachedPricePer1M: provider.cachedPricePer1M
+                  } : undefined;
+                  rateLimiter.recordUsage(model, logEntry, pricing);
+
                   controller.close();
                   break;
                 }
@@ -391,6 +453,7 @@ export function createChatCompletionsRoute(
         statusCode: 500,
         durationMs: Date.now() - startTime,
         isStreaming: false,
+        userName: currentUser?.name,
         error: { message: error.message || 'Internal error', type: error.name }
       });
 

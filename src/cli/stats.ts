@@ -2,11 +2,10 @@
 
 import { Command } from 'commander';
 import { existsSync } from 'fs';
-import { join } from 'path';
-import { getProxyDir } from '../config.js';
-import { 
-  loadStats, 
-  formatDateRange, 
+import { getProxyDir, getLogDir } from '../config.js';
+import {
+  loadStats,
+  formatDateRange,
   getLogFilesForRange,
   parseLogFile,
   createEmptyModelStats,
@@ -27,13 +26,11 @@ interface CliStatsOptions {
 }
 
 function resolveLogDir(options: CliStatsOptions): string {
-  const defaultDir = getProxyDir();
-  const userDir = options.dir || defaultDir;
-
+  // 如果用户指定了 --log-dir，使用用户值；否则使用默认日志目录
   if (options.logDir) {
     return options.logDir;
   }
-  return join(userDir, 'logs/proxy');
+  return getLogDir();
 }
 
 function formatModelStats(model: string, stats: ModelStats, indent = 2): string[] {

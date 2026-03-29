@@ -6,6 +6,16 @@ import { join } from 'path';
 
 export type ProviderType = 'openai' | 'anthropic';
 
+/**
+ * 模型使用限制配置
+ */
+export interface ModelLimit {
+  type: 'requests' | 'input_tokens' | 'cost';
+  period: 'day' | 'hours' | 'week' | 'month';
+  periodValue?: number;  // 当 period='hours' 时，指定小时数
+  max: number;           // 最大限制值
+}
+
 export interface ApiKey {
   id: string;
   name: string;
@@ -22,12 +32,26 @@ export interface ProviderConfig {
   baseUrl: string;
   provider: ProviderType;
   desc?: string;
+  inputPricePer1M?: number;    // 输入 token 每百万价格（美元）
+  outputPricePer1M?: number;   // 输出 token 每百万价格（美元）
+  cachedPricePer1M?: number;   // 缓存 token 每百万价格（美元）
+  limits?: ModelLimit[];       // 使用限制配置
+}
+
+/**
+ * 用户 API Key 配置
+ */
+export interface UserApiKey {
+  name: string;
+  apikey: string;
+  desc?: string;
 }
 
 export interface ProxyConfig {
   models: ProviderConfig[];
   adminPassword?: string; // SHA256 哈希值
   apiKeys?: ApiKey[];
+  userApiKeys?: UserApiKey[];
 }
 
 const REQUIRED_FIELDS = ['customModel', 'realModel', 'apiKey', 'baseUrl', 'provider'] as const;
@@ -59,6 +83,29 @@ export function getProxyDir(): string {
 }
 
 /**
+ * 获取配置文件路径（默认）
+ */
+export function getConfigPath(): string {
+  return join(getProxyDir(), 'config.json');
+}
+
+/**
+ * 获取日志目录路径（结构化日志）
+ * 默认：~/.llm-gateway/logs/proxy
+ */
+export function getLogDir(): string {
+  return join(getProxyDir(), 'logs/proxy');
+}
+
+/**
+ * 获取详细日志目录路径（请求/响应完整内容）
+ * 默认：~/.llm-gateway/logs
+ */
+export function getDetailLogDir(): string {
+  return join(getProxyDir(), 'logs');
+}
+
+/**
  * 验证配置项是否包含所有必需字段
  */
 function validateProviderConfig(config: any, index: number): void {
@@ -66,6 +113,30 @@ function validateProviderConfig(config: any, index: number): void {
     if (!config[field]) {
       throw new Error(`Missing required field: ${field} at index ${index}`);
     }
+  }
+}
+
+/**
+ * 验证 ModelLimit 配置
+ */
+function validateModelLimit(limit: any, index: number, modelIndex: number): void {
+  const validTypes = ['requests', 'input_tokens', 'cost'];
+  const validPeriods = ['day', 'hours', 'week', 'month'];
+  
+  if (!validTypes.includes(limit.type)) {
+    throw new Error(`Invalid limit type "${limit.type}" at model ${modelIndex}, limit ${index}. Valid types: ${validTypes.join(', ')}`);
+  }
+  
+  if (!validPeriods.includes(limit.period)) {
+    throw new Error(`Invalid limit period "${limit.period}" at model ${modelIndex}, limit ${index}. Valid periods: ${validPeriods.join(', ')}`);
+  }
+  
+  if (limit.period === 'hours' && typeof limit.periodValue !== 'number') {
+    throw new Error(`Missing periodValue for hours period at model ${modelIndex}, limit ${index}`);
+  }
+  
+  if (typeof limit.max !== 'number') {
+    throw new Error(`Missing or invalid max value at model ${modelIndex}, limit ${index}`);
   }
 }
 
@@ -79,6 +150,16 @@ function validateModelsArray(models: any): ProviderConfig[] {
 
   models.forEach((item: any, index: number) => {
     validateProviderConfig(item, index);
+    
+    // 验证 limits
+    if (item.limits) {
+      if (!Array.isArray(item.limits)) {
+        throw new Error(`limits must be an array at model ${index}`);
+      }
+      item.limits.forEach((limit: any, limitIndex: number) => {
+        validateModelLimit(limit, limitIndex, index);
+      });
+    }
   });
 
   return models as ProviderConfig[];
@@ -154,7 +235,8 @@ export function loadFullConfig(configPath: string): ProxyConfig {
     return {
       models: config.models,
       adminPassword: config.adminPassword,
-      apiKeys: config.apiKeys || []
+      apiKeys: config.apiKeys || [],
+      userApiKeys: config.userApiKeys
     };
   }
 
@@ -171,7 +253,19 @@ export function findProvider(config: ProviderConfig[], model: string): ProviderC
 /**
  * 保存配置到文件
  */
-export function saveConfig(configPath: string, config: ProviderConfig[], adminPassword?: string, apiKeys?: ApiKey[]): void {
+export function saveConfig(config: ProxyConfig, configPath: string): void {
+  const dir = join(configPath, '..');
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
+  writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
+}
+
+/**
+ * 保存配置到文件（旧版本，保持向后兼容）
+ * @deprecated 请使用 saveConfig(config, configPath)
+ */
+export function saveConfigLegacy(configPath: string, config: ProviderConfig[], adminPassword?: string, apiKeys?: ApiKey[]): void {
   const dir = join(configPath, '..');
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
@@ -191,7 +285,8 @@ export function saveConfig(configPath: string, config: ProviderConfig[], adminPa
  */
 export function createDefaultConfig(configPath: string): void {
   const defaultConfig: ProviderConfig[] = [];
-  saveConfig(configPath, defaultConfig);
+  const proxyConfig: ProxyConfig = { models: defaultConfig };
+  saveConfig(proxyConfig, configPath);
 }
 
 /**

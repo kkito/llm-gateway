@@ -39,7 +39,7 @@ export function createApiKeysRoute(deps: RouteDeps) {
       const newKey = addApiKey(proxyConfig.apiKeys || [], name, key, provider);
       const apiKeys = [...(proxyConfig.apiKeys || []), newKey];
 
-      saveConfig(configPath, proxyConfig.models, proxyConfig.adminPassword, apiKeys);
+      saveConfig({ ...proxyConfig, apiKeys }, configPath);
 
       const updatedApiKeys = getApiKeyOptions(apiKeys);
       return c.html(<ApiKeysPage apiKeys={updatedApiKeys} success="API Key 添加成功" />);
@@ -99,7 +99,7 @@ export function createApiKeysRoute(deps: RouteDeps) {
       }
 
       const apiKeys = updateApiKey(proxyConfig.apiKeys || [], id, updates);
-      saveConfig(configPath, proxyConfig.models, proxyConfig.adminPassword, apiKeys);
+      saveConfig({ ...proxyConfig, apiKeys }, configPath);
 
       const updatedApiKeys = getApiKeyOptions(apiKeys);
       return c.html(<ApiKeysPage apiKeys={updatedApiKeys} success="API Key 更新成功" />);
@@ -117,7 +117,7 @@ export function createApiKeysRoute(deps: RouteDeps) {
       const proxyConfig = loadFullConfig(configPath);
 
       const apiKeys = deleteApiKey(proxyConfig.apiKeys || [], id);
-      saveConfig(configPath, proxyConfig.models, proxyConfig.adminPassword, apiKeys);
+      saveConfig({ ...proxyConfig, apiKeys }, configPath);
 
       const updatedApiKeys = getApiKeyOptions(apiKeys);
       return c.html(<ApiKeysPage apiKeys={updatedApiKeys} success="API Key 已删除" />);

@@ -6,13 +6,13 @@ import { join } from 'path';
  * 将请求/响应的完整内容输出到文件，避免控制台输出过于冗长
  *
  * 文件命名格式：{requestId}_{stage}.log
- * 输出目录：logs/（相对于项目根目录）
+ * 输出目录：由调用方指定（推荐使用 getDetailLogDir() 获取默认目录）
  */
 export class DetailLogger {
   private logDir: string;
   private enabled: boolean;
 
-  constructor(logDir: string = 'logs', enabled: boolean = false) {
+  constructor(logDir: string, enabled: boolean = false) {
     this.logDir = logDir;
     this.enabled = enabled;
     if (!existsSync(logDir)) {

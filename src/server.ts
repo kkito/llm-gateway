@@ -15,11 +15,17 @@ import { createModelFormRoute } from './admin/routes/model-form.js';
 import { createStatsRoute } from './admin/routes/stats.js';
 import { createStatsApiRoute } from './admin/routes/stats-api.js';
 import { createHomeRoute } from './user/routes/home.js';
+import { createLoginRoute as createUserLoginRoute } from './user/routes/login.js';
+import { createStatsRoute as createUserStatsRoute } from './user/routes/stats.js';
+import { createLogoutRoute } from './user/routes/logout.js';
 import { createLoginRoute } from './admin/routes/login.js';
 import { createPasswordRoute } from './admin/routes/password.js';
 import { createApiKeysRoute } from './admin/routes/api-keys.js';
+import { createUsersRoute } from './admin/routes/users.js';
 import { authMiddleware, isPasswordConfigured, sessions } from './admin/middleware/auth.js';
+import { createUserAuthMiddleware } from './user/middleware/auth.js';
 import { loadFullConfig } from './config.js';
+import { join as pathJoin } from 'path';
 
 // 获取当前模块目录 (用于静态文件服务)
 const __filename = fileURLToPath(import.meta.url);
@@ -33,6 +39,9 @@ export function createServer(
   configPath?: string
 ): Hono {
   const app = new Hono();
+
+  // 从 logger 获取 logDir
+  const logDir = pathJoin(logger.getFilePath(), '..');
 
   // 可变配置引用，用于热加载
   let currentConfig = config;
@@ -107,12 +116,35 @@ export function createServer(
     await next();
   });
 
+  // 用户登录路由（需要在认证中间件之前注册）
+  if (configPath) {
+    app.route('/user/login', createUserLoginRoute({ configPath }));
+  }
+
+  // 用户登出路由（需要在认证中间件之前注册）
+  app.route('', createLogoutRoute());
+
+  // 用户统计路由（需要在认证中间件之前注册，因为它内部处理认证）
+  if (configPath) {
+    app.route('/user/stats', createUserStatsRoute(configPath));
+  }
+
+  // 用户认证中间件 - 应用到所有 API 路由（仅在配置 userApiKeys 时）
+  // 注意：必须在 /user/login 和 /user/stats 之后注册，这样这些路由不会被中间件拦截
+  if (configPath) {
+    app.use('/user/*', createUserAuthMiddleware(configPath));
+    app.use('/v1/*', createUserAuthMiddleware(configPath));
+    app.use('/chat/completions', createUserAuthMiddleware(configPath));
+    app.use('/messages', createUserAuthMiddleware(configPath));
+  }
+
   // 聊天完成路由
   app.route('', createChatCompletionsRoute(
     () => currentConfig,
     logger,
     detailLogger,
-    timeoutMs
+    timeoutMs,
+    logDir
   ));
 
   // 消息路由
@@ -120,7 +152,8 @@ export function createServer(
     () => currentConfig,
     logger,
     detailLogger,
-    timeoutMs
+    timeoutMs,
+    logDir
   ));
 
   // 登录路由（无需认证）
@@ -212,8 +245,13 @@ export function createServer(
   // 统计 API 路由
   app.route('', createStatsApiRoute());
 
+  // 用户管理路由
+  if (configPath) {
+    app.route('', createUsersRoute(configPath));
+  }
+
   // 用户首页路由
-  app.route('', createHomeRoute(() => currentConfig));
+  app.route('', createHomeRoute(() => currentConfig, configPath));
 
   return app;
 }
