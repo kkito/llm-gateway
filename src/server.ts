@@ -17,6 +17,7 @@ import { createStatsApiRoute } from './admin/routes/stats-api.js';
 import { createHomeRoute } from './user/routes/home.js';
 import { createLoginRoute } from './admin/routes/login.js';
 import { createPasswordRoute } from './admin/routes/password.js';
+import { createApiKeysRoute } from './admin/routes/api-keys.js';
 import { authMiddleware, isPasswordConfigured, sessions } from './admin/middleware/auth.js';
 import { loadFullConfig } from './config.js';
 
@@ -130,6 +131,11 @@ export function createServer(
   // 密码管理路由（需在认证中间件之前注册，因为它内部处理认证逻辑）
   if (configPath) {
     app.route('', createPasswordRoute({ configPath }));
+  }
+
+  // API Keys 管理路由
+  if (configPath) {
+    app.route('', createApiKeysRoute({ configPath }));
   }
 
   // 为 /admin/* 路由添加认证中间件（仅在已配置密码时）
