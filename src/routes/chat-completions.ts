@@ -114,7 +114,7 @@ export function createChatCompletionsRoute(
     let customModel = 'unknown';
     
     // 获取当前用户
-    const currentUser = getCurrentUser(c);
+    const currentUser = (c as any).currentUser || getCurrentUser(c);
 
     try {
       const body = await c.req.json();
@@ -220,6 +220,23 @@ export function createChatCompletionsRoute(
         isStreaming: !!stream,
         userName: currentUser?.name
       };
+
+      // 如果启用了用户认证但未认证用户调用，直接返回错误
+      if ((c as any).userAuthEnabled && !currentUser) {
+        logger.log({
+          timestamp: new Date().toISOString(),
+          requestId,
+          customModel: model,
+          endpoint,
+          method: 'POST',
+          statusCode: 401,
+          durationMs: Date.now() - startTime,
+          isStreaming: !!stream,
+          userName: currentUser?.name,
+          error: { message: 'Authentication required' }
+        });
+        return c.json({ error: { message: 'Authentication required' } }, 401);
+      }
 
       // 处理非流式响应
       if (response.ok && !stream) {

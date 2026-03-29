@@ -128,11 +128,13 @@ export function createServer(
     app.route('/user/stats', createUserStatsRoute(configPath));
   }
 
-  // 用户认证中间件 - 应用到 /user/* 和 /v1/* 路由（仅在已配置 userApiKeys 时）
+  // 用户认证中间件 - 应用到所有 API 路由（仅在配置 userApiKeys 时）
   // 注意：必须在 /user/login 和 /user/stats 之后注册，这样这些路由不会被中间件拦截
   if (configPath) {
     app.use('/user/*', createUserAuthMiddleware(configPath));
     app.use('/v1/*', createUserAuthMiddleware(configPath));
+    app.use('/chat/completions', createUserAuthMiddleware(configPath));
+    app.use('/messages', createUserAuthMiddleware(configPath));
   }
 
   // 聊天完成路由
@@ -239,7 +241,7 @@ export function createServer(
 
   // 用户管理路由
   if (configPath) {
-    app.route('', createUsersRoute());
+    app.route('', createUsersRoute(configPath));
   }
 
   // 用户首页路由

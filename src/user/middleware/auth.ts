@@ -60,6 +60,9 @@ export function createUserAuthMiddleware(configPath: string) {
   return async (c: Context, next: Next) => {
     const config = loadFullConfig(configPath);
     const isAuthEnabled = config.userApiKeys && config.userApiKeys.length > 0;
+    
+    // 将认证状态注入上下文
+    (c as any).userAuthEnabled = isAuthEnabled;
 
     // 未启用认证，直接放行
     if (!isAuthEnabled) {
@@ -90,12 +93,22 @@ export function createUserAuthMiddleware(configPath: string) {
       c.req.header('x-api-key');
 
     if (!apiKey) {
+      // Web 页面请求，重定向到登录页
+      if (c.req.path.startsWith('/user/')) {
+        return c.redirect('/user/login');
+      }
+      // API 请求，返回 401
       return c.json({ error: { message: 'Missing API Key' } }, 401);
     }
 
     // 验证 API Key 是否存在
     const validUser = config.userApiKeys?.find(u => u.apikey === apiKey);
     if (!validUser) {
+      // Web 页面请求，重定向到登录页
+      if (c.req.path.startsWith('/user/')) {
+        return c.redirect('/user/login');
+      }
+      // API 请求，返回 401
       return c.json({ error: { message: 'Invalid API Key' } }, 401);
     }
 
