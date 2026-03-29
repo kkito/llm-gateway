@@ -5,6 +5,7 @@ import type { ProviderConfig, ProviderType } from '../../config.js';
 interface Props {
   model?: ProviderConfig;
   error?: string;
+  apiKeyOptions?: { id: string; name: string; provider: string }[];
 }
 
 export const ModelFormPage: FC<Props> = (props) => {
@@ -79,13 +80,37 @@ export const ModelFormPage: FC<Props> = (props) => {
 
         <label>
           API Key
-          <input
-            name="apiKey"
-            type="password"
-            placeholder={isEdit ? '留空则保持原密钥不变' : '请输入 API Key'}
-            value={isEdit ? '' : (props.model?.apiKey || '')}
-            required={!isEdit}
-          />
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <select
+              name="apiKeySource"
+              onchange={(e: Event) => {
+                const target = e.target as HTMLSelectElement;
+                const manualInput = document.getElementById('apiKeyManual') as HTMLInputElement;
+                if (target.value === 'manual') {
+                  if (manualInput) manualInput.disabled = false;
+                } else {
+                  if (manualInput) {
+                    manualInput.disabled = true;
+                    manualInput.value = '';
+                  }
+                }
+              }}
+            >
+              <option value="manual">手动输入...</option>
+              {props.apiKeyOptions?.map((opt) => (
+                <option value={opt.id}>{opt.name} ({opt.provider})</option>
+              ))}
+            </select>
+            <input
+              id="apiKeyManual"
+              name="apiKey"
+              type="password"
+              placeholder={isEdit ? '留空则保持原密钥不变' : '请输入 API Key'}
+              value={isEdit ? '' : (props.model?.apiKey || '')}
+              required={!isEdit}
+              style={{ flex: 1 }}
+            />
+          </div>
           {isEdit && <small>留空则保持原密钥不变</small>}
         </label>
 
