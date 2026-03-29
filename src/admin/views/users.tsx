@@ -10,9 +10,12 @@ export interface UserApiKey {
 interface Props {
   users: UserApiKey[];
   error?: string;
+  authEnabled?: boolean;
 }
 
 export const UsersPage: FC<Props> = (props) => {
+  const authEnabled = props.authEnabled !== false;
+
   return (
     <Layout title="用户管理">
       <h1>用户管理</h1>
@@ -23,12 +26,37 @@ export const UsersPage: FC<Props> = (props) => {
         </article>
       )}
 
-      <a href="/admin/users/new" role="button">
-        新增用户
-      </a>
+      <div style={{display: 'flex', gap: '0.5rem', marginBottom: '1rem', alignItems: 'center'}}>
+        <a href="/admin/users/new" role="button">
+          新增用户
+        </a>
+        
+        {/* 启用/禁用切换按钮 */}
+        <form method="post" action="/admin/users/toggle" style={{display: 'inline'}}>
+          <input type="hidden" name="enabled" value={authEnabled ? 'false' : 'true'} />
+          <button
+            type="submit"
+            class="secondary"
+            style={{
+              backgroundColor: authEnabled ? '#dc2626' : '#10b981',
+              color: 'white',
+              border: 'none',
+              padding: '0.5rem 1rem',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            {authEnabled ? '禁用用户认证' : '启用用户认证'}
+          </button>
+        </form>
+      </div>
 
       {props.users.length === 0 ? (
-        <p style={{ marginTop: '1rem', color: '#666' }}>暂无用户，请点击"新增用户"添加</p>
+        <p style={{ marginTop: '1rem', color: '#666' }}>
+          {authEnabled 
+            ? '暂无用户，请点击"新增用户"添加'
+            : '用户认证已禁用，所有用户均可直接访问'}
+        </p>
       ) : (
         <>
           <table>
@@ -49,6 +77,12 @@ export const UsersPage: FC<Props> = (props) => {
                   </td>
                   <td>{user.desc || '-'}</td>
                   <td>
+                    <a
+                      href={`/admin/users/edit/${user.name}`}
+                      style={{marginRight: '0.5rem'}}
+                    >
+                      编辑
+                    </a>
                     <button
                       type="button"
                       class="secondary"

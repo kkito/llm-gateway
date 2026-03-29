@@ -233,7 +233,7 @@ export function createServer(
 
   // 用户管理路由
   if (configPath) {
-    app.route('', createUsersRoute());
+    app.route('', createUsersRoute(configPath));
   }
 
   // 用户首页路由

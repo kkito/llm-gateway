@@ -24,7 +24,8 @@ export function createHomeRoute(config: ProviderConfig[] | (() => ProviderConfig
     // 未启用认证时，直接显示页面（无需登录）
     if (!isAuthEnabled) {
       const currentConfig = typeof config === 'function' ? config() : config;
-      return c.html(<HomePage models={currentConfig} userName="Guest" />);
+      // 未启用认证时，不显示用户名（无 Guest 概念）
+      return c.html(<HomePage models={currentConfig} userName={undefined} />);
     }
 
     // 已启用认证，需要登录
