@@ -5,7 +5,7 @@ import type { ProviderConfig, ProviderType } from '../../config.js';
 interface Props {
   model?: ProviderConfig;
   error?: string;
-  apiKeyOptions?: { id: string; name: string; provider: string }[];
+  apiKeyOptions?: { id: string; name: string }[];
 }
 
 export const ModelFormPage: FC<Props> = (props) => {
@@ -80,25 +80,15 @@ export const ModelFormPage: FC<Props> = (props) => {
 
         <label>
           API Key
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <select
               name="apiKeySource"
-              onchange={(e: Event) => {
-                const target = e.target as HTMLSelectElement;
-                const manualInput = document.getElementById('apiKeyManual') as HTMLInputElement;
-                if (target.value === 'manual') {
-                  if (manualInput) manualInput.disabled = false;
-                } else {
-                  if (manualInput) {
-                    manualInput.disabled = true;
-                    manualInput.value = '';
-                  }
-                }
-              }}
+              onchange="const manualInput = document.getElementById('apiKeyManual'); if (this.value === 'manual') { manualInput.disabled = false; manualInput.required = true; manualInput.focus(); } else { manualInput.disabled = true; manualInput.value = ''; manualInput.required = false; }"
+              style={{ maxWidth: '300px' }}
             >
               <option value="manual">手动输入...</option>
               {props.apiKeyOptions?.map((opt) => (
-                <option value={opt.id}>{opt.name} ({opt.provider})</option>
+                <option value={opt.id}>{opt.name}</option>
               ))}
             </select>
             <input
@@ -108,8 +98,9 @@ export const ModelFormPage: FC<Props> = (props) => {
               placeholder={isEdit ? '留空则保持原密钥不变' : '请输入 API Key'}
               value={isEdit ? '' : (props.model?.apiKey || '')}
               required={!isEdit}
-              style={{ flex: 1 }}
+              style={{ width: '100%', boxSizing: 'border-box' }}
             />
+            <small>可以选择已保存的 API Key，或手动输入</small>
           </div>
           {isEdit && <small>留空则保持原密钥不变</small>}
         </label>

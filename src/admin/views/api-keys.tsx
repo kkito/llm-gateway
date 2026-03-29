@@ -1,6 +1,6 @@
 import { FC } from 'hono/jsx';
 import { Layout } from '../components/Layout.js';
-import type { ApiKey, ProviderType } from '../../config.js';
+import type { ApiKey } from '../../config.js';
 
 interface Props {
   apiKeys: Omit<ApiKey, 'key'>[];
@@ -38,7 +38,6 @@ export const ApiKeysPage: FC<Props> = (props) => {
             <thead>
               <tr>
                 <th>名称</th>
-                <th>Provider</th>
                 <th>创建时间</th>
                 <th>操作</th>
               </tr>
@@ -47,7 +46,6 @@ export const ApiKeysPage: FC<Props> = (props) => {
               {props.apiKeys.map((key) => (
                 <tr key={key.id}>
                   <td>{key.name}</td>
-                  <td>{key.provider === 'openai' ? 'OpenAI' : 'Anthropic'}</td>
                   <td>{new Date(key.createdAt).toLocaleDateString()}</td>
                   <td>
                     <a href={`/admin/api-keys/edit/${key.id}`}>编辑</a>
@@ -73,30 +71,11 @@ export const ApiKeysPage: FC<Props> = (props) => {
             <input
               name="name"
               type="text"
-              placeholder="例如：我的 OpenAI Key"
+              placeholder="例如：我的 API Key"
               value={props.editingKey?.name || ''}
               required
             />
             <small>用于识别此 API Key</small>
-          </label>
-
-          <label>
-            Provider
-            <select name="provider" required>
-              <option value="">请选择...</option>
-              <option
-                value="openai"
-                selected={props.editingKey?.provider === 'openai'}
-              >
-                OpenAI
-              </option>
-              <option
-                value="anthropic"
-                selected={props.editingKey?.provider === 'anthropic'}
-              >
-                Anthropic
-              </option>
-            </select>
           </label>
 
           <label>

@@ -201,11 +201,10 @@ describe('config', () => {
 
     describe('addApiKey', () => {
       it('should add a new API key', () => {
-        const result = addApiKey([], 'Test Key', 'sk-test', 'openai');
+        const result = addApiKey([], 'Test Key', 'sk-test');
         expect(result).toBeDefined();
         expect(result.name).toBe('Test Key');
         expect(result.key).toBe('sk-test');
-        expect(result.provider).toBe('openai');
         expect(result.id).toBeDefined();
         expect(result.createdAt).toBeDefined();
       });

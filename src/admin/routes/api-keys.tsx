@@ -27,16 +27,15 @@ export function createApiKeysRoute(deps: RouteDeps) {
       const body = await c.req.parseBody();
       const name = body.name as string;
       const key = body.key as string;
-      const provider = body.provider as 'openai' | 'anthropic';
 
-      if (!name || !key || !provider) {
+      if (!name || !key) {
         const proxyConfig = loadFullConfig(configPath);
         const apiKeys = getApiKeyOptions(proxyConfig.apiKeys || []);
         return c.html(<ApiKeysPage apiKeys={apiKeys} error="请填写所有必填字段" />);
       }
 
       const proxyConfig = loadFullConfig(configPath);
-      const newKey = addApiKey(proxyConfig.apiKeys || [], name, key, provider);
+      const newKey = addApiKey(proxyConfig.apiKeys || [], name, key);
       const apiKeys = [...(proxyConfig.apiKeys || []), newKey];
 
       saveConfig({ ...proxyConfig, apiKeys }, configPath);
@@ -79,12 +78,11 @@ export function createApiKeysRoute(deps: RouteDeps) {
       const body = await c.req.parseBody();
       const name = body.name as string;
       const key = body.key as string;
-      const provider = body.provider as 'openai' | 'anthropic';
 
       const proxyConfig = loadFullConfig(configPath);
       const currentApiKey = getApiKey(proxyConfig.apiKeys || [], id);
 
-      if (!name || !provider) {
+      if (!name) {
         const apiKeys = getApiKeyOptions(proxyConfig.apiKeys || []);
         if (currentApiKey) {
           const { key: _removed, ...editingKey } = currentApiKey;
@@ -93,7 +91,7 @@ export function createApiKeysRoute(deps: RouteDeps) {
         return c.html(<ApiKeysPage apiKeys={apiKeys} error="请填写所有必填字段" />);
       }
 
-      const updates: Partial<ApiKey> = { name, provider };
+      const updates: Partial<ApiKey> = { name };
       if (key) {
         updates.key = key;
       }

@@ -20,7 +20,6 @@ export interface ApiKey {
   id: string;
   name: string;
   key: string;
-  provider: ProviderType;
   createdAt: number;
   updatedAt: number;
 }
@@ -333,15 +332,13 @@ function generateId(): string {
 export function addApiKey(
   config: ApiKey[],
   name: string,
-  key: string,
-  provider: ProviderType
+  key: string
 ): ApiKey {
   const now = Date.now();
   const newKey: ApiKey = {
     id: generateId(),
     name,
     key,
-    provider,
     createdAt: now,
     updatedAt: now
   };
