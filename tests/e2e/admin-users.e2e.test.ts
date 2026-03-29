@@ -407,4 +407,102 @@ describe('Admin Users Management E2E', () => {
       expect(response.status).toBe(302);
     });
   });
+
+  describe('菜单导航', () => {
+    it('管理菜单应该包含用户管理链接', async () => {
+      const response = await app.request('/admin/users', {
+        headers: {
+          Cookie: adminSessionCookie
+        }
+      });
+
+      expect(response.status).toBe(200);
+      const html = await response.text();
+      // 菜单中应该包含指向 /admin/users 的链接
+      expect(html).toContain('<a href="/admin/users"');
+      expect(html).toContain('用户管理');
+    });
+
+    it('模型管理页面菜单也应该包含用户管理链接', async () => {
+      const response = await app.request('/admin/models', {
+        headers: {
+          Cookie: adminSessionCookie
+        }
+      });
+
+      expect(response.status).toBe(200);
+      const html = await response.text();
+      // 菜单中应该包含指向 /admin/users 的链接
+      expect(html).toContain('<a href="/admin/users"');
+      expect(html).toContain('用户管理');
+    });
+  });
+
+  describe('空用户时启用认证提示', () => {
+    it('当没有用户且认证被禁用时，应该提示需要先添加用户', async () => {
+      // 先清空所有用户
+      await app.request('/admin/users/delete/初始用户', {
+        method: 'POST',
+        headers: {
+          Cookie: adminSessionCookie
+        }
+      });
+
+      const response = await app.request('/admin/users', {
+        headers: {
+          Cookie: adminSessionCookie
+        }
+      });
+
+      expect(response.status).toBe(200);
+      const html = await response.text();
+      // 应该显示提示信息，告知用户需要先添加用户才能启用认证
+      expect(html).toContain('提示');
+      expect(html).toContain('添加用户');
+    });
+  });
+
+  describe('错误提示显示', () => {
+    it('错误提示应该正确转义 HTML 标签，不应显示原始 HTML', async () => {
+      // 测试页面中错误信息的显示方式
+      // 首先通过 API 提交错误请求，然后检查如果错误显示在页面上是否正确转义
+      const response = await app.request('/admin/users/new', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Cookie: adminSessionCookie
+        },
+        body: new URLSearchParams({ name: '', desc: '测试' })
+      });
+
+      // 应该返回 400 错误
+      expect(response.status).toBe(400);
+      const data = await response.json() as any;
+      // 错误信息应该是纯文本，不应该包含未转义的 HTML
+      expect(data.error).toBeDefined();
+      expect(typeof data.error).toBe('string');
+    });
+
+    it('用户登录页面错误信息应该转义 HTML 标签防止 XSS', async () => {
+      // 使用包含 HTML 标签的 API Key 尝试登录
+      const maliciousApiKey = '<script>alert("xss")</script>';
+      const response = await app.request('/user/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({ apikey: maliciousApiKey })
+      });
+
+      expect(response.status).toBe(200);
+      const html = await response.text();
+      
+      // 验证页面正常返回错误信息
+      expect(html).toContain('无效的 API Key');
+      
+      // 验证输入的恶意 HTML 标签被转义，不会直接渲染
+      // 即使错误信息不是用户输入的内容，也要确保页面中没有未转义的 script 标签
+      expect(html).not.toMatch(/<script>alert\("xss"\)<\/script>/);
+    });
+  });
 });

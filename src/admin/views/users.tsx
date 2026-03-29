@@ -15,6 +15,7 @@ interface Props {
 
 export const UsersPage: FC<Props> = (props) => {
   const authEnabled = props.authEnabled !== false;
+  const hasUsers = props.users.length > 0;
 
   return (
     <Layout title="用户管理">
@@ -30,7 +31,7 @@ export const UsersPage: FC<Props> = (props) => {
         <a href="/admin/users/new" role="button">
           新增用户
         </a>
-        
+
         {/* 启用/禁用切换按钮 */}
         <form method="post" action="/admin/users/toggle" style={{display: 'inline'}}>
           <input type="hidden" name="enabled" value={authEnabled ? 'false' : 'true'} />
@@ -43,17 +44,26 @@ export const UsersPage: FC<Props> = (props) => {
               border: 'none',
               padding: '0.5rem 1rem',
               borderRadius: '4px',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              opacity: !authEnabled && !hasUsers ? 0.5 : 1
             }}
+            disabled={!authEnabled && !hasUsers}
           >
             {authEnabled ? '禁用用户认证' : '启用用户认证'}
           </button>
         </form>
+
+        {/* 空用户时的提示信息 */}
+        {!authEnabled && !hasUsers && (
+          <span style={{color: '#666', fontSize: '0.9rem'}}>
+            提示：请先添加用户后再启用认证
+          </span>
+        )}
       </div>
 
       {props.users.length === 0 ? (
         <p style={{ marginTop: '1rem', color: '#666' }}>
-          {authEnabled 
+          {authEnabled
             ? '暂无用户，请点击"新增用户"添加'
             : '用户认证已禁用，所有用户均可直接访问'}
         </p>
