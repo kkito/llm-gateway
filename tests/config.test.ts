@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { loadConfig, findProvider, getProxyDir, ProviderConfig, hashPassword, verifyPassword } from '../src/config.js';
+import { loadConfig, findProvider, getProxyDir, ProviderConfig, hashPassword, verifyPassword, ApiKey, addApiKey, getApiKey, updateApiKey, deleteApiKey, getApiKeyOptions } from '../src/config.js';
 import { writeFileSync, unlinkSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -176,6 +176,85 @@ describe('config', () => {
       const hash = hashPassword(password);
       expect(verifyPassword(password, hash)).toBe(true);
       expect(verifyPassword('wrong password', hash)).toBe(false);
+    });
+  });
+
+  describe('ApiKey operations', () => {
+    const testApiKeys: ApiKey[] = [
+      {
+        id: 'test-uuid-1',
+        name: 'My OpenAI Key',
+        key: 'sk-test-openai',
+        provider: 'openai',
+        createdAt: 1700000000000,
+        updatedAt: 1700000000000
+      },
+      {
+        id: 'test-uuid-2',
+        name: 'My Anthropic Key',
+        key: 'sk-ant-test-anthropic',
+        provider: 'anthropic',
+        createdAt: 1700000000000,
+        updatedAt: 1700000000000
+      }
+    ];
+
+    describe('addApiKey', () => {
+      it('should add a new API key', () => {
+        const result = addApiKey([], 'Test Key', 'sk-test', 'openai');
+        expect(result).toBeDefined();
+        expect(result.name).toBe('Test Key');
+        expect(result.key).toBe('sk-test');
+        expect(result.provider).toBe('openai');
+        expect(result.id).toBeDefined();
+        expect(result.createdAt).toBeDefined();
+      });
+    });
+
+    describe('getApiKey', () => {
+      it('should find API key by id', () => {
+        const result = getApiKey(testApiKeys, 'test-uuid-1');
+        expect(result).toBeDefined();
+        expect(result?.name).toBe('My OpenAI Key');
+      });
+
+      it('should return null for unknown id', () => {
+        const result = getApiKey(testApiKeys, 'unknown-id');
+        expect(result).toBeNull();
+      });
+    });
+
+    describe('updateApiKey', () => {
+      it('should update API key', () => {
+        const result = updateApiKey(testApiKeys, 'test-uuid-1', { name: 'Updated Key' });
+        expect(result[0].name).toBe('Updated Key');
+      });
+
+      it('should throw error for unknown id', () => {
+        expect(() => updateApiKey(testApiKeys, 'unknown', { name: 'Test' })).toThrow('API Key not found');
+      });
+    });
+
+    describe('deleteApiKey', () => {
+      it('should delete API key', () => {
+        const result = deleteApiKey(testApiKeys, 'test-uuid-1');
+        expect(result).toHaveLength(1);
+        expect(result[0].id).toBe('test-uuid-2');
+      });
+
+      it('should throw error for unknown id', () => {
+        expect(() => deleteApiKey(testApiKeys, 'unknown')).toThrow('API Key not found');
+      });
+    });
+
+    describe('getApiKeyOptions', () => {
+      it('should return options without key field', () => {
+        const result = getApiKeyOptions(testApiKeys);
+        expect(result[0]).not.toHaveProperty('key');
+        expect(result[0]).toHaveProperty('id');
+        expect(result[0]).toHaveProperty('name');
+        expect(result[0]).toHaveProperty('provider');
+      });
     });
   });
 });

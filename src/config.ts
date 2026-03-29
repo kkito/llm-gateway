@@ -1,9 +1,19 @@
 import { createHash } from 'crypto';
+import { randomUUID } from 'crypto';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 
 export type ProviderType = 'openai' | 'anthropic';
+
+export interface ApiKey {
+  id: string;
+  name: string;
+  key: string;
+  provider: ProviderType;
+  createdAt: number;
+  updatedAt: number;
+}
 
 export interface ProviderConfig {
   customModel: string;
@@ -17,6 +27,7 @@ export interface ProviderConfig {
 export interface ProxyConfig {
   models: ProviderConfig[];
   adminPassword?: string; // SHA256 哈希值
+  apiKeys?: ApiKey[];
 }
 
 const REQUIRED_FIELDS = ['customModel', 'realModel', 'apiKey', 'baseUrl', 'provider'] as const;
@@ -131,7 +142,7 @@ export function loadFullConfig(configPath: string): ProxyConfig {
     config.forEach((item: any, index: number) => {
       validateProviderConfig(item, index);
     });
-    return { models: config };
+    return { models: config, apiKeys: [] };
   }
 
   // 新格式：对象，包含 models 数组
@@ -142,7 +153,8 @@ export function loadFullConfig(configPath: string): ProxyConfig {
     validateModelsArray(config.models);
     return {
       models: config.models,
-      adminPassword: config.adminPassword
+      adminPassword: config.adminPassword,
+      apiKeys: config.apiKeys || []
     };
   }
 
@@ -159,7 +171,7 @@ export function findProvider(config: ProviderConfig[], model: string): ProviderC
 /**
  * 保存配置到文件
  */
-export function saveConfig(configPath: string, config: ProviderConfig[], adminPassword?: string): void {
+export function saveConfig(configPath: string, config: ProviderConfig[], adminPassword?: string, apiKeys?: ApiKey[]): void {
   const dir = join(configPath, '..');
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
@@ -167,6 +179,9 @@ export function saveConfig(configPath: string, config: ProviderConfig[], adminPa
   const proxyConfig: ProxyConfig = { models: config };
   if (adminPassword) {
     proxyConfig.adminPassword = adminPassword;
+  }
+  if (apiKeys) {
+    proxyConfig.apiKeys = apiKeys;
   }
   writeFileSync(configPath, JSON.stringify(proxyConfig, null, 2), 'utf-8');
 }
@@ -208,4 +223,75 @@ export function deleteConfigEntry(
     throw new Error(`未找到模型：${customModel}`);
   }
   return config.filter(p => p.customModel !== customModel);
+}
+
+/**
+ * 生成 UUID
+ */
+function generateId(): string {
+  return randomUUID();
+}
+
+/**
+ * 添加 API Key
+ */
+export function addApiKey(
+  config: ApiKey[],
+  name: string,
+  key: string,
+  provider: ProviderType
+): ApiKey {
+  const now = Date.now();
+  const newKey: ApiKey = {
+    id: generateId(),
+    name,
+    key,
+    provider,
+    createdAt: now,
+    updatedAt: now
+  };
+  return newKey;
+}
+
+/**
+ * 更新 API Key
+ */
+export function updateApiKey(
+  config: ApiKey[],
+  id: string,
+  updates: Partial<Omit<ApiKey, 'id' | 'createdAt'>>
+): ApiKey[] {
+  const index = config.findIndex(k => k.id === id);
+  if (index === -1) {
+    throw new Error(`API Key not found: ${id}`);
+  }
+  const updated = { ...config[index], ...updates, updatedAt: Date.now() };
+  const newConfig = [...config];
+  newConfig[index] = updated;
+  return newConfig;
+}
+
+/**
+ * 删除 API Key
+ */
+export function deleteApiKey(config: ApiKey[], id: string): ApiKey[] {
+  const index = config.findIndex(k => k.id === id);
+  if (index === -1) {
+    throw new Error(`API Key not found: ${id}`);
+  }
+  return config.filter(k => k.id !== id);
+}
+
+/**
+ * 获取单个 API Key
+ */
+export function getApiKey(config: ApiKey[], id: string): ApiKey | null {
+  return config.find(k => k.id === id) || null;
+}
+
+/**
+ * 获取下拉选项（不返回 key 本身）
+ */
+export function getApiKeyOptions(config: ApiKey[]): Omit<ApiKey, 'key'>[] {
+  return config.map(({ key, ...rest }) => rest);
 }
