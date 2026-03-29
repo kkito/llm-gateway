@@ -22,6 +22,7 @@ export const Layout: FC<Props> = (props) => {
             <li><a href="/admin/models">模型管理</a></li>
             <li><a href="/admin/stats">统计 Dashboard</a></li>
             <li><a href="/admin/password">密码设置</a></li>
+            <li><a href="/admin/api-keys">API Key 管理</a></li>
           </ul>
         </nav>
         <main class="container">{props.children}</main>
