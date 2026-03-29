@@ -65,6 +65,22 @@ export function getConfigPath(): string {
 }
 
 /**
+ * 获取日志目录路径（结构化日志）
+ * 默认：~/.llm-gateway/logs/proxy
+ */
+export function getLogDir(): string {
+  return join(getProxyDir(), 'logs/proxy');
+}
+
+/**
+ * 获取详细日志目录路径（请求/响应完整内容）
+ * 默认：~/.llm-gateway/logs
+ */
+export function getDetailLogDir(): string {
+  return join(getProxyDir(), 'logs');
+}
+
+/**
  * 验证配置项是否包含所有必需字段
  */
 function validateProviderConfig(config: any, index: number): void {

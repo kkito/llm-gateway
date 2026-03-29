@@ -60,6 +60,9 @@ export function createUserAuthMiddleware(configPath: string) {
   return async (c: Context, next: Next) => {
     const config = loadFullConfig(configPath);
     const isAuthEnabled = config.userApiKeys && config.userApiKeys.length > 0;
+    
+    // 将认证状态注入上下文
+    (c as any).userAuthEnabled = isAuthEnabled;
 
     // 未启用认证，直接放行
     if (!isAuthEnabled) {

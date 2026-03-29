@@ -264,7 +264,7 @@ export function loadStats(logDir: string, options: StatsOptions = {}): Stats {
   }
 
   // 如果指定了 userName，过滤日志
-  if (options.userName) {
+  if (options.userName !== undefined) {
     entries = entries.filter(e => e.userName === options.userName);
   }
 

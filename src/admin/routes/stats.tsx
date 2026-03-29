@@ -1,8 +1,7 @@
 import { Hono } from 'hono';
 import { StatsPage } from '../views/stats.js';
 import { loadStats } from '../../lib/stats-core.js';
-import { getProxyDir } from '../../config.js';
-import { join } from 'path';
+import { getLogDir } from '../../config.js';
 
 export function createStatsRoute() {
   const app = new Hono();
@@ -15,9 +14,8 @@ export function createStatsRoute() {
       const month = c.req.query('month');
       const byHour = c.req.query('byHour') === 'true';
 
-      // 解析日志目录
-      const defaultDir = getProxyDir();
-      const logDir = join(defaultDir, 'logs/proxy');
+      // 使用统一的日志目录
+      const logDir = getLogDir();
 
       // 构建查询选项
       const options: { date?: string; week?: string; month?: string; byHour?: boolean } = {};

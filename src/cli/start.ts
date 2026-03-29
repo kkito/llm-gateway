@@ -2,7 +2,7 @@
 
 import { Command } from 'commander';
 import { serve } from '@hono/node-server';
-import { loadConfig, getProxyDir, createDefaultConfig } from '../config.js';
+import { loadConfig, getProxyDir, getLogDir, getDetailLogDir, createDefaultConfig } from '../config.js';
 import { Logger } from '../logger.js';
 import { DetailLogger } from '../detail-logger.js';
 import { createServer } from '../server.js';
@@ -30,20 +30,20 @@ function resolvePaths(options: CliOptions) {
   const defaultDir = getProxyDir();
   const userDir = options.dir || defaultDir;
 
-  // 如果用户指定了 --config，使用用户值；否则使用 defaultDir/config.json
+  // 如果用户指定了 --config，使用用户值；否则使用默认配置文件路径
   const configPath = options.config
     ? options.config
     : join(userDir, 'config.json');
 
-  // 如果用户指定了 --log-dir，使用用户值；否则使用 defaultDir/logs/proxy
+  // 如果用户指定了 --log-dir，使用用户值；否则使用默认日志目录
   const logDirPath = options.logDir
     ? options.logDir
-    : join(userDir, 'logs/proxy');
+    : getLogDir();
 
   // 详细日志目录
   const detailLogDir = options.logDir
     ? join(options.logDir, '..')
-    : join(userDir, 'logs');
+    : getDetailLogDir();
 
   return { configPath, logDirPath, detailLogDir, userDir };
 }
@@ -148,7 +148,8 @@ function startDaemon(options: CliOptions, userDir: string): void {
   console.log(`   kill ${child.pid}`);
   console.log(`   或：llm-gateway-start --stop`);
   console.log(`\n查看日志:`);
-  console.log(`   tail -f ${join(userDir, 'logs/proxy')}/proxy-*.log`);
+  const logDirForDisplay = options.logDir || getLogDir();
+  console.log(`   tail -f ${logDirForDisplay}/proxy-*.log`);
 
   // 父进程退出
   process.exit(0);
