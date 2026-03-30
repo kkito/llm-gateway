@@ -98,27 +98,26 @@ export function createModelFormRoute(deps: RouteDeps) {
         const max = maxStr ? parseFloat(maxStr) : 0;
         if (max <= 0) continue;
 
-        const limit: ModelLimit = {
-          type: type as 'requests' | 'input_tokens' | 'cost',
-          max: max
-        };
-
         if (type !== 'cost') {
           const period = body[`limits[${i}].period`] as string | undefined;
           if (!period) continue;
-          limit.period = period as 'day' | 'hours' | 'week' | 'month';
+
+          const limit: ModelLimit = {
+            type: type as 'requests' | 'input_tokens',
+            period: period as 'day' | 'hours' | 'week' | 'month',
+            max: max
+          };
 
           if (period === 'hours') {
             const periodValueStr = body[`limits[${i}].periodValue`] as string;
             limit.periodValue = periodValueStr ? parseInt(periodValueStr) : undefined;
           }
+
+          limits.push(limit);
         } else {
           // cost 类型：解析价格配置到 limits 数组和 ProviderConfig 顶层
           // cost 类型也需要保存 period（虽然前端不显示）
           const period = body[`limits[${i}].period`] as string | undefined;
-          if (period) {
-            limit.period = period as 'day' | 'hours' | 'week' | 'month';
-          }
 
           const inputPriceStr = body[`limits[${i}].inputPricePer1M`] as string;
           const outputPriceStr = body[`limits[${i}].outputPricePer1M`] as string;
@@ -126,22 +125,26 @@ export function createModelFormRoute(deps: RouteDeps) {
 
           if (inputPriceStr) {
             const inputPrice = parseFloat(inputPriceStr);
-            (limit as any).inputPricePer1M = inputPrice;
             inputPricePer1M = inputPrice;
           }
           if (outputPriceStr) {
             const outputPrice = parseFloat(outputPriceStr);
-            (limit as any).outputPricePer1M = outputPrice;
             outputPricePer1M = outputPrice;
           }
           if (cachedPriceStr) {
             const cachedPrice = parseFloat(cachedPriceStr);
-            (limit as any).cachedPricePer1M = cachedPrice;
             cachedPricePer1M = cachedPrice;
           }
-        }
 
-        limits.push(limit);
+          // 为 cost 类型创建 limit 对象
+          const limit: ModelLimit = {
+            type: 'cost',
+            period: (period || 'day') as 'day' | 'hours' | 'week' | 'month',
+            max: max  // cost 类型使用 max 字段保存金额限制
+          };
+
+          limits.push(limit);
+        }
       }
     }
 
@@ -272,27 +275,26 @@ export function createModelFormRoute(deps: RouteDeps) {
         const max = maxStr ? parseFloat(maxStr) : 0;
         if (max <= 0) continue;
 
-        const limit: ModelLimit = {
-          type: type as 'requests' | 'input_tokens' | 'cost',
-          max: max
-        };
-
         if (type !== 'cost') {
           const period = body[`limits[${i}].period`] as string | undefined;
           if (!period) continue;
-          limit.period = period as 'day' | 'hours' | 'week' | 'month';
+
+          const limit: ModelLimit = {
+            type: type as 'requests' | 'input_tokens',
+            period: period as 'day' | 'hours' | 'week' | 'month',
+            max: max
+          };
 
           if (period === 'hours') {
             const periodValueStr = body[`limits[${i}].periodValue`] as string;
             limit.periodValue = periodValueStr ? parseInt(periodValueStr) : undefined;
           }
+
+          limits.push(limit);
         } else {
           // cost 类型：解析价格配置到 limits 数组和 ProviderConfig 顶层
           // cost 类型也需要保存 period（虽然前端不显示）
           const period = body[`limits[${i}].period`] as string | undefined;
-          if (period) {
-            limit.period = period as 'day' | 'hours' | 'week' | 'month';
-          }
 
           const inputPriceStr = body[`limits[${i}].inputPricePer1M`] as string;
           const outputPriceStr = body[`limits[${i}].outputPricePer1M`] as string;
@@ -300,22 +302,26 @@ export function createModelFormRoute(deps: RouteDeps) {
 
           if (inputPriceStr) {
             const inputPrice = parseFloat(inputPriceStr);
-            (limit as any).inputPricePer1M = inputPrice;
             inputPricePer1M = inputPrice;
           }
           if (outputPriceStr) {
             const outputPrice = parseFloat(outputPriceStr);
-            (limit as any).outputPricePer1M = outputPrice;
             outputPricePer1M = outputPrice;
           }
           if (cachedPriceStr) {
             const cachedPrice = parseFloat(cachedPriceStr);
-            (limit as any).cachedPricePer1M = cachedPrice;
             cachedPricePer1M = cachedPrice;
           }
-        }
 
-        limits.push(limit);
+          // 为 cost 类型创建 limit 对象
+          const limit: ModelLimit = {
+            type: 'cost',
+            period: (period || 'day') as 'day' | 'hours' | 'week' | 'month',
+            max: max  // cost 类型使用 max 字段保存金额限制
+          };
+
+          limits.push(limit);
+        }
       }
     }
 

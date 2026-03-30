@@ -35,14 +35,15 @@ function escapeHtml(str: string | number | undefined): string {
 }
 
 // 生成限制卡片 HTML 的函数
-function renderLimitCard(limit: ModelLimit | undefined, index: number): string {
+function renderLimitCard(limit: ModelLimit | undefined, index: number, priceConfig?: { inputPricePer1M?: number; outputPricePer1M?: number; cachedPricePer1M?: number }): string {
   const type = limit?.type || '';
   const period = limit?.period || '';
   const max = limit?.max || '';
   const periodValue = limit?.periodValue || '';
-  const inputPricePer1M = limit ? (limit as any).inputPricePer1M : '';
-  const outputPricePer1M = limit ? (limit as any).outputPricePer1M : '';
-  const cachedPricePer1M = limit ? (limit as any).cachedPricePer1M : '';
+  // 优先从 limit 对象读取，如果没有则从 priceConfig 读取（用于编辑时）
+  const inputPricePer1M = (limit as any)?.inputPricePer1M ?? priceConfig?.inputPricePer1M ?? '';
+  const outputPricePer1M = (limit as any)?.outputPricePer1M ?? priceConfig?.outputPricePer1M ?? '';
+  const cachedPricePer1M = (limit as any)?.cachedPricePer1M ?? priceConfig?.cachedPricePer1M ?? '';
 
   const isCost = type === 'cost';
   const isRequestsOrTokens = type === 'requests' || type === 'input_tokens';
@@ -345,8 +346,15 @@ export const ModelFormPage: FC<Props> = (props) => {
   const formAction = isEdit ? `/admin/models/edit/${escapeHtml(props.model!.customModel)}` : '/admin/models';
   const existingLimits = props.model?.limits || [];
 
+  // 价格配置（顶层）
+  const priceConfig = props.model ? {
+    inputPricePer1M: props.model.inputPricePer1M,
+    outputPricePer1M: props.model.outputPricePer1M,
+    cachedPricePer1M: props.model.cachedPricePer1M
+  } : undefined;
+
   // 预渲染已有配置的限制卡片
-  const existingCardsHtml = existingLimits.map((limit, i) => renderLimitCard(limit, i)).join('\n');
+  const existingCardsHtml = existingLimits.map((limit, i) => renderLimitCard(limit, i, priceConfig)).join('\n');
 
   // 生成客户端 JavaScript
   const limitScript = generateLimitScript(existingLimits.length);
