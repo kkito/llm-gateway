@@ -156,6 +156,75 @@ function renderLimitCard(limit: ModelLimit | undefined, index: number, priceConf
   `;
 }
 
+// 生成新的空白限制卡片 HTML（用于 JavaScript 脚本，使用占位符）
+function renderNewLimitCardForScript(): string {
+  const index = '__INDEX__';
+  return `
+    <div class="limit-card" data-index="${index}" style="border: 1px solid #ddd; padding: 1rem; margin-bottom: 1rem; border-radius: 4px; background: #fafafa;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+        <strong>限制规则 #${'\' + (index + 1) + \''}</strong>
+        <button type="button" class="secondary" onclick="removeLimitCard(this)" style="padding: 0.25rem 0.5rem; font-size: 0.875rem;">删除</button>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <label>
+          限制类型
+          <select name="limits[${index}].type" onchange="handleLimitTypeChange(this)">
+            <option value="">Free (不限制)</option>
+            <option value="requests">按请求次数</option>
+            <option value="input_tokens">按 Token 数</option>
+            <option value="cost">按金额</option>
+          </select>
+        </label>
+
+        <label class="period-field" style="display: none;">
+          时间周期
+          <select name="limits[${index}].period" onchange="handlePeriodChange(this)">
+            <option value="">请选择...</option>
+            <option value="day">按天</option>
+            <option value="week">按周</option>
+            <option value="month">按月</option>
+            <option value="hours">按小时</option>
+          </select>
+        </label>
+
+        <label class="period-field" style="display: none;">
+          限制数值
+          <input type="number" name="limits[${index}].max" min="1" placeholder="请输入限制数值" />
+        </label>
+
+        <label class="hours-field" style="display: none;">
+          小时数
+          <input type="number" name="limits[${index}].periodValue" min="1" placeholder="请输入小时数" />
+        </label>
+
+        <label class="cost-field" style="display: none;">
+          限制金额 (美元)
+          <input type="number" name="limits[${index}].max" min="0.01" step="0.01" placeholder="请输入限制金额" />
+        </label>
+      </div>
+
+      <div class="price-config" style="display: none; margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed #ccc;">
+        <strong style="font-size: 0.875rem; color: #666;">价格配置 (按 Token 计费)</strong>
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-top: 0.5rem;">
+          <label>
+            输入单价 ($/百万 token)
+            <input type="number" name="limits[${index}].inputPricePer1M" min="0" step="0.01" placeholder="请输入" />
+          </label>
+          <label>
+            输出单价 ($/百万 token)
+            <input type="number" name="limits[${index}].outputPricePer1M" min="0" step="0.01" placeholder="请输入（可选）" />
+          </label>
+          <label>
+            缓存单价 ($/百万 token)
+            <input type="number" name="limits[${index}].cachedPricePer1M" min="0" step="0.01" placeholder="请输入（可选）" />
+          </label>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 // 生成新的空白限制卡片 HTML
 function renderNewLimitCard(index: number): string {
   return `
@@ -229,10 +298,78 @@ function generateLimitScript(initialCount: number): string {
   const script = `
 let limitCardCount = ${initialCount};
 
+// 创建限制卡片 HTML 的函数（使用模板字符串）
+function createLimitCard(index) {
+  return \`
+    <div class="limit-card" data-index="\${index}" style="border: 1px solid #ddd; padding: 1rem; margin-bottom: 1rem; border-radius: 4px; background: #fafafa;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+        <strong>限制规则 #\${index + 1}</strong>
+        <button type="button" class="secondary" onclick="removeLimitCard(this)" style="padding: 0.25rem 0.5rem; font-size: 0.875rem;">删除</button>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <label>
+          限制类型
+          <select name="limits[\${index}].type" onchange="handleLimitTypeChange(this)">
+            <option value="">Free (不限制)</option>
+            <option value="requests">按请求次数</option>
+            <option value="input_tokens">按 Token 数</option>
+            <option value="cost">按金额</option>
+          </select>
+        </label>
+
+        <label class="period-field" style="display: none;">
+          时间周期
+          <select name="limits[\${index}].period" onchange="handlePeriodChange(this)">
+            <option value="">请选择...</option>
+            <option value="day">按天</option>
+            <option value="week">按周</option>
+            <option value="month">按月</option>
+            <option value="hours">按小时</option>
+          </select>
+        </label>
+
+        <label class="period-field" style="display: none;">
+          限制数值
+          <input type="number" name="limits[\${index}].max" min="1" placeholder="请输入限制数值" />
+        </label>
+
+        <label class="hours-field" style="display: none;">
+          小时数
+          <input type="number" name="limits[\${index}].periodValue" min="1" placeholder="请输入小时数" />
+        </label>
+
+        <label class="cost-field" style="display: none;">
+          限制金额 (美元)
+          <input type="number" name="limits[\${index}].max" min="0.01" step="0.01" placeholder="请输入限制金额" />
+        </label>
+      </div>
+
+      <div class="price-config" style="display: none; margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed #ccc;">
+        <strong style="font-size: 0.875rem; color: #666;">价格配置 (按 Token 计费)</strong>
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-top: 0.5rem;">
+          <label>
+            输入单价 (\$/百万 token)
+            <input type="number" name="limits[\${index}].inputPricePer1M" min="0" step="0.01" placeholder="请输入" />
+          </label>
+          <label>
+            输出单价 (\$/百万 token)
+            <input type="number" name="limits[\${index}].outputPricePer1M" min="0" step="0.01" placeholder="请输入（可选）" />
+          </label>
+          <label>
+            缓存单价 (\$/百万 token)
+            <input type="number" name="limits[\${index}].cachedPricePer1M" min="0" step="0.01" placeholder="请输入（可选）" />
+          </label>
+        </div>
+      </div>
+    </div>
+  \`;
+}
+
 function addLimitCard() {
   const container = document.getElementById('limitsContainer');
   const index = limitCardCount;
-  const cardHtml = '${renderNewLimitCard(0).replace(/0/g, "' + index + '")}';
+  const cardHtml = createLimitCard(index);
   container.insertAdjacentHTML('beforeend', cardHtml);
   limitCardCount++;
   renumberCards();
@@ -372,6 +509,9 @@ export const ModelFormPage: FC<Props> = (props) => {
         </article>
       )}
 
+      {/* JavaScript for dynamic limit card management - 必须放在表单之前，确保函数先定义 */}
+      <script dangerouslySetInnerHTML={{ __html: limitScript }} />
+
       <form method="post" action={formAction}>
         <label>
           自定义模型名称
@@ -492,9 +632,6 @@ export const ModelFormPage: FC<Props> = (props) => {
           取消
         </a>
       </form>
-
-      {/* JavaScript for dynamic limit card management */}
-      <script dangerouslySetInnerHTML={{ __html: limitScript }} />
     </Layout>
   );
 };
