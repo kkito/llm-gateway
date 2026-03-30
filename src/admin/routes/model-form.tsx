@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import type { ProviderConfig, ProxyConfig } from '../../config.js';
+import type { ProviderConfig, ProxyConfig, ModelLimit } from '../../config.js';
 import { saveConfig, loadConfig, updateConfigEntry, deleteConfigEntry, loadFullConfig, getApiKeyOptions } from '../../config.js';
 import { ModelFormPage } from '../views/model-form.js';
 import { ModelsPage } from '../views/models.js';
@@ -82,6 +82,69 @@ export function createModelFormRoute(deps: RouteDeps) {
       );
     }
 
+    // 解析限制配置
+    const limits: ModelLimit[] = [];
+    let inputPricePer1M: number | undefined;
+    let outputPricePer1M: number | undefined;
+    let cachedPricePer1M: number | undefined;
+
+    const limitType0 = body['limits[0].type'] as string | undefined;
+    if (limitType0 !== undefined) {
+      for (let i = 0; i < 10; i++) {
+        const type = body[`limits[${i}].type`] as string | undefined;
+        if (!type || type === '') continue;
+
+        const maxStr = body[`limits[${i}].max`] as string;
+        const max = maxStr ? parseFloat(maxStr) : 0;
+        if (max <= 0) continue;
+
+        const limit: ModelLimit = {
+          type: type as 'requests' | 'input_tokens' | 'cost',
+          max: max
+        };
+
+        if (type !== 'cost') {
+          const period = body[`limits[${i}].period`] as string | undefined;
+          if (!period) continue;
+          limit.period = period as 'day' | 'hours' | 'week' | 'month';
+
+          if (period === 'hours') {
+            const periodValueStr = body[`limits[${i}].periodValue`] as string;
+            limit.periodValue = periodValueStr ? parseInt(periodValueStr) : undefined;
+          }
+        } else {
+          // cost 类型：解析价格配置到 limits 数组和 ProviderConfig 顶层
+          // cost 类型也需要保存 period（虽然前端不显示）
+          const period = body[`limits[${i}].period`] as string | undefined;
+          if (period) {
+            limit.period = period as 'day' | 'hours' | 'week' | 'month';
+          }
+
+          const inputPriceStr = body[`limits[${i}].inputPricePer1M`] as string;
+          const outputPriceStr = body[`limits[${i}].outputPricePer1M`] as string;
+          const cachedPriceStr = body[`limits[${i}].cachedPricePer1M`] as string;
+
+          if (inputPriceStr) {
+            const inputPrice = parseFloat(inputPriceStr);
+            (limit as any).inputPricePer1M = inputPrice;
+            inputPricePer1M = inputPrice;
+          }
+          if (outputPriceStr) {
+            const outputPrice = parseFloat(outputPriceStr);
+            (limit as any).outputPricePer1M = outputPrice;
+            outputPricePer1M = outputPrice;
+          }
+          if (cachedPriceStr) {
+            const cachedPrice = parseFloat(cachedPriceStr);
+            (limit as any).cachedPricePer1M = cachedPrice;
+            cachedPricePer1M = cachedPrice;
+          }
+        }
+
+        limits.push(limit);
+      }
+    }
+
     try {
       // 创建新配置
       const newConfig: ProviderConfig = {
@@ -90,7 +153,11 @@ export function createModelFormRoute(deps: RouteDeps) {
         apiKey: finalApiKey,
         baseUrl,
         provider,
-        desc: desc || undefined
+        desc: desc || undefined,
+        limits: limits.length > 0 ? limits : undefined,
+        inputPricePer1M,
+        outputPricePer1M,
+        cachedPricePer1M
       };
 
       // 保存到文件 - 保留 apiKeys 等其他配置
@@ -189,6 +256,69 @@ export function createModelFormRoute(deps: RouteDeps) {
       );
     }
 
+    // 解析限制配置
+    const limits: ModelLimit[] = [];
+    let inputPricePer1M: number | undefined;
+    let outputPricePer1M: number | undefined;
+    let cachedPricePer1M: number | undefined;
+
+    const limitType0 = body['limits[0].type'] as string | undefined;
+    if (limitType0 !== undefined) {
+      for (let i = 0; i < 10; i++) {
+        const type = body[`limits[${i}].type`] as string | undefined;
+        if (!type || type === '') continue;
+
+        const maxStr = body[`limits[${i}].max`] as string;
+        const max = maxStr ? parseFloat(maxStr) : 0;
+        if (max <= 0) continue;
+
+        const limit: ModelLimit = {
+          type: type as 'requests' | 'input_tokens' | 'cost',
+          max: max
+        };
+
+        if (type !== 'cost') {
+          const period = body[`limits[${i}].period`] as string | undefined;
+          if (!period) continue;
+          limit.period = period as 'day' | 'hours' | 'week' | 'month';
+
+          if (period === 'hours') {
+            const periodValueStr = body[`limits[${i}].periodValue`] as string;
+            limit.periodValue = periodValueStr ? parseInt(periodValueStr) : undefined;
+          }
+        } else {
+          // cost 类型：解析价格配置到 limits 数组和 ProviderConfig 顶层
+          // cost 类型也需要保存 period（虽然前端不显示）
+          const period = body[`limits[${i}].period`] as string | undefined;
+          if (period) {
+            limit.period = period as 'day' | 'hours' | 'week' | 'month';
+          }
+
+          const inputPriceStr = body[`limits[${i}].inputPricePer1M`] as string;
+          const outputPriceStr = body[`limits[${i}].outputPricePer1M`] as string;
+          const cachedPriceStr = body[`limits[${i}].cachedPricePer1M`] as string;
+
+          if (inputPriceStr) {
+            const inputPrice = parseFloat(inputPriceStr);
+            (limit as any).inputPricePer1M = inputPrice;
+            inputPricePer1M = inputPrice;
+          }
+          if (outputPriceStr) {
+            const outputPrice = parseFloat(outputPriceStr);
+            (limit as any).outputPricePer1M = outputPrice;
+            outputPricePer1M = outputPrice;
+          }
+          if (cachedPriceStr) {
+            const cachedPrice = parseFloat(cachedPriceStr);
+            (limit as any).cachedPricePer1M = cachedPrice;
+            cachedPricePer1M = cachedPrice;
+          }
+        }
+
+        limits.push(limit);
+      }
+    }
+
     try {
       // 更新配置
       const newEntry: ProviderConfig = {
@@ -197,7 +327,11 @@ export function createModelFormRoute(deps: RouteDeps) {
         apiKey: finalApiKey,
         baseUrl,
         provider,
-        desc: desc || undefined
+        desc: desc || undefined,
+        limits: limits.length > 0 ? limits : undefined,
+        inputPricePer1M,
+        outputPricePer1M,
+        cachedPricePer1M
       };
 
       const newConfigList = updateConfigEntry(currentConfig, oldModel, newEntry);
