@@ -14,7 +14,8 @@ import { createModelsRoute } from './admin/routes/models.js';
 import { createModelFormRoute } from './admin/routes/model-form.js';
 import { createModelLimitsRoute } from './admin/routes/model-limits.js';
 import { createStatsRoute } from './admin/routes/stats.js';
-import { createStatsApiRoute } from './admin/routes/stats-api.js';
+import { createStatsApiRoute, initStatsProvider } from './admin/routes/stats-api.js';
+import { createUsageApiRoute, initUsageApiTracker } from './admin/routes/usage-api.js';
 import { createHomeRoute } from './user/routes/home.js';
 import { createLoginRoute as createUserLoginRoute } from './user/routes/login.js';
 import { createStatsRoute as createUserStatsRoute } from './user/routes/stats.js';
@@ -27,6 +28,8 @@ import { authMiddleware, isPasswordConfigured, sessions } from './admin/middlewa
 import { createUserAuthMiddleware } from './user/middleware/auth.js';
 import { loadFullConfig } from './config.js';
 import { join as pathJoin } from 'path';
+import { UsageTracker } from './lib/usage-tracker.js';
+import { StatsProvider } from './lib/stats-provider.js';
 
 // 获取当前模块目录 (用于静态文件服务)
 const __filename = fileURLToPath(import.meta.url);
@@ -43,6 +46,31 @@ export function createServer(
 
   // 从 logger 获取 logDir
   const logDir = pathJoin(logger.getFilePath(), '..');
+
+  // 创建用量追踪器
+  const usageTracker = new UsageTracker(logDir);
+
+  // 初始化 UsageTracker API
+  initUsageApiTracker(usageTracker);
+
+  // 创建统计提供者（共享 usageTracker 实例）
+  const statsProvider = new StatsProvider(usageTracker, logDir);
+  initStatsProvider(statsProvider);
+
+  // 定期清理过期的滑动窗口数据（每小时清理一次）
+  const cleanupInterval = setInterval(() => {
+    statsProvider.cleanup();
+    console.log('🧹 已清理过期的滑动窗口数据');
+  }, 60 * 60 * 1000); // 1 小时
+
+  // 确保进程退出时清理定时器
+  process.on('SIGINT', () => {
+    clearInterval(cleanupInterval);
+  });
+
+  process.on('SIGTERM', () => {
+    clearInterval(cleanupInterval);
+  });
 
   // 可变配置引用，用于热加载
   let currentConfig = config;
@@ -245,7 +273,8 @@ export function createServer(
     app.route('', createModelLimitsRoute({
       config: () => currentConfig,
       configPath,
-      onConfigChange
+      onConfigChange,
+      usageTracker
     }));
   }
 
@@ -254,6 +283,9 @@ export function createServer(
 
   // 统计 API 路由
   app.route('', createStatsApiRoute());
+
+  // 实时用量 API 路由
+  app.route('', createUsageApiRoute());
 
   // 用户管理路由
   if (configPath) {

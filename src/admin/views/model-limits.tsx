@@ -2,9 +2,14 @@ import { FC } from 'hono/jsx';
 import { Layout } from '../components/Layout.js';
 import type { ProviderConfig, ModelLimit } from '../../config.js';
 
+interface LimitWithUsage extends ModelLimit {
+  currentUsage: number;
+  periodDesc: string;
+}
+
 interface Props {
   model: ProviderConfig;
-  limits: ModelLimit[];
+  limits: LimitWithUsage[];
   error?: string;
   success?: string;
 }
@@ -79,6 +84,7 @@ export const ModelLimitsPage: FC<Props> = (props) => {
                 <th>类型</th>
                 <th>周期</th>
                 <th>数值</th>
+                <th>使用情况</th>
                 <th>操作</th>
               </tr>
             </thead>
@@ -95,6 +101,24 @@ export const ModelLimitsPage: FC<Props> = (props) => {
                     {limit.type === 'cost'
                       ? `$${limit.max}`
                       : `${limit.max}次`}
+                  </td>
+                  <td>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <span style={{ fontWeight: 'bold' }}>
+                        {limit.type === 'cost'
+                          ? `$${limit.currentUsage.toFixed(4)} / $${limit.max}`
+                          : `${Math.round(limit.currentUsage)} / ${limit.max}次`}
+                      </span>
+                      <span style={{ fontSize: '12px', color: '#666' }}>
+                        {limit.period === 'hours'
+                          ? `过去 ${limit.periodValue || 24} 小时`
+                          : limit.period === 'day'
+                          ? '今日'
+                          : limit.period === 'week'
+                          ? '本周'
+                          : '本月'}
+                      </span>
+                    </div>
                   </td>
                   <td>
                     <button
@@ -182,6 +206,8 @@ export const ModelLimitsPage: FC<Props> = (props) => {
       <script
         dangerouslySetInnerHTML={{
           __html: `
+            const MODEL_NAME = '${model.customModel}';
+
             function handleTypeChange(select) {
               const type = select.value;
               const periodLabel = document.getElementById('periodLabel');

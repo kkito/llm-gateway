@@ -289,8 +289,10 @@ export class UsageTracker {
         needReload = true;
       }
     }
-    
-    if (needReload && pricing) {
+
+    // 只要有加载需求就执行加载，pricing 为 undefined 时 cost 会计为 0
+    // 对于 requests/input_tokens 类型的限制，不需要 pricing 也能统计
+    if (needReload) {
       this.loadFromLogs(counter, period, periodValue, pricing);
     }
   }
