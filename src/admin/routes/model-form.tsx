@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
-import type { ProviderConfig, ProxyConfig, ModelLimit } from '../../config.js';
-import { saveConfig, loadConfig, updateConfigEntry, deleteConfigEntry, loadFullConfig, getApiKeyOptions } from '../../config.js';
+import type { ProviderConfig, ProxyConfig } from '../../config.js';
+import { saveConfig, updateConfigEntry, deleteConfigEntry, loadFullConfig, getApiKeyOptions } from '../../config.js';
 import { ModelFormPage } from '../views/model-form.js';
 import { ModelsPage } from '../views/models.js';
 
@@ -82,74 +82,8 @@ export function createModelFormRoute(deps: RouteDeps) {
       );
     }
 
-    // 解析限制配置
-    const limits: ModelLimit[] = [];
-    let inputPricePer1M: number | undefined;
-    let outputPricePer1M: number | undefined;
-    let cachedPricePer1M: number | undefined;
-
-    const limitType0 = body['limits[0].type'] as string | undefined;
-    if (limitType0 !== undefined) {
-      for (let i = 0; i < 10; i++) {
-        const type = body[`limits[${i}].type`] as string | undefined;
-        if (!type || type === '') continue;
-
-        const maxStr = body[`limits[${i}].max`] as string;
-        const max = maxStr ? parseFloat(maxStr) : 0;
-        if (max <= 0) continue;
-
-        if (type !== 'cost') {
-          const period = body[`limits[${i}].period`] as string | undefined;
-          if (!period) continue;
-
-          const limit: ModelLimit = {
-            type: type as 'requests' | 'input_tokens',
-            period: period as 'day' | 'hours' | 'week' | 'month',
-            max: max
-          };
-
-          if (period === 'hours') {
-            const periodValueStr = body[`limits[${i}].periodValue`] as string;
-            limit.periodValue = periodValueStr ? parseInt(periodValueStr) : undefined;
-          }
-
-          limits.push(limit);
-        } else {
-          // cost 类型：解析价格配置到 limits 数组和 ProviderConfig 顶层
-          // cost 类型也需要保存 period（虽然前端不显示）
-          const period = body[`limits[${i}].period`] as string | undefined;
-
-          const inputPriceStr = body[`limits[${i}].inputPricePer1M`] as string;
-          const outputPriceStr = body[`limits[${i}].outputPricePer1M`] as string;
-          const cachedPriceStr = body[`limits[${i}].cachedPricePer1M`] as string;
-
-          if (inputPriceStr) {
-            const inputPrice = parseFloat(inputPriceStr);
-            inputPricePer1M = inputPrice;
-          }
-          if (outputPriceStr) {
-            const outputPrice = parseFloat(outputPriceStr);
-            outputPricePer1M = outputPrice;
-          }
-          if (cachedPriceStr) {
-            const cachedPrice = parseFloat(cachedPriceStr);
-            cachedPricePer1M = cachedPrice;
-          }
-
-          // 为 cost 类型创建 limit 对象
-          const limit: ModelLimit = {
-            type: 'cost',
-            period: (period || 'day') as 'day' | 'hours' | 'week' | 'month',
-            max: max  // cost 类型使用 max 字段保存金额限制
-          };
-
-          limits.push(limit);
-        }
-      }
-    }
-
     try {
-      // 创建新配置
+      // 创建新配置（不包含 limits 和价格配置）
       const newConfig: ProviderConfig = {
         customModel,
         realModel,
@@ -157,10 +91,6 @@ export function createModelFormRoute(deps: RouteDeps) {
         baseUrl,
         provider,
         desc: desc || undefined,
-        limits: limits.length > 0 ? limits : undefined,
-        inputPricePer1M,
-        outputPricePer1M,
-        cachedPricePer1M
       };
 
       // 保存到文件 - 保留 apiKeys 等其他配置
@@ -228,7 +158,7 @@ export function createModelFormRoute(deps: RouteDeps) {
 
     // 处理 API Key：优先使用下拉框选择的，其次使用手动输入的，最后使用原值
     let finalApiKey: string = oldEntry.apiKey; // 默认使用原值
-    
+
     if (apiKeySource && apiKeySource !== 'manual') {
       // 从配置中查找选中的 API Key
       try {
@@ -259,74 +189,8 @@ export function createModelFormRoute(deps: RouteDeps) {
       );
     }
 
-    // 解析限制配置
-    const limits: ModelLimit[] = [];
-    let inputPricePer1M: number | undefined;
-    let outputPricePer1M: number | undefined;
-    let cachedPricePer1M: number | undefined;
-
-    const limitType0 = body['limits[0].type'] as string | undefined;
-    if (limitType0 !== undefined) {
-      for (let i = 0; i < 10; i++) {
-        const type = body[`limits[${i}].type`] as string | undefined;
-        if (!type || type === '') continue;
-
-        const maxStr = body[`limits[${i}].max`] as string;
-        const max = maxStr ? parseFloat(maxStr) : 0;
-        if (max <= 0) continue;
-
-        if (type !== 'cost') {
-          const period = body[`limits[${i}].period`] as string | undefined;
-          if (!period) continue;
-
-          const limit: ModelLimit = {
-            type: type as 'requests' | 'input_tokens',
-            period: period as 'day' | 'hours' | 'week' | 'month',
-            max: max
-          };
-
-          if (period === 'hours') {
-            const periodValueStr = body[`limits[${i}].periodValue`] as string;
-            limit.periodValue = periodValueStr ? parseInt(periodValueStr) : undefined;
-          }
-
-          limits.push(limit);
-        } else {
-          // cost 类型：解析价格配置到 limits 数组和 ProviderConfig 顶层
-          // cost 类型也需要保存 period（虽然前端不显示）
-          const period = body[`limits[${i}].period`] as string | undefined;
-
-          const inputPriceStr = body[`limits[${i}].inputPricePer1M`] as string;
-          const outputPriceStr = body[`limits[${i}].outputPricePer1M`] as string;
-          const cachedPriceStr = body[`limits[${i}].cachedPricePer1M`] as string;
-
-          if (inputPriceStr) {
-            const inputPrice = parseFloat(inputPriceStr);
-            inputPricePer1M = inputPrice;
-          }
-          if (outputPriceStr) {
-            const outputPrice = parseFloat(outputPriceStr);
-            outputPricePer1M = outputPrice;
-          }
-          if (cachedPriceStr) {
-            const cachedPrice = parseFloat(cachedPriceStr);
-            cachedPricePer1M = cachedPrice;
-          }
-
-          // 为 cost 类型创建 limit 对象
-          const limit: ModelLimit = {
-            type: 'cost',
-            period: (period || 'day') as 'day' | 'hours' | 'week' | 'month',
-            max: max  // cost 类型使用 max 字段保存金额限制
-          };
-
-          limits.push(limit);
-        }
-      }
-    }
-
     try {
-      // 更新配置
+      // 更新配置（保留原有的 limits 和价格配置）
       const newEntry: ProviderConfig = {
         customModel,
         realModel,
@@ -334,10 +198,10 @@ export function createModelFormRoute(deps: RouteDeps) {
         baseUrl,
         provider,
         desc: desc || undefined,
-        limits: limits.length > 0 ? limits : undefined,
-        inputPricePer1M,
-        outputPricePer1M,
-        cachedPricePer1M
+        limits: oldEntry.limits,
+        inputPricePer1M: oldEntry.inputPricePer1M,
+        outputPricePer1M: oldEntry.outputPricePer1M,
+        cachedPricePer1M: oldEntry.cachedPricePer1M
       };
 
       const newConfigList = updateConfigEntry(currentConfig, oldModel, newEntry);

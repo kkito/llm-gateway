@@ -78,6 +78,14 @@ export const ModelsPage: FC<Props> = (props) => {
                     >
                       编辑
                     </a>
+                    <a
+                      href={`/admin/models/${encodeURIComponent(model.customModel)}/limits`}
+                      role="button"
+                      class="secondary"
+                      style={{ marginRight: '0.5rem', fontSize: '12px', padding: '4px 8px' }}
+                    >
+                      管理限制
+                    </a>
                     <button
                       type="button"
                       class="secondary"

@@ -12,6 +12,7 @@ import { createChatCompletionsRoute } from './routes/chat-completions.js';
 import { createMessagesRoute } from './routes/messages.js';
 import { createModelsRoute } from './admin/routes/models.js';
 import { createModelFormRoute } from './admin/routes/model-form.js';
+import { createModelLimitsRoute } from './admin/routes/model-limits.js';
 import { createStatsRoute } from './admin/routes/stats.js';
 import { createStatsApiRoute } from './admin/routes/stats-api.js';
 import { createHomeRoute } from './user/routes/home.js';
@@ -233,6 +234,15 @@ export function createServer(
   // 模型表单路由
   if (configPath) {
     app.route('', createModelFormRoute({
+      config: () => currentConfig,
+      configPath,
+      onConfigChange
+    }));
+  }
+
+  // 模型限制管理路由
+  if (configPath) {
+    app.route('', createModelLimitsRoute({
       config: () => currentConfig,
       configPath,
       onConfigChange
