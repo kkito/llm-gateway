@@ -1,11 +1,9 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { serveStatic } from '@hono/node-server/serve-static';
-import { watch } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import type { ProviderConfig } from './config.js';
-import { loadConfig } from './config.js';
 import type { Logger } from './logger.js';
 import { DetailLogger } from './detail-logger.js';
 import { createChatCompletionsRoute } from './routes/chat-completions.js';
@@ -43,35 +41,14 @@ export function createServer(
   // 从 logger 获取 logDir
   const logDir = pathJoin(logger.getFilePath(), '..');
 
-  // 可变配置引用，用于热加载
+  // 可变配置引用，用于后台 API 更新
   let currentConfig = config;
 
-  // 配置更新回调
+  // 配置更新回调（由后台 API 调用）
   const onConfigChange = (newConfig: ProviderConfig[]) => {
     currentConfig = newConfig;
     console.log('✅ 配置已更新，当前模型数量:', newConfig.length);
   };
-
-  // 文件监听 - 热加载配置
-  if (configPath) {
-    let debounceTimer: NodeJS.Timeout | null = null;
-    watch(configPath, (eventType) => {
-      if (eventType === 'change') {
-        // 防抖处理
-        if (debounceTimer) clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
-          try {
-            const newConfig = loadConfig(configPath);
-            currentConfig = newConfig;
-            console.log('🔄 检测到配置文件变化，已重新加载配置');
-          } catch (error: any) {
-            console.error('❌ 配置文件重新加载失败:', error.message);
-          }
-        }, 500);
-      }
-    });
-    console.log(`📁 已监听配置文件变化: ${configPath}`);
-  }
 
   // CORS 配置
   app.use('*', cors());
