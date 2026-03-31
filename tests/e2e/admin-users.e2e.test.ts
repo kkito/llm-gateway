@@ -3,7 +3,6 @@ import { Hono } from 'hono';
 import { createServer } from '../../src/server.js';
 import { Logger } from '../../src/logger.js';
 import { DetailLogger } from '../../src/detail-logger.js';
-import { UsageTracker } from '../../src/lib/usage-tracker.js';
 import type { ProviderConfig, UserApiKey } from '../../src/config.js';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -49,8 +48,6 @@ describe('Admin Users Management E2E', () => {
   });
 
   beforeEach(async () => {
-    // 重置单例状态
-    UsageTracker.resetInstance();
     sessions.clear();
     userSessions.clear();
 
@@ -98,8 +95,6 @@ describe('Admin Users Management E2E', () => {
   });
 
   afterEach(() => {
-    // 重置单例状态
-    UsageTracker.resetInstance();
     rmSync(testLogDir, { recursive: true, force: true });
   });
 

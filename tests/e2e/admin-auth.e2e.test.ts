@@ -3,7 +3,6 @@ import { Hono } from 'hono';
 import { createServer } from '../../src/server.js';
 import { Logger } from '../../src/logger.js';
 import { DetailLogger } from '../../src/detail-logger.js';
-import { UsageTracker } from '../../src/lib/usage-tracker.js';
 import type { ProviderConfig } from '../../src/config.js';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -18,8 +17,6 @@ describe('Admin 认证 E2E 测试', () => {
   let originalFetch: typeof fetch;
 
   beforeAll(() => {
-    // 重置单例状态
-    UsageTracker.resetInstance();
     testLogDir = join(tmpdir(), 'test-admin-auth-' + Date.now());
     testConfigPath = join(testLogDir, 'config.json');
 
@@ -45,14 +42,10 @@ describe('Admin 认证 E2E 测试', () => {
   });
 
   afterAll(() => {
-    // 重置单例状态
-    UsageTracker.resetInstance();
     globalThis.fetch = originalFetch;
   });
 
   beforeEach(() => {
-    // 重置单例状态
-    UsageTracker.resetInstance();
     // 清空所有 Session
     sessions.clear();
   });

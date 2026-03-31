@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { RateLimiter } from '../../src/lib/rate-limiter.js';
-import { UsageTracker } from '../../src/lib/usage-tracker.js';
 import type { ModelLimit } from '../../src/config.js';
 import { mkdirSync, rmSync, existsSync } from 'fs';
 import { join } from 'path';
@@ -11,8 +10,6 @@ describe('rate-limiter', () => {
   let rateLimiter: RateLimiter;
 
   beforeEach(() => {
-    // 重置单例状态
-    UsageTracker.resetInstance();
     if (!existsSync(testLogDir)) {
       mkdirSync(testLogDir, { recursive: true });
     }
@@ -20,8 +17,6 @@ describe('rate-limiter', () => {
   });
 
   afterEach(() => {
-    // 重置单例状态
-    UsageTracker.resetInstance();
     try {
       if (existsSync(testLogDir)) {
         rmSync(testLogDir, { recursive: true, force: true });

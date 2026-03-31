@@ -3,7 +3,6 @@ import { Hono } from 'hono';
 import { createServer } from '../../src/server.js';
 import { Logger } from '../../src/logger.js';
 import { DetailLogger } from '../../src/detail-logger.js';
-import { UsageTracker } from '../../src/lib/usage-tracker.js';
 import type { ProviderConfig, ApiKey } from '../../src/config.js';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -16,8 +15,6 @@ describe('Admin Models Form E2E', () => {
   let originalFetch: typeof fetch;
 
   beforeAll(() => {
-    // 重置单例状态
-    UsageTracker.resetInstance();
     testLogDir = join(tmpdir(), 'test-models-form-' + Date.now());
     testConfigPath = join(testLogDir, 'config.json');
 
@@ -64,8 +61,6 @@ describe('Admin Models Form E2E', () => {
   });
 
   afterAll(() => {
-    // 重置单例状态
-    UsageTracker.resetInstance();
     globalThis.fetch = originalFetch;
     rmSync(testLogDir, { recursive: true, force: true });
   });
