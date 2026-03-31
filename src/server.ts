@@ -64,10 +64,12 @@ export function createServer(
   // 确保进程退出时清理定时器
   process.on('SIGINT', () => {
     clearInterval(cleanupInterval);
+    process.exit(0);
   });
 
   process.on('SIGTERM', () => {
     clearInterval(cleanupInterval);
+    process.exit(0);
   });
 
   // 可变配置引用，用于后台 API 更新
