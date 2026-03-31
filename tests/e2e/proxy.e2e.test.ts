@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { createServer } from '../../src/server.js';
 import { Logger } from '../../src/logger.js';
 import { DetailLogger } from '../../src/detail-logger.js';
+import { UsageTracker } from '../../src/lib/usage-tracker.js';
 import type { ProviderConfig } from '../../src/config.js';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -71,6 +72,8 @@ describe('proxy e2e', () => {
   let originalFetch: typeof fetch;
 
   beforeAll(() => {
+    // 重置单例状态
+    UsageTracker.resetInstance();
     testLogDir = join(tmpdir(), 'test-e2e-logs-' + Date.now());
     const logger = new Logger(testLogDir);
     const detailLogger = new DetailLogger(testLogDir);
@@ -100,6 +103,8 @@ describe('proxy e2e', () => {
   });
 
   afterAll(() => {
+    // 重置单例状态
+    UsageTracker.resetInstance();
     // 恢复原始 fetch
     globalThis.fetch = originalFetch;
   });

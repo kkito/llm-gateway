@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { createServer } from '../../src/server.js';
 import { Logger } from '../../src/logger.js';
 import { DetailLogger } from '../../src/detail-logger.js';
+import { UsageTracker } from '../../src/lib/usage-tracker.js';
 import type { ProviderConfig, UserApiKey } from '../../src/config.js';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -42,10 +43,14 @@ describe('User Auth - No Guest User E2E', () => {
   });
 
   afterAll(() => {
+    // 重置单例状态
+    UsageTracker.resetInstance();
     globalThis.fetch = originalFetch;
   });
 
   beforeEach(() => {
+    // 重置单例状态
+    UsageTracker.resetInstance();
     userSessions.clear();
   });
 
@@ -76,7 +81,7 @@ describe('User Auth - No Guest User E2E', () => {
 
       try {
         const response = await noAuthApp.request('/user/main');
-        
+
         // 应该直接返回 200，而不是重定向到登录页
         expect(response.status).toBe(200);
         

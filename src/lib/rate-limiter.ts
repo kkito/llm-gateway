@@ -32,7 +32,7 @@ export class RateLimiter {
   private tracker: UsageTracker;
 
   constructor(logDir: string) {
-    this.tracker = new UsageTracker(logDir);
+    this.tracker = UsageTracker.getInstance(logDir);
   }
 
   /**

@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { createServer } from '../../src/server.js';
 import { Logger } from '../../src/logger.js';
 import { DetailLogger } from '../../src/detail-logger.js';
+import { UsageTracker } from '../../src/lib/usage-tracker.js';
 import type { ProviderConfig } from '../../src/config.js';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -15,6 +16,8 @@ describe('Rate Limit E2E 测试', () => {
   let originalFetch: typeof fetch;
 
   beforeAll(() => {
+    // 重置单例状态
+    UsageTracker.resetInstance();
     testLogDir = join(tmpdir(), 'test-rate-limit-e2e-' + Date.now());
     testConfigPath = join(testLogDir, 'config.json');
 
@@ -58,6 +61,8 @@ describe('Rate Limit E2E 测试', () => {
   });
 
   afterAll(() => {
+    // 重置单例状态
+    UsageTracker.resetInstance();
     globalThis.fetch = originalFetch;
     try {
       if (existsSync(testLogDir)) {
@@ -67,6 +72,8 @@ describe('Rate Limit E2E 测试', () => {
   });
 
   beforeEach(() => {
+    // 重置单例状态
+    UsageTracker.resetInstance();
     // 清理日志文件以重置计数器
     const files = ['proxy-' + new Date().toISOString().split('T')[0] + '.log'];
     for (const file of files) {

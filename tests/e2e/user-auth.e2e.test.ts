@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { createServer } from '../../src/server.js';
 import { Logger } from '../../src/logger.js';
 import { DetailLogger } from '../../src/detail-logger.js';
+import { UsageTracker } from '../../src/lib/usage-tracker.js';
 import type { ProviderConfig, UserApiKey } from '../../src/config.js';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -39,6 +40,8 @@ describe('User Authentication E2E', () => {
   let originalFetch: typeof fetch;
 
   beforeAll(() => {
+    // 重置单例状态
+    UsageTracker.resetInstance();
     testLogDir = join(tmpdir(), 'test-user-auth-' + Date.now());
     testConfigPath = join(testLogDir, 'config.json');
 
@@ -62,13 +65,13 @@ describe('User Authentication E2E', () => {
     ];
 
     // 创建临时配置文件
-    writeFileSync(testConfigPath, JSON.stringify({ 
+    writeFileSync(testConfigPath, JSON.stringify({
       models: testConfig,
       userApiKeys: testUserApiKeys
     }, null, 2));
 
     app = createServer(testConfig, logger, detailLogger, 30000, testConfigPath);
-    
+
     // 设置测试 API Key
     testApiKey = 'sk-lg-test1234567890123456';
 
@@ -78,6 +81,8 @@ describe('User Authentication E2E', () => {
   });
 
   afterAll(() => {
+    // 重置单例状态
+    UsageTracker.resetInstance();
     // 恢复原始 fetch
     globalThis.fetch = originalFetch;
 
@@ -90,6 +95,8 @@ describe('User Authentication E2E', () => {
   });
 
   beforeEach(() => {
+    // 重置单例状态
+    UsageTracker.resetInstance();
     // 清空所有 Session
     userSessions.clear();
     vi.clearAllMocks();

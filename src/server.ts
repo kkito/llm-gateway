@@ -47,8 +47,8 @@ export function createServer(
   // 从 logger 获取 logDir
   const logDir = pathJoin(logger.getFilePath(), '..');
 
-  // 创建用量追踪器
-  const usageTracker = new UsageTracker(logDir);
+  // 创建用量追踪器（单例）
+  const usageTracker = UsageTracker.getInstance(logDir);
 
   // 初始化 UsageTracker API
   initUsageApiTracker(usageTracker);

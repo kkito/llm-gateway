@@ -74,11 +74,33 @@ interface ParsedLogEntry {
  * 用量追踪器类
  */
 export class UsageTracker {
+  private static instance: UsageTracker | null = null;
   private counters: Map<string, ModelUsageCounter> = new Map();
   private logDir: string;
 
-  constructor(logDir: string) {
+  private constructor(logDir: string) {
     this.logDir = logDir;
+  }
+
+  /**
+   * 获取单例实例
+   */
+  static getInstance(logDir: string): UsageTracker {
+    if (!UsageTracker.instance) {
+      UsageTracker.instance = new UsageTracker(logDir);
+    }
+    // 验证 logDir 一致性
+    if (UsageTracker.instance.logDir !== logDir) {
+      throw new Error(`logDir mismatch: ${logDir} vs ${UsageTracker.instance.logDir}`);
+    }
+    return UsageTracker.instance;
+  }
+
+  /**
+   * 重置单例实例（用于测试）
+   */
+  static resetInstance(): void {
+    UsageTracker.instance = null;
   }
 
   /**
