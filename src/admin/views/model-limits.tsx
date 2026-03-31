@@ -155,6 +155,7 @@ export const ModelLimitsPage: FC<Props> = (props) => {
               <input
                 type="number"
                 name="max"
+                id="maxInput"
                 min="1"
                 placeholder="请输入数值"
               />
@@ -165,9 +166,11 @@ export const ModelLimitsPage: FC<Props> = (props) => {
               <input
                 type="number"
                 name="max"
+                id="costMaxInput"
                 min="0.01"
                 step="0.01"
                 placeholder="请输入金额"
+                disabled
               />
             </label>
           </div>
@@ -195,20 +198,26 @@ export const ModelLimitsPage: FC<Props> = (props) => {
               // 清除必填
               const periodSelect = periodLabel.querySelector('select');
               const periodValueInput = periodValueLabel.querySelector('input');
-              const maxInput = maxLabel.querySelector('input');
-              const costMaxInput = costMaxLabel.querySelector('input');
+              const maxInput = document.getElementById('maxInput');
+              const costMaxInput = document.getElementById('costMaxInput');
 
               periodSelect.required = false;
               periodValueInput.required = false;
               maxInput.required = false;
+              maxInput.disabled = true;
               costMaxInput.required = false;
+              costMaxInput.disabled = true;
 
               if (type === 'requests' || type === 'input_tokens') {
                 periodLabel.style.display = 'block';
                 periodSelect.required = true;
+                maxLabel.style.display = 'block';
+                maxInput.required = true;
+                maxInput.disabled = false;
               } else if (type === 'cost') {
                 costMaxLabel.style.display = 'block';
                 costMaxInput.required = true;
+                costMaxInput.disabled = false;
               }
             }
 
@@ -221,7 +230,7 @@ export const ModelLimitsPage: FC<Props> = (props) => {
               maxLabel.style.display = 'block';
 
               const periodValueInput = periodValueLabel.querySelector('input');
-              const maxInput = maxLabel.querySelector('input');
+              const maxInput = document.getElementById('maxInput');
 
               if (period === 'hours') {
                 periodValueInput.required = true;
