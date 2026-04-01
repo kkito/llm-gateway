@@ -397,6 +397,28 @@ export function createChatCompletionsRoute(
               while (true) {
                 const { done, value } = await reader.read();
                 if (done) {
+                  // OpenRouter 特殊处理：最后一个 chunk 可能不以 \n\n 结尾
+                  if (provider.baseUrl?.includes('openrouter') && buffer.trim()) {
+                    let sseLine = buffer;
+                    if (!sseLine.startsWith('data:')) {
+                      sseLine = `data: ${sseLine}`;
+                    }
+                    if (!sseLine.endsWith('\n\n')) {
+                      sseLine += '\n\n';
+                    }
+                    chunks.push(sseLine);
+                    try {
+                      controller.enqueue(new TextEncoder().encode(sseLine));
+                    } catch (err: any) {
+                      // 安静捕获中断错误
+                      if (err?.name === 'AbortError' ||
+                          err?.code === 'ERR_INVALID_STATE' ||
+                          err?.message?.includes('Controller is already closed')) {
+                        // 正常中断，无需处理
+                      }
+                    }
+                  }
+
                   // 记录原始上游响应到文件
                   detailLogger.logStreamResponse(requestId + '_raw', rawChunks);
                   // 从最后的 chunk 中提取 cachedTokens 和 usage 信息
@@ -478,6 +500,11 @@ export function createChatCompletionsRoute(
                 for (const part of parts) {
                   if (!part.trim()) continue;
 
+                  // OpenRouter 特殊处理：跳过 SSE 注释行（以 : 开头）
+                  if (provider.baseUrl?.includes('openrouter') && part.startsWith(':')) {
+                    continue;
+                  }
+
                   // 根据 provider 格式处理
                   if (providerFormat === 'anthropic') {
                     // Anthropic → OpenAI 流式转换
@@ -504,13 +531,28 @@ export function createChatCompletionsRoute(
                     }
 
                     chunks.push(sseLine);
-                    controller.enqueue(new TextEncoder().encode(sseLine));
+                    try {
+                      controller.enqueue(new TextEncoder().encode(sseLine));
+                    } catch (err: any) {
+                      // 安静捕获中断错误：客户端断开或 controller 已关闭
+                      if (err?.name === 'AbortError' ||
+                          err?.code === 'ERR_INVALID_STATE' ||
+                          err?.message?.includes('Controller is already closed')) {
+                        // 正常中断，无需处理
+                        return;
+                      }
+                      throw err;
+                    }
                   }
                 }
               }
             } catch (error) {
               console.log(`   ❌ [流式处理错误] ${error}`);
-              controller.error(error);
+              try {
+                controller.error(error);
+              } catch {
+                // Controller 已关闭，忽略错误
+              }
             }
           }
         });

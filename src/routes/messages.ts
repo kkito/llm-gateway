@@ -398,13 +398,28 @@ export function createMessagesRoute(
                     sseLine += '\n\n';
 
                     chunks.push(sseLine);
-                    controller.enqueue(new TextEncoder().encode(sseLine));
+                    try {
+                      controller.enqueue(new TextEncoder().encode(sseLine));
+                    } catch (err: any) {
+                      // 安静捕获中断错误：客户端断开或 controller 已关闭
+                      if (err?.name === 'AbortError' ||
+                          err?.code === 'ERR_INVALID_STATE' ||
+                          err?.message?.includes('Controller is already closed')) {
+                        // 正常中断，无需处理
+                        return;
+                      }
+                      throw err;
+                    }
                   }
                 }
               }
             } catch (error) {
               console.log(`   ❌ [流式处理错误] ${error}`);
-              controller.error(error);
+              try {
+                controller.error(error);
+              } catch {
+                // Controller 已关闭，忽略错误
+              }
             }
           }
         });
