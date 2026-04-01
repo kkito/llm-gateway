@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import type { ProviderConfig, ModelLimit } from '../../config.js';
+import type { ProviderConfig, ModelLimit, ProxyConfig } from '../../config.js';
 import { loadFullConfig, saveConfig } from '../../config.js';
 import { ModelLimitsPage } from '../views/model-limits.js';
 import { UsageTracker } from '../../lib/usage-tracker.js';
@@ -11,9 +11,9 @@ interface LimitWithUsage extends ModelLimit {
 }
 
 interface RouteDeps {
-  config: ProviderConfig[] | (() => ProviderConfig[]);
+  config: ProxyConfig | (() => ProxyConfig);
   configPath: string;
-  onConfigChange: (newConfig: ProviderConfig[]) => void;
+  onConfigChange: (newConfig: ProxyConfig) => void;
   usageTracker: UsageTracker;
 }
 
@@ -25,7 +25,7 @@ export function createModelLimitsRoute(deps: RouteDeps) {
   app.get('/admin/models/:model/limits', async (c) => {
     const modelParam = c.req.param('model');
     const currentConfig = typeof config === 'function' ? config() : config;
-    const model = currentConfig.find(p => p.customModel === modelParam);
+    const model = currentConfig.models.find(p => p.customModel === modelParam);
 
     if (!model) {
       return c.html(<ModelLimitsPage model={modelParam as any} limits={[]} error={`未找到模型：${modelParam}`} />);
@@ -68,13 +68,13 @@ export function createModelLimitsRoute(deps: RouteDeps) {
     const body = await c.req.parseBody();
 
     const currentConfig = typeof config === 'function' ? config() : config;
-    const modelIndex = currentConfig.findIndex(p => p.customModel === modelParam);
+    const modelIndex = currentConfig.models.findIndex(p => p.customModel === modelParam);
 
     if (modelIndex === -1) {
       return c.html(<ModelLimitsPage model={modelParam as any} limits={[]} error={`未找到模型：${modelParam}`} />);
     }
 
-    const model = currentConfig[modelIndex];
+    const model = currentConfig.models[modelIndex];
     const type = body.type as string;
     const period = body.period as string | undefined;
     const periodValue = body.periodValue as string | undefined;
@@ -120,16 +120,12 @@ export function createModelLimitsRoute(deps: RouteDeps) {
       const newLimits = [...limits, limit];
       const updatedModel = { ...model, limits: newLimits };
 
-      const newConfigList = [...currentConfig];
-      newConfigList[modelIndex] = updatedModel;
-
-      // 保存到文件
       const proxyConfig = loadFullConfig(configPath);
-      proxyConfig.models = newConfigList;
+      proxyConfig.models[modelIndex] = updatedModel;
       saveConfig(proxyConfig, configPath);
 
       // 触发配置更新回调
-      onConfigChange(newConfigList);
+      onConfigChange(proxyConfig);
 
       // 重定向回限制管理页面
       return c.redirect(`/admin/models/${encodeURIComponent(modelParam)}/limits`);
@@ -146,13 +142,13 @@ export function createModelLimitsRoute(deps: RouteDeps) {
     const index = parseInt(indexParam);
 
     const currentConfig = typeof config === 'function' ? config() : config;
-    const modelIndex = currentConfig.findIndex(p => p.customModel === modelParam);
+    const modelIndex = currentConfig.models.findIndex(p => p.customModel === modelParam);
 
     if (modelIndex === -1) {
       return c.html(<ModelLimitsPage model={modelParam as any} limits={[]} error={`未找到模型：${modelParam}`} />);
     }
 
-    const model = currentConfig[modelIndex];
+    const model = currentConfig.models[modelIndex];
     const limits = model.limits || [];
 
     if (index < 0 || index >= limits.length) {
@@ -165,16 +161,12 @@ export function createModelLimitsRoute(deps: RouteDeps) {
       const newLimits = limits.filter((_, i) => i !== index);
       const updatedModel = { ...model, limits: newLimits.length > 0 ? newLimits : undefined };
 
-      const newConfigList = [...currentConfig];
-      newConfigList[modelIndex] = updatedModel;
-
-      // 保存到文件
       const proxyConfig = loadFullConfig(configPath);
-      proxyConfig.models = newConfigList;
+      proxyConfig.models[modelIndex] = updatedModel;
       saveConfig(proxyConfig, configPath);
 
       // 触发配置更新回调
-      onConfigChange(newConfigList);
+      onConfigChange(proxyConfig);
 
       // 重定向回限制管理页面
       return c.redirect(`/admin/models/${encodeURIComponent(modelParam)}/limits`);

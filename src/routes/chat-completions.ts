@@ -1,10 +1,11 @@
 import { Hono } from 'hono';
-import type { ProviderConfig } from '../config.js';
+import type { ProviderConfig, ProxyConfig } from '../config.js';
 import type { Logger } from '../logger.js';
 import type { DetailLogger } from '../detail-logger.js';
 import { v4 as uuidv4 } from 'uuid';
 import { buildHeaders, buildUrl } from '../providers/index.js';
 import { convertOpenAIRequestToAnthropic, convertAnthropicResponseToOpenAI } from '../converters/openai-to-anthropic.js';
+import { ModelGroupResolver } from '../lib/model-group-resolver.js';
 import {
   convertAnthropicStreamEventToOpenAI,
   parseSSEBlock,
@@ -98,7 +99,7 @@ function parseAndConvertAnthropicSSE(
 }
 
 export function createChatCompletionsRoute(
-  config: ProviderConfig[] | (() => ProviderConfig[]),
+  config: ProxyConfig | (() => ProxyConfig),
   logger: Logger,
   detailLogger: DetailLogger,
   timeoutMs: number,
@@ -112,38 +113,116 @@ export function createChatCompletionsRoute(
     const startTime = Date.now();
     const requestId = uuidv4();
     let customModel = 'unknown';
-    
+    let modelGroup: string | undefined;
+    let actualModel: string | undefined;
+    let triedModels: Array<{ model: string; exceeded: boolean; message?: string }> = [];
+    let body: any = {};
+
     // 获取当前用户
     const currentUser = (c as any).currentUser || getCurrentUser(c);
 
     try {
-      const body = await c.req.json();
-      customModel = body.model;
-      const { model, stream } = body;
+      body = await c.req.json();
+      const { model, model_group, stream } = body;
+
+      // 调试日志：打印接收到的参数
+      console.log(`   🔍 [调试] body.model=${JSON.stringify(model)}, body.model_group=${JSON.stringify(model_group)}`);
+
+      // 验证参数互斥
+      if (model && model_group) {
+        return c.json({
+          error: { message: 'model and model_group are mutually exclusive', type: 'invalid_request_error' }
+        }, 400);
+      }
+
+      if (!model && !model_group) {
+        return c.json({
+          error: { message: 'Either model or model_group must be provided', type: 'invalid_request_error' }
+        }, 400);
+      }
 
       // 记录用户请求
       detailLogger.logRequest(requestId, body);
 
-      console.log(`\n📥 [请求] ${requestId} - 模型：${model} - 流式：${!!stream}`);
-
       // 获取最新配置
       const currentConfig = typeof config === 'function' ? config() : config;
-      const provider = currentConfig.find(p => p.customModel === model);
-      if (!provider) {
-        console.log(`   ❌ 未找到模型配置`);
-        logger.log({
-          timestamp: new Date().toISOString(),
-          requestId,
-          customModel: model,
-          endpoint,
-          method: 'POST',
-          statusCode: 404,
-          durationMs: Date.now() - startTime,
-          isStreaming: !!stream,
-          userName: currentUser?.name,
-          error: { message: 'Model not found' }
-        });
-        return c.json({ error: { message: 'Model not found' } }, 404);
+      let provider: ProviderConfig | undefined;
+
+      if (model_group) {
+        // Model Group 模式
+        modelGroup = model_group;
+        console.log(`\n📥 [请求] ${requestId} - 模型组：${model_group} - 流式：${!!stream}`);
+        
+        const resolver = new ModelGroupResolver();
+        const modelNames = resolver.resolveModelGroup(currentConfig.modelGroups, model_group);
+        console.log(`   ✓ 匹配 model_group: ${model_group} -> [${modelNames.join(', ')}]`);
+        
+        const result = await resolver.findAvailableModel(modelNames, currentConfig.models, logDir);
+        provider = result.provider;
+        actualModel = result.model;
+        triedModels = result.triedModels;
+        customModel = actualModel;
+        
+        // 记录尝试过的模型
+        for (const tried of triedModels) {
+          if (tried.exceeded) {
+            console.log(`   ⚠️  [跳过] ${tried.model} - ${tried.message}`);
+          }
+        }
+        console.log(`   ✓ 使用模型：${actualModel}`);
+      } else {
+        // 单个模型模式
+        customModel = model;
+        console.log(`\n📥 [请求] ${requestId} - 模型：${model} - 流式：${!!stream}`);
+
+        // 尝试查找单个模型配置
+        provider = currentConfig.models.find(p => p.customModel === model);
+        actualModel = model;
+
+        // 如果未找到单个模型，尝试作为 modelGroup 处理（智能识别）
+        if (!provider && currentConfig.modelGroups) {
+          try {
+            const resolver = new ModelGroupResolver();
+            const modelNames = resolver.resolveModelGroup(currentConfig.modelGroups, model);
+            console.log(`   🔍 智能识别：${model} 被识别为 modelGroup -> [${modelNames.join(', ')}]`);
+
+            // 自动启用模型组模式
+            modelGroup = model;
+            console.log(`\n📥 [请求] ${requestId} - 模型组：${model} - 流式：${!!stream}`);
+
+            const result = await resolver.findAvailableModel(modelNames, currentConfig.models, logDir);
+            provider = result.provider;
+            actualModel = result.model;
+            triedModels = result.triedModels;
+            customModel = actualModel;
+
+            for (const tried of triedModels) {
+              if (tried.exceeded) {
+                console.log(`   ⚠️  [跳过] ${tried.model} - ${tried.message}`);
+              }
+            }
+            console.log(`   ✓ 使用模型：${actualModel}`);
+          } catch (groupError) {
+            // 不是有效的 modelGroup，继续查找单个模型（下面会返回 404）
+          }
+        }
+
+        if (!provider) {
+          console.log(`   ❌ 未找到模型配置`);
+          logger.log({
+            timestamp: new Date().toISOString(),
+            requestId,
+            customModel: model,
+            endpoint,
+            method: 'POST',
+            statusCode: 404,
+            durationMs: Date.now() - startTime,
+            isStreaming: !!stream,
+            userName: currentUser?.name,
+            error: { message: 'Model not found' }
+          });
+          return c.json({ error: { message: 'Model not found' } }, 404);
+        }
       }
 
       console.log(`   ✓ 匹配 provider: ${provider.customModel} -> ${provider.realModel} (${provider.provider})`);
@@ -210,7 +289,10 @@ export function createChatCompletionsRoute(
       const logEntry: any = {
         timestamp: new Date().toISOString(),
         requestId,
-        customModel: model,
+        customModel: model_group ? actualModel! : model,
+        modelGroup: model_group,
+        actualModel: actualModel,
+        triedModels: triedModels.length > 0 ? triedModels : undefined,
         realModel: provider.realModel,
         provider: provider.provider,
         endpoint,
@@ -226,7 +308,8 @@ export function createChatCompletionsRoute(
         logger.log({
           timestamp: new Date().toISOString(),
           requestId,
-          customModel: model,
+          customModel: model_group ? actualModel! : model,
+          modelGroup: model_group,
           endpoint,
           method: 'POST',
           statusCode: 401,
@@ -259,7 +342,7 @@ export function createChatCompletionsRoute(
               outputPricePer1M: provider.outputPricePer1M,
               cachedPricePer1M: provider.cachedPricePer1M
             } : undefined;
-            rateLimiter.recordUsage(model, logEntry, pricing);
+            rateLimiter.recordUsage(actualModel || model, logEntry, pricing);
             return c.json(openaiResponse);
           } else {
             // OpenAI provider: 直接透传
@@ -275,7 +358,7 @@ export function createChatCompletionsRoute(
               outputPricePer1M: provider.outputPricePer1M,
               cachedPricePer1M: provider.cachedPricePer1M
             } : undefined;
-            rateLimiter.recordUsage(model, logEntry, pricing);
+            rateLimiter.recordUsage(actualModel || model, logEntry, pricing);
             return c.json(responseData);
           }
         } catch {
@@ -378,7 +461,7 @@ export function createChatCompletionsRoute(
                     outputPricePer1M: provider.outputPricePer1M,
                     cachedPricePer1M: provider.cachedPricePer1M
                   } : undefined;
-                  rateLimiter.recordUsage(model, logEntry, pricing);
+                  rateLimiter.recordUsage(actualModel || model, logEntry, pricing);
 
                   controller.close();
                   break;
@@ -447,7 +530,8 @@ export function createChatCompletionsRoute(
       logger.log({
         timestamp: new Date().toISOString(),
         requestId,
-        customModel,
+        customModel: modelGroup ? actualModel! : (body.model as string),
+        modelGroup: modelGroup,
         endpoint,
         method: 'POST',
         statusCode: 500,
@@ -466,6 +550,29 @@ export function createChatCompletionsRoute(
           }
         }, 504);
       }
+
+      // ModelGroupExhaustedError: 所有模型都超过限制
+      if (error.name === 'ModelGroupExhaustedError') {
+        return c.json({
+          error: {
+            message: error.message || 'All models in group exceeded their limits',
+            type: 'rate_limit_error',
+            code: 'rate_limit_exceeded',
+            param: null
+          }
+        }, 429);
+      }
+
+      // Model group not found 或其他配置错误
+      if (error.message && error.message.includes('Model group')) {
+        return c.json({
+          error: {
+            message: error.message,
+            type: 'invalid_request_error'
+          }
+        }, 400);
+      }
+
       return c.json({
         error: { message: error.message || 'Internal error' }
       }, 500);

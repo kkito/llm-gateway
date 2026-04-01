@@ -7,7 +7,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { ProviderConfig } from '../../src/config.js';
+import type { ProviderConfig, ProxyConfig } from '../../src/config.js';
 import type { Logger } from '../../src/logger.js';
 import type { DetailLogger } from '../../src/detail-logger.js';
 import { createChatCompletionsRoute } from '../../src/routes/chat-completions.js';
@@ -46,22 +46,24 @@ class MockDetailLogger {
 
 describe('SSE 透传 - OpenAI 请求到 OpenAI Provider', () => {
   let app: Hono;
-  const config: ProviderConfig[] = [
-    {
-      customModel: 'openai/gpt-4',
-      realModel: 'gpt-4',
-      provider: 'openai',
-      apiKey: 'test-key',
-      baseUrl: 'https://api.openai.com/v1'
-    }
-  ];
+  const proxyConfig: ProxyConfig = {
+    models: [
+      {
+        customModel: 'openai/gpt-4',
+        realModel: 'gpt-4',
+        provider: 'openai',
+        apiKey: 'test-key',
+        baseUrl: 'https://api.openai.com/v1'
+      }
+    ]
+  };
 
   beforeEach(() => {
     app = new Hono();
     const logger = new MockLogger() as unknown as Logger;
     const detailLogger = new MockDetailLogger() as unknown as DetailLogger;
 
-    app.route('', createChatCompletionsRoute(config, logger, detailLogger, 30000));
+    app.route('', createChatCompletionsRoute(proxyConfig, logger, detailLogger, 30000, '/tmp'));
   });
 
   it('应直接透传 OpenAI SSE 格式，不做转换', async () => {
@@ -189,22 +191,24 @@ describe('SSE 透传 - OpenAI 请求到 OpenAI Provider', () => {
 
 describe('SSE 透传 - Anthropic 请求到 Anthropic Provider', () => {
   let app: Hono;
-  const config: ProviderConfig[] = [
-    {
-      customModel: 'anthropic/claude-3-sonnet',
-      realModel: 'claude-3-sonnet-20240229',
-      provider: 'anthropic',
-      apiKey: 'test-key',
-      baseUrl: 'https://api.anthropic.com'
-    }
-  ];
+  const proxyConfig: ProxyConfig = {
+    models: [
+      {
+        customModel: 'anthropic/claude-3-sonnet',
+        realModel: 'claude-3-sonnet-20240229',
+        provider: 'anthropic',
+        apiKey: 'test-key',
+        baseUrl: 'https://api.anthropic.com'
+      }
+    ]
+  };
 
   beforeEach(() => {
     app = new Hono();
     const logger = new MockLogger() as unknown as Logger;
     const detailLogger = new MockDetailLogger() as unknown as DetailLogger;
 
-    app.route('', createMessagesRoute(config, logger, detailLogger, 30000));
+    app.route('', createMessagesRoute(proxyConfig, logger, detailLogger, 30000, '/tmp'));
   });
 
   it('应直接透传 Anthropic SSE 格式，不做转换', async () => {
@@ -559,21 +563,23 @@ describe('SSE 透传 - Anthropic 请求到 Anthropic Provider', () => {
 
 describe('SSE 透传 - 边界情况', () => {
   it('应正确处理不完整的 SSE 块（缓冲区累积）', async () => {
-    const config: ProviderConfig[] = [
-      {
-        customModel: 'openai/gpt-4',
-        realModel: 'gpt-4',
-        provider: 'openai',
-        apiKey: 'test-key',
-        baseUrl: 'https://api.openai.com/v1'
-      }
-    ];
+    const proxyConfig: ProxyConfig = {
+      models: [
+        {
+          customModel: 'openai/gpt-4',
+          realModel: 'gpt-4',
+          provider: 'openai',
+          apiKey: 'test-key',
+          baseUrl: 'https://api.openai.com/v1'
+        }
+      ]
+    };
 
     const app = new Hono();
     const logger = new MockLogger() as unknown as Logger;
     const detailLogger = new MockDetailLogger() as unknown as DetailLogger;
 
-    app.route('', createChatCompletionsRoute(config, logger, detailLogger, 30000));
+    app.route('', createChatCompletionsRoute(proxyConfig, logger, detailLogger, 30000, '/tmp'));
 
     // 模拟一个 SSE 块被分成多个 TCP 包到达
     const incompleteChunk1 = 'data: {"id":"chatcmpl-123","choices":[{"index":0,"delta":{"content":"部';
@@ -621,21 +627,23 @@ describe('SSE 透传 - 边界情况', () => {
   });
 
   it('应正确处理空的 SSE 块', async () => {
-    const config: ProviderConfig[] = [
-      {
-        customModel: 'anthropic/claude-3-sonnet',
-        realModel: 'claude-3-sonnet-20240229',
-        provider: 'anthropic',
-        apiKey: 'test-key',
-        baseUrl: 'https://api.anthropic.com'
-      }
-    ];
+    const proxyConfig: ProxyConfig = {
+      models: [
+        {
+          customModel: 'anthropic/claude-3-sonnet',
+          realModel: 'claude-3-sonnet-20240229',
+          provider: 'anthropic',
+          apiKey: 'test-key',
+          baseUrl: 'https://api.anthropic.com'
+        }
+      ]
+    };
 
     const app = new Hono();
     const logger = new MockLogger() as unknown as Logger;
     const detailLogger = new MockDetailLogger() as unknown as DetailLogger;
 
-    app.route('', createMessagesRoute(config, logger, detailLogger, 30000));
+    app.route('', createMessagesRoute(proxyConfig, logger, detailLogger, 30000, '/tmp'));
 
     // 模拟包含空块的 SSE 流
     const chunksWithEmpty = [

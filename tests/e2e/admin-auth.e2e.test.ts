@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { createServer } from '../../src/server.js';
 import { Logger } from '../../src/logger.js';
 import { DetailLogger } from '../../src/detail-logger.js';
-import type { ProviderConfig } from '../../src/config.js';
+import type { ProviderConfig, ProxyConfig } from '../../src/config.js';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { hashPassword, saveConfig } from '../../src/config.js';
@@ -23,8 +23,8 @@ describe('Admin 认证 E2E 测试', () => {
     const logger = new Logger(testLogDir);
     const detailLogger = new DetailLogger(testLogDir);
 
-    // 创建测试配置
-    const testConfig: ProviderConfig[] = [
+    // 创建测试模型配置
+    const testModels: ProviderConfig[] = [
       {
         customModel: 'test-openai',
         realModel: 'gpt-4',
@@ -34,8 +34,13 @@ describe('Admin 认证 E2E 测试', () => {
       }
     ];
 
+    // 创建测试 ProxyConfig 对象
+    const testConfig: ProxyConfig = {
+      models: testModels
+    };
+
     // 创建临时配置文件
-    writeFileSync(testConfigPath, JSON.stringify({ models: testConfig }, null, 2));
+    writeFileSync(testConfigPath, JSON.stringify(testConfig, null, 2));
 
     app = createServer(testConfig, logger, detailLogger, 30000, testConfigPath);
     originalFetch = globalThis.fetch;
@@ -477,7 +482,7 @@ describe('Admin 认证 E2E 测试', () => {
       // 重新创建服务器以加载最新配置（无密码）
       const logger = new Logger(testLogDir + '-refresh');
       const detailLogger = new DetailLogger(testLogDir + '-refresh');
-      const testConfig: ProviderConfig[] = [
+      const testModels: ProviderConfig[] = [
         {
           customModel: 'test-openai',
           realModel: 'gpt-4',
@@ -486,6 +491,7 @@ describe('Admin 认证 E2E 测试', () => {
           provider: 'openai'
         }
       ];
+      const testConfig: ProxyConfig = { models: testModels };
       const freshApp = createServer(testConfig, logger, detailLogger, 30000, testConfigPath);
 
       // 现在应该可以无密码访问

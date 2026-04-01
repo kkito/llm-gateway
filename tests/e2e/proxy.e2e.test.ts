@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { createServer } from '../../src/server.js';
 import { Logger } from '../../src/logger.js';
 import { DetailLogger } from '../../src/detail-logger.js';
-import type { ProviderConfig } from '../../src/config.js';
+import type { ProviderConfig, ProxyConfig } from '../../src/config.js';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
@@ -75,8 +75,8 @@ describe('proxy e2e', () => {
     const logger = new Logger(testLogDir);
     const detailLogger = new DetailLogger(testLogDir);
 
-    // 创建测试配置 - 使用不存在的 provider 来避免真实调用
-    const testConfig: ProviderConfig[] = [
+    // 创建测试模型配置 - 使用不存在的 provider 来避免真实调用
+    const testModels: ProviderConfig[] = [
       {
         customModel: 'test-openai',
         realModel: 'gpt-4',
@@ -92,6 +92,11 @@ describe('proxy e2e', () => {
         provider: 'anthropic'
       }
     ];
+
+    // 创建测试 ProxyConfig 对象
+    const testConfig: ProxyConfig = {
+      models: testModels
+    };
 
     app = createServer(testConfig, logger, detailLogger, 30000);
 

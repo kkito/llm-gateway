@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { createServer } from '../../src/server.js';
 import { Logger } from '../../src/logger.js';
 import { DetailLogger } from '../../src/detail-logger.js';
-import type { ProviderConfig, ApiKey } from '../../src/config.js';
+import type { ProviderConfig, ApiKey, ProxyConfig } from '../../src/config.js';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { writeFileSync, rmSync, mkdirSync } from 'fs';
@@ -22,8 +22,8 @@ describe('Admin Models Edit - 限制管理独立页面 E2E', () => {
     const logger = new Logger(testLogDir);
     const detailLogger = new DetailLogger(testLogDir);
 
-    // 创建测试配置（包含 API Keys 和有限制的模型）
-    const testConfig: ProviderConfig[] = [
+    // 创建测试模型配置（包含有限制的模型）
+    const testModels: ProviderConfig[] = [
       {
         customModel: 'gateway-LongCat-Flash-Lite',
         realModel: 'gpt-4o-mini',
@@ -57,10 +57,16 @@ describe('Admin Models Edit - 限制管理独立页面 E2E', () => {
       }
     ];
 
+    // 创建测试 ProxyConfig 对象
+    const testConfig: ProxyConfig = {
+      models: testModels,
+      apiKeys: testApiKeys
+    };
+
     // 创建配置文件（包含 models 和 apiKeys）
     writeFileSync(
       testConfigPath,
-      JSON.stringify({ models: testConfig, apiKeys: testApiKeys }, null, 2)
+      JSON.stringify(testConfig, null, 2)
     );
 
     app = createServer(testConfig, logger, detailLogger, 30000, testConfigPath);

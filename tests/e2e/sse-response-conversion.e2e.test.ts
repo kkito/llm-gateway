@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { createServer } from '../../src/server.js';
 import { Logger } from '../../src/logger.js';
 import { DetailLogger } from '../../src/detail-logger.js';
-import type { ProviderConfig } from '../../src/config.js';
+import type { ProviderConfig, ProxyConfig } from '../../src/config.js';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
@@ -62,8 +62,8 @@ describe('SSE 响应转换 - E2E 验证', () => {
     const logger = new Logger(testLogDir);
     const detailLogger = new DetailLogger(testLogDir);
 
-    // 测试配置：模拟跨 Provider 调用
-    const testConfig: ProviderConfig[] = [
+    // 测试模型配置：模拟跨 Provider 调用
+    const testModels: ProviderConfig[] = [
       {
         customModel: 'test-openai',
         realModel: 'gpt-4',
@@ -87,6 +87,11 @@ describe('SSE 响应转换 - E2E 验证', () => {
         provider: 'openai'
       }
     ];
+
+    // 创建测试 ProxyConfig 对象
+    const testConfig: ProxyConfig = {
+      models: testModels
+    };
 
     app = createServer(testConfig, logger, detailLogger, 30000);
     originalFetch = globalThis.fetch;

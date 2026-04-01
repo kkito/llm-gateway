@@ -5,9 +5,9 @@ import { ModelFormPage } from '../views/model-form.js';
 import { ModelsPage } from '../views/models.js';
 
 interface RouteDeps {
-  config: ProviderConfig[] | (() => ProviderConfig[]);
+  config: ProxyConfig | (() => ProxyConfig);
   configPath: string;
-  onConfigChange: (newConfig: ProviderConfig[]) => void;
+  onConfigChange: (newConfig: ProxyConfig) => void;
 }
 
 export function createModelFormRoute(deps: RouteDeps) {
@@ -70,7 +70,7 @@ export function createModelFormRoute(deps: RouteDeps) {
     }
 
     // 检查是否已存在同名模型
-    const existingIndex = currentConfig.findIndex(p => p.customModel === customModel);
+    const existingIndex = currentConfig.models.findIndex(p => p.customModel === customModel);
     if (existingIndex >= 0) {
       const proxyConfig = loadFullConfig(configPath);
       return c.html(
@@ -94,13 +94,12 @@ export function createModelFormRoute(deps: RouteDeps) {
       };
 
       // 保存到文件 - 保留 apiKeys 等其他配置
-      const newConfigList = [...currentConfig, newConfig];
       const proxyConfig = loadFullConfig(configPath);
-      proxyConfig.models = newConfigList;
+      proxyConfig.models = [...proxyConfig.models, newConfig];
       saveConfig(proxyConfig, configPath);
 
       // 触发配置更新回调
-      onConfigChange(newConfigList);
+      onConfigChange(proxyConfig);
 
       // 重定向到列表页
       return c.redirect('/admin/models');
@@ -114,7 +113,7 @@ export function createModelFormRoute(deps: RouteDeps) {
   app.get('/admin/models/edit/:model', (c) => {
     const modelParam = c.req.param('model');
     const currentConfig = typeof config === 'function' ? config() : config;
-    const model = currentConfig.find(p => p.customModel === modelParam);
+    const model = currentConfig.models.find(p => p.customModel === modelParam);
 
     if (!model) {
       return c.html(<ModelFormPage error={`未找到模型：${modelParam}`} />);
@@ -144,7 +143,7 @@ export function createModelFormRoute(deps: RouteDeps) {
 
     // 获取当前配置
     const currentConfig = typeof config === 'function' ? config() : config;
-    const oldEntry = currentConfig.find(p => p.customModel === oldModel);
+    const oldEntry = currentConfig.models.find(p => p.customModel === oldModel);
 
     if (!oldEntry) {
       return c.html(<ModelFormPage error={`未找到模型：${oldModel}`} />);
@@ -177,7 +176,7 @@ export function createModelFormRoute(deps: RouteDeps) {
     // 如果两者都没有，使用原值（finalApiKey 已初始化为原值）
 
     // 检查新名称是否与其他模型冲突（排除当前模型）
-    const existingIndex = currentConfig.findIndex(p => p.customModel === customModel && p.customModel !== oldModel);
+    const existingIndex = currentConfig.models.findIndex(p => p.customModel === customModel && p.customModel !== oldModel);
     if (existingIndex >= 0) {
       const proxyConfig = loadFullConfig(configPath);
       return c.html(
@@ -204,14 +203,14 @@ export function createModelFormRoute(deps: RouteDeps) {
         cachedPricePer1M: oldEntry.cachedPricePer1M
       };
 
-      const newConfigList = updateConfigEntry(currentConfig, oldModel, newEntry);
+      const newConfigList = updateConfigEntry(currentConfig.models, oldModel, newEntry);
       // 保存到文件 - 保留 apiKeys 等其他配置
       const proxyConfig = loadFullConfig(configPath);
       proxyConfig.models = newConfigList;
       saveConfig(proxyConfig, configPath);
 
       // 触发配置更新回调
-      onConfigChange(newConfigList);
+      onConfigChange(proxyConfig);
 
       // 重定向到列表页
       return c.redirect('/admin/models');
@@ -227,19 +226,19 @@ export function createModelFormRoute(deps: RouteDeps) {
     const currentConfig = typeof config === 'function' ? config() : config;
 
     try {
-      const newConfigList = deleteConfigEntry(currentConfig, modelParam);
+      const newConfigList = deleteConfigEntry(currentConfig.models, modelParam);
       // 保存到文件 - 保留 apiKeys 等其他配置
       const proxyConfig = loadFullConfig(configPath);
       proxyConfig.models = newConfigList;
       saveConfig(proxyConfig, configPath);
 
       // 触发配置更新回调
-      onConfigChange(newConfigList);
+      onConfigChange(proxyConfig);
 
       // 重定向到列表页
       return c.redirect('/admin/models');
     } catch (error: any) {
-      return c.html(<ModelsPage models={currentConfig} error={`删除失败：${error.message}`} />);
+      return c.html(<ModelsPage models={currentConfig.models} error={`删除失败：${error.message}`} />);
     }
   });
 
@@ -249,9 +248,9 @@ export function createModelFormRoute(deps: RouteDeps) {
     const direction = c.req.query('direction');
     const currentConfig = typeof config === 'function' ? config() : config;
 
-    const currentIndex = currentConfig.findIndex(p => p.customModel === modelParam);
+    const currentIndex = currentConfig.models.findIndex(p => p.customModel === modelParam);
     if (currentIndex === -1) {
-      return c.html(<ModelsPage models={currentConfig} error={`未找到模型：${modelParam}`} />);
+      return c.html(<ModelsPage models={currentConfig.models} error={`未找到模型：${modelParam}`} />);
     }
 
     try {
@@ -265,12 +264,12 @@ export function createModelFormRoute(deps: RouteDeps) {
       }
 
       // 检查边界
-      if (newIndex < 0 || newIndex >= currentConfig.length) {
+      if (newIndex < 0 || newIndex >= currentConfig.models.length) {
         return c.redirect('/admin/models');
       }
 
       // 交换数组元素
-      const newConfigList = [...currentConfig];
+      const newConfigList = [...currentConfig.models];
       const temp = newConfigList[currentIndex];
       newConfigList[currentIndex] = newConfigList[newIndex];
       newConfigList[newIndex] = temp;
@@ -281,12 +280,12 @@ export function createModelFormRoute(deps: RouteDeps) {
       saveConfig(proxyConfig, configPath);
 
       // 触发配置更新回调
-      onConfigChange(newConfigList);
+      onConfigChange(proxyConfig);
 
       // 重定向到列表页
       return c.redirect('/admin/models');
     } catch (error: any) {
-      return c.html(<ModelsPage models={currentConfig} error={`移动失败：${error.message}`} />);
+      return c.html(<ModelsPage models={currentConfig.models} error={`移动失败：${error.message}`} />);
     }
   });
 

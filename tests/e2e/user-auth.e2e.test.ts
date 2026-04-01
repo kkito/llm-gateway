@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { createServer } from '../../src/server.js';
 import { Logger } from '../../src/logger.js';
 import { DetailLogger } from '../../src/detail-logger.js';
-import type { ProviderConfig, UserApiKey } from '../../src/config.js';
+import type { ProviderConfig, UserApiKey, ProxyConfig } from '../../src/config.js';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { writeFileSync, rmSync } from 'fs';
@@ -45,8 +45,8 @@ describe('User Authentication E2E', () => {
     const logger = new Logger(testLogDir);
     const detailLogger = new DetailLogger(testLogDir);
 
-    // 创建测试配置
-    const testConfig: ProviderConfig[] = [
+    // 创建测试模型配置
+    const testModels: ProviderConfig[] = [
       {
         customModel: 'test-openai',
         realModel: 'gpt-4',
@@ -61,11 +61,14 @@ describe('User Authentication E2E', () => {
       { name: '测试用户', apikey: 'sk-lg-test1234567890123456' }
     ];
 
-    // 创建临时配置文件
-    writeFileSync(testConfigPath, JSON.stringify({
-      models: testConfig,
+    // 创建测试 ProxyConfig 对象
+    const testConfig: ProxyConfig = {
+      models: testModels,
       userApiKeys: testUserApiKeys
-    }, null, 2));
+    };
+
+    // 创建临时配置文件
+    writeFileSync(testConfigPath, JSON.stringify(testConfig, null, 2));
 
     app = createServer(testConfig, logger, detailLogger, 30000, testConfigPath);
 
@@ -100,12 +103,12 @@ describe('User Authentication E2E', () => {
     // 创建没有配置 userApiKeys 的服务器
     const noAuthLogDir = join(tmpdir(), 'test-no-auth-' + Date.now());
     const noAuthConfigPath = join(noAuthLogDir, 'config.json');
-    
+
     // 确保目录存在
     const { mkdirSync } = await import('fs');
     mkdirSync(noAuthLogDir, { recursive: true });
-    
-    const testConfig: ProviderConfig[] = [
+
+    const testModels: ProviderConfig[] = [
       {
         customModel: 'test-openai',
         realModel: 'gpt-4',
@@ -115,7 +118,8 @@ describe('User Authentication E2E', () => {
       }
     ];
 
-    writeFileSync(noAuthConfigPath, JSON.stringify({ models: testConfig }, null, 2));
+    const testConfig: ProxyConfig = { models: testModels };
+    writeFileSync(noAuthConfigPath, JSON.stringify(testConfig, null, 2));
 
     const logger = new Logger(noAuthLogDir);
     const detailLogger = new DetailLogger(noAuthLogDir);

@@ -3,7 +3,7 @@ import { cors } from 'hono/cors';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import type { ProviderConfig } from './config.js';
+import type { ProviderConfig, ProxyConfig } from './config.js';
 import type { Logger } from './logger.js';
 import { DetailLogger } from './detail-logger.js';
 import { createChatCompletionsRoute } from './routes/chat-completions.js';
@@ -11,6 +11,8 @@ import { createMessagesRoute } from './routes/messages.js';
 import { createModelsRoute } from './admin/routes/models.js';
 import { createModelFormRoute } from './admin/routes/model-form.js';
 import { createModelLimitsRoute } from './admin/routes/model-limits.js';
+import { createModelGroupsRoute } from './admin/routes/model-groups.js';
+import { createModelGroupFormRoute } from './admin/routes/model-group-form.js';
 import { createStatsRoute } from './admin/routes/stats.js';
 import { createStatsApiRoute, initStatsProvider } from './admin/routes/stats-api.js';
 import { createUsageApiRoute, initUsageApiTracker } from './admin/routes/usage-api.js';
@@ -34,7 +36,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 export function createServer(
-  config: ProviderConfig[],
+  config: ProxyConfig,
   logger: Logger,
   detailLogger: DetailLogger,
   timeoutMs: number = 300000,
@@ -76,9 +78,9 @@ export function createServer(
   let currentConfig = config;
 
   // 配置更新回调（由后台 API 调用）
-  const onConfigChange = (newConfig: ProviderConfig[]) => {
+  const onConfigChange = (newConfig: ProxyConfig) => {
     currentConfig = newConfig;
-    console.log('✅ 配置已更新，当前模型数量:', newConfig.length);
+    console.log('✅ 配置已更新，当前模型数量:', newConfig.models.length);
   };
 
   // CORS 配置
@@ -254,6 +256,22 @@ export function createServer(
       configPath,
       onConfigChange,
       usageTracker
+    }));
+  }
+
+  // Model Groups 表单路由（需在列表路由之前注册，确保 /admin/model-groups/new 优先匹配）
+  if (configPath) {
+    app.route('', createModelGroupFormRoute({
+      configPath,
+      onConfigChange
+    }));
+  }
+
+  // Model Groups 管理路由
+  if (configPath) {
+    app.route('', createModelGroupsRoute({
+      configPath,
+      onConfigChange
     }));
   }
 

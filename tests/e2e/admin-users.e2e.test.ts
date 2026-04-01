@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { createServer } from '../../src/server.js';
 import { Logger } from '../../src/logger.js';
 import { DetailLogger } from '../../src/detail-logger.js';
-import type { ProviderConfig, UserApiKey } from '../../src/config.js';
+import type { ProviderConfig, UserApiKey, ProxyConfig } from '../../src/config.js';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { writeFileSync, rmSync, mkdirSync, readFileSync } from 'fs';
@@ -57,7 +57,7 @@ describe('Admin Users Management E2E', () => {
     // 确保目录存在
     mkdirSync(testLogDir, { recursive: true });
 
-    const testConfig: ProviderConfig[] = [
+    const testModels: ProviderConfig[] = [
       {
         customModel: 'test-openai',
         realModel: 'gpt-4',
@@ -72,11 +72,14 @@ describe('Admin Users Management E2E', () => {
       { name: '初始用户', apikey: 'sk-lg-initial123456789012', desc: '初始测试用户' }
     ];
 
-    writeFileSync(testConfigPath, JSON.stringify({
-      models: testConfig,
+    // 创建测试 ProxyConfig 对象
+    const testConfig: ProxyConfig = {
+      models: testModels,
       adminPassword: '946ef222d5a6fafae845a03be3b747667c15d97d7fbe8fade1b150809fff144d', // "admin123" 的哈希
       userApiKeys: initialUserApiKeys
-    }, null, 2));
+    };
+
+    writeFileSync(testConfigPath, JSON.stringify(testConfig, null, 2));
 
     const logger = new Logger(testLogDir);
     const detailLogger = new DetailLogger(testLogDir);

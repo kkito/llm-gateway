@@ -46,8 +46,18 @@ export interface UserApiKey {
   desc?: string;
 }
 
+/**
+ * 模型组配置
+ */
+export interface ModelGroup {
+  name: string;
+  models: string[];
+  desc?: string;
+}
+
 export interface ProxyConfig {
   models: ProviderConfig[];
+  modelGroups?: ModelGroup[];
   adminPassword?: string; // SHA256 哈希值
   apiKeys?: ApiKey[];
   userApiKeys?: UserApiKey[];
@@ -149,7 +159,7 @@ function validateModelsArray(models: any): ProviderConfig[] {
 
   models.forEach((item: any, index: number) => {
     validateProviderConfig(item, index);
-    
+
     // 验证 limits
     if (item.limits) {
       if (!Array.isArray(item.limits)) {
@@ -162,6 +172,40 @@ function validateModelsArray(models: any): ProviderConfig[] {
   });
 
   return models as ProviderConfig[];
+}
+
+/**
+ * 验证 ModelGroup 配置
+ */
+function validateModelGroups(
+  modelGroups: any[],
+  models: ProviderConfig[]
+): ModelGroup[] {
+  const modelNames = new Set(models.map(m => m.customModel));
+  const groupNames = new Set<string>();
+
+  modelGroups.forEach((group: any, index: number) => {
+    if (!group.name || typeof group.name !== 'string') {
+      throw new Error(`Model group at index ${index} must have a name`);
+    }
+
+    if (groupNames.has(group.name)) {
+      throw new Error(`Duplicate model group name: "${group.name}"`);
+    }
+    groupNames.add(group.name);
+
+    if (!Array.isArray(group.models) || group.models.length === 0) {
+      throw new Error(`Model group "${group.name}" models array cannot be empty`);
+    }
+
+    group.models.forEach((modelName: string) => {
+      if (!modelNames.has(modelName)) {
+        throw new Error(`Model "${modelName}" in group "${group.name}" not found`);
+      }
+    });
+  });
+
+  return modelGroups as ModelGroup[];
 }
 
 /**
@@ -231,8 +275,12 @@ export function loadFullConfig(configPath: string): ProxyConfig {
       throw new Error('Config must have a "models" array');
     }
     validateModelsArray(config.models);
+    if (config.modelGroups) {
+      validateModelGroups(config.modelGroups, config.models);
+    }
     return {
       models: config.models,
+      modelGroups: config.modelGroups,
       adminPassword: config.adminPassword,
       apiKeys: config.apiKeys || [],
       userApiKeys: config.userApiKeys

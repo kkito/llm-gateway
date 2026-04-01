@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { ProviderConfig } from '../src/config.js';
+import type { ProviderConfig, ProxyConfig } from '../src/config.js';
 import type { Logger } from '../src/logger.js';
 import type { DetailLogger } from '../src/detail-logger.js';
 import { createChatCompletionsRoute } from '../src/routes/chat-completions.js';
@@ -23,15 +23,17 @@ const mockDetailLogger = {
 } as unknown as DetailLogger;
 
 describe('Route Aliases', () => {
-  const config: ProviderConfig[] = [
-    {
-      customModel: 'gpt-4',
-      realModel: 'gpt-4',
-      provider: 'openai',
-      apiKey: 'test-key',
-      baseUrl: 'https://api.openai.com/v1'
-    }
-  ];
+  const proxyConfig: ProxyConfig = {
+    models: [
+      {
+        customModel: 'gpt-4',
+        realModel: 'gpt-4',
+        provider: 'openai',
+        apiKey: 'test-key',
+        baseUrl: 'https://api.openai.com/v1'
+      }
+    ]
+  };
 
   const mockResponse = {
     id: 'chatcmpl-123',
@@ -55,7 +57,7 @@ describe('Route Aliases', () => {
 
     beforeEach(() => {
       app = new Hono();
-      app.route('', createChatCompletionsRoute(config, mockLogger, mockDetailLogger, 30000));
+      app.route('', createChatCompletionsRoute(proxyConfig, mockLogger, mockDetailLogger, 30000, '/tmp'));
     });
 
     it.each([
@@ -78,7 +80,7 @@ describe('Route Aliases', () => {
 
     beforeEach(() => {
       app = new Hono();
-      app.route('', createMessagesRoute(config, mockLogger, mockDetailLogger, 30000));
+      app.route('', createMessagesRoute(proxyConfig, mockLogger, mockDetailLogger, 30000, '/tmp'));
     });
 
     it.each([

@@ -10,17 +10,19 @@ interface Props {
 export const ModelsPage: FC<Props> = (props) => {
   return (
     <Layout title="模型列表">
-      <h1>模型列表</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+        <h1>模型列表</h1>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <a href="/admin/model-groups" role="button" class="secondary">Model Groups</a>
+          <a href="/admin/models/new" role="button">新增模型</a>
+        </div>
+      </div>
 
       {props.error && (
         <article aria-label="错误提示" style={{ backgroundColor: '#fee2e2', color: '#991b1b' }}>
           <strong>错误：</strong> {props.error}
         </article>
       )}
-
-      <a href="/admin/models/new" role="button">
-        新增模型
-      </a>
 
       {props.models.length === 0 ? (
         <p style={{ marginTop: '1rem', color: '#666' }}>暂无模型配置，请点击"新增模型"添加</p>

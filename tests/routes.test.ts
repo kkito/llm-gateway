@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { ProviderConfig } from '../src/config.js';
+import type { ProviderConfig, ProxyConfig } from '../src/config.js';
 import { Logger } from '../src/logger.js';
 import { DetailLogger } from '../src/detail-logger.js';
 import { createChatCompletionsRoute } from '../src/routes/chat-completions.js';
@@ -25,15 +25,15 @@ class MockDetailLogger {
   logRequest(id: string, body: any) {
     // no-op
   }
-  
+
   logUpstreamRequest(id: string, body: any) {
     // no-op
   }
-  
+
   logStreamResponse(id: string, chunks: string[]) {
     // no-op
   }
-  
+
   logConvertedResponse(id: string, response: any) {
     // no-op
   }
@@ -43,29 +43,31 @@ class MockDetailLogger {
 
 describe('createChatCompletionsRoute', () => {
   let app: Hono;
-  const config: ProviderConfig[] = [
-    {
-      customModel: 'anthropic/claude-3-sonnet',
-      realModel: 'claude-3-sonnet-20240229',
-      provider: 'anthropic',
-      apiKey: 'test-key',
-      baseUrl: 'https://api.anthropic.com'
-    },
-    {
-      customModel: 'openai/gpt-4',
-      realModel: 'gpt-4',
-      provider: 'openai',
-      apiKey: 'test-key',
-      baseUrl: 'https://api.openai.com/v1'
-    }
-  ];
+  const proxyConfig: ProxyConfig = {
+    models: [
+      {
+        customModel: 'anthropic/claude-3-sonnet',
+        realModel: 'claude-3-sonnet-20240229',
+        provider: 'anthropic',
+        apiKey: 'test-key',
+        baseUrl: 'https://api.anthropic.com'
+      },
+      {
+        customModel: 'openai/gpt-4',
+        realModel: 'gpt-4',
+        provider: 'openai',
+        apiKey: 'test-key',
+        baseUrl: 'https://api.openai.com/v1'
+      }
+    ]
+  };
 
   beforeEach(() => {
     app = new Hono();
     const logger = new MockLogger() as unknown as Logger;
     const detailLogger = new MockDetailLogger() as unknown as DetailLogger;
-    
-    app.route('', createChatCompletionsRoute(config, logger, detailLogger, 30000));
+
+    app.route('', createChatCompletionsRoute(proxyConfig, logger, detailLogger, 30000, '/tmp'));
   });
 
   it('should handle non-streaming request to Anthropic provider', async () => {
@@ -87,8 +89,21 @@ describe('createChatCompletionsRoute', () => {
       ok: true,
       status: 200,
       json: async () => mockAnthropicResponse,
-      clone: function() { return this; },
-      body: null
+      clone: function() {
+        return {
+          json: async () => mockAnthropicResponse,
+          body: new ReadableStream({
+            start(controller) {
+              controller.close();
+            }
+          })
+        };
+      },
+      body: new ReadableStream({
+        start(controller) {
+          controller.close();
+        }
+      })
     } as any);
 
     const response = await app.request('/v1/chat/completions', {
@@ -237,29 +252,31 @@ describe('createChatCompletionsRoute', () => {
 
 describe('createMessagesRoute', () => {
   let app: Hono;
-  const config: ProviderConfig[] = [
-    {
-      customModel: 'anthropic/claude-3-sonnet',
-      realModel: 'claude-3-sonnet-20240229',
-      provider: 'anthropic',
-      apiKey: 'test-key',
-      baseUrl: 'https://api.anthropic.com'
-    },
-    {
-      customModel: 'openai/gpt-4',
-      realModel: 'gpt-4',
-      provider: 'openai',
-      apiKey: 'test-key',
-      baseUrl: 'https://api.openai.com/v1'
-    }
-  ];
+  const proxyConfig: ProxyConfig = {
+    models: [
+      {
+        customModel: 'anthropic/claude-3-sonnet',
+        realModel: 'claude-3-sonnet-20240229',
+        provider: 'anthropic',
+        apiKey: 'test-key',
+        baseUrl: 'https://api.anthropic.com'
+      },
+      {
+        customModel: 'openai/gpt-4',
+        realModel: 'gpt-4',
+        provider: 'openai',
+        apiKey: 'test-key',
+        baseUrl: 'https://api.openai.com/v1'
+      }
+    ]
+  };
 
   beforeEach(() => {
     app = new Hono();
     const logger = new MockLogger() as unknown as Logger;
     const detailLogger = new MockDetailLogger() as unknown as DetailLogger;
-    
-    app.route('', createMessagesRoute(config, logger, detailLogger, 30000));
+
+    app.route('', createMessagesRoute(proxyConfig, logger, detailLogger, 30000, '/tmp'));
   });
 
   it('should handle non-streaming request to OpenAI provider', async () => {

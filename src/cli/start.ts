@@ -2,7 +2,7 @@
 
 import { Command } from 'commander';
 import { serve } from '@hono/node-server';
-import { loadConfig, getProxyDir, getLogDir, getDetailLogDir, createDefaultConfig } from '../config.js';
+import { loadFullConfig, getProxyDir, getLogDir, getDetailLogDir, createDefaultConfig } from '../config.js';
 import { Logger } from '../logger.js';
 import { DetailLogger } from '../detail-logger.js';
 import { createServer } from '../server.js';
@@ -200,9 +200,9 @@ function main() {
         }
 
         // 加载配置
-        const config = loadConfig(configPath);
-        console.log(`✓ 已加载 ${config.length} 个 provider 配置`);
-        config.forEach((p, i) => {
+        const config = loadFullConfig(configPath);
+        console.log(`✓ 已加载 ${config.models.length} 个 provider 配置`);
+        config.models.forEach((p, i) => {
           console.log(`  [${i + 1}] ${p.customModel} -> ${p.baseUrl}`);
         });
 

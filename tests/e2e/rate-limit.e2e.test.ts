@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { createServer } from '../../src/server.js';
 import { Logger } from '../../src/logger.js';
 import { DetailLogger } from '../../src/detail-logger.js';
-import type { ProviderConfig } from '../../src/config.js';
+import type { ProviderConfig, ProxyConfig } from '../../src/config.js';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { writeFileSync, mkdirSync, rmSync, existsSync } from 'fs';
@@ -22,8 +22,8 @@ describe('Rate Limit E2E 测试', () => {
       mkdirSync(testLogDir, { recursive: true });
     }
 
-    // 创建测试配置 - 带有限制
-    const testConfig: ProviderConfig[] = [
+    // 创建测试模型配置 - 带有限制
+    const testModels: ProviderConfig[] = [
       {
         customModel: 'test-limited',
         realModel: 'gpt-4',
@@ -48,7 +48,12 @@ describe('Rate Limit E2E 测试', () => {
       }
     ];
 
-    writeFileSync(testConfigPath, JSON.stringify({ models: testConfig }, null, 2));
+    // 创建测试 ProxyConfig 对象
+    const testConfig: ProxyConfig = {
+      models: testModels
+    };
+
+    writeFileSync(testConfigPath, JSON.stringify(testConfig, null, 2));
 
     const logger = new Logger(testLogDir);
     const detailLogger = new DetailLogger(testLogDir);

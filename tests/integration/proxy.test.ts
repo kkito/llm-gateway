@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { Hono } from 'hono';
-import type { ProviderConfig } from '../../src/config.js';
+import type { ProviderConfig, ProxyConfig } from '../../src/config.js';
 import { Logger } from '../../src/logger.js';
 import { DetailLogger } from '../../src/detail-logger.js';
 import { createServer } from '../../src/server.js';
@@ -11,7 +11,7 @@ describe('proxy integration', () => {
   let app: Hono;
   let testLogDir: string;
 
-  const testConfig: ProviderConfig[] = [
+  const testModels: ProviderConfig[] = [
     {
       customModel: 'test-gpt4',
       realModel: 'gpt-4',
@@ -20,6 +20,10 @@ describe('proxy integration', () => {
       provider: 'openai'
     }
   ];
+
+  const testConfig: ProxyConfig = {
+    models: testModels
+  };
 
   beforeAll(() => {
     testLogDir = join(tmpdir(), 'test-integration-logs-' + Date.now());

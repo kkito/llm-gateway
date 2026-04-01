@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import { Hono } from 'hono';
 import { createServer } from '../../src/server.js';
 import { Logger } from '../../src/logger.js';
 import { DetailLogger } from '../../src/detail-logger.js';
-import type { ProviderConfig, UserApiKey } from '../../src/config.js';
+import type { ProviderConfig, UserApiKey, ProxyConfig } from '../../src/config.js';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { writeFileSync, rmSync, mkdirSync } from 'fs';
@@ -58,7 +58,7 @@ describe('User Auth - No Guest User E2E', () => {
       // 确保目录存在
       mkdirSync(testLogDir, { recursive: true });
 
-      const testConfig: ProviderConfig[] = [
+      const testModels: ProviderConfig[] = [
         {
           customModel: 'test-openai',
           realModel: 'gpt-4',
@@ -68,7 +68,8 @@ describe('User Auth - No Guest User E2E', () => {
         }
       ];
 
-      writeFileSync(testConfigPath, JSON.stringify({ models: testConfig }, null, 2));
+      const testConfig: ProxyConfig = { models: testModels };
+      writeFileSync(testConfigPath, JSON.stringify(testConfig, null, 2));
 
       const logger = new Logger(testLogDir);
       const detailLogger = new DetailLogger(testLogDir);
@@ -100,7 +101,7 @@ describe('User Auth - No Guest User E2E', () => {
       // 确保目录存在
       mkdirSync(testLogDir, { recursive: true });
 
-      const testConfig: ProviderConfig[] = [
+      const testModels: ProviderConfig[] = [
         {
           customModel: 'test-openai',
           realModel: 'gpt-4',
@@ -110,7 +111,8 @@ describe('User Auth - No Guest User E2E', () => {
         }
       ];
 
-      writeFileSync(testConfigPath, JSON.stringify({ models: testConfig }, null, 2));
+      const testConfig: ProxyConfig = { models: testModels };
+      writeFileSync(testConfigPath, JSON.stringify(testConfig, null, 2));
 
       const logger = new Logger(testLogDir);
       const detailLogger = new DetailLogger(testLogDir);
@@ -118,7 +120,7 @@ describe('User Auth - No Guest User E2E', () => {
 
       try {
         const response = await noAuthApp.request('/user/stats');
-        
+
         // 应该直接返回 200，而不是重定向到登录页
         expect(response.status).toBe(200);
       } finally {
@@ -133,7 +135,7 @@ describe('User Auth - No Guest User E2E', () => {
       // 确保目录存在
       mkdirSync(testLogDir, { recursive: true });
 
-      const testConfig: ProviderConfig[] = [
+      const testModels: ProviderConfig[] = [
         {
           customModel: 'test-openai',
           realModel: 'gpt-4',
@@ -143,7 +145,8 @@ describe('User Auth - No Guest User E2E', () => {
         }
       ];
 
-      writeFileSync(testConfigPath, JSON.stringify({ models: testConfig }, null, 2));
+      const testConfig: ProxyConfig = { models: testModels };
+      writeFileSync(testConfigPath, JSON.stringify(testConfig, null, 2));
 
       const logger = new Logger(testLogDir);
       const detailLogger = new DetailLogger(testLogDir);
@@ -175,7 +178,7 @@ describe('User Auth - No Guest User E2E', () => {
       // 确保目录存在
       mkdirSync(testLogDir, { recursive: true });
 
-      const testConfig: ProviderConfig[] = [
+      const testModels: ProviderConfig[] = [
         {
           customModel: 'test-openai',
           realModel: 'gpt-4',
@@ -189,10 +192,12 @@ describe('User Auth - No Guest User E2E', () => {
         { name: '测试用户', apikey: testApiKey }
       ];
 
-      writeFileSync(testConfigPath, JSON.stringify({
-        models: testConfig,
+      const testConfig: ProxyConfig = {
+        models: testModels,
         userApiKeys: testUserApiKeys
-      }, null, 2));
+      };
+
+      writeFileSync(testConfigPath, JSON.stringify(testConfig, null, 2));
 
       const logger = new Logger(testLogDir);
       const detailLogger = new DetailLogger(testLogDir);
