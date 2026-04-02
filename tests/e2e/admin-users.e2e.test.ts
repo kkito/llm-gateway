@@ -331,7 +331,7 @@ describe('Admin Users Management E2E', () => {
       expect(response.status).toBe(200);
       const html = await response.text();
       // 应该包含 toggle 功能的元素（显示禁用或启用按钮）
-      expect(html).toContain('禁用用户认证');
+      expect(html).toContain('禁用认证');
     });
 
     it('应该成功禁用用户认证（清空 userApiKeys）', async () => {
@@ -460,7 +460,7 @@ describe('Admin Users Management E2E', () => {
       expect(response.status).toBe(200);
       const html = await response.text();
       // 应该显示提示信息，告知用户需要先添加用户才能启用认证
-      expect(html).toContain('提示');
+      expect(html).toContain('请先添加用户');
       expect(html).toContain('添加用户');
     });
   });
