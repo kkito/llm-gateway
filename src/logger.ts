@@ -31,24 +31,41 @@ export interface LogEntry {
 }
 
 export class Logger {
-  private logFilePath: string;
+  private logDir: string;
+  private customFilename?: string; // 当提供自定义文件名时使用（主要用于测试）
 
   constructor(
-    private logDir: string,
-    private filename: string = `proxy-${new Date().toISOString().split('T')[0]}.log`
+    logDir: string,
+    customFilename?: string
   ) {
+    this.logDir = logDir;
+    this.customFilename = customFilename;
     if (!existsSync(logDir)) {
       mkdirSync(logDir, { recursive: true });
     }
-    this.logFilePath = join(logDir, filename);
+  }
+
+  /**
+   * 获取当前日期的日志文件路径
+   * 如果指定了自定义文件名（如测试中），使用自定义文件名
+   * 否则动态生成当天的文件名
+   */
+  private getCurrentLogPath(): string {
+    let filename: string;
+    if (this.customFilename) {
+      filename = this.customFilename;
+    } else {
+      filename = `proxy-${new Date().toISOString().split('T')[0]}.log`;
+    }
+    return join(this.logDir, filename);
+  }
+
+  getFilePath(): string {
+    return this.getCurrentLogPath();
   }
 
   log(entry: LogEntry): void {
     const line = JSON.stringify(entry) + '\n';
-    appendFileSync(this.logFilePath, line, 'utf-8');
-  }
-
-  getFilePath(): string {
-    return this.logFilePath;
+    appendFileSync(this.getCurrentLogPath(), line, 'utf-8');
   }
 }

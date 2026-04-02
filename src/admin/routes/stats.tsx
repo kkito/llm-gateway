@@ -2,20 +2,30 @@ import { Hono } from 'hono';
 import { StatsPage } from '../views/stats.js';
 import { loadStats } from '../../lib/stats-core.js';
 import { getLogDir } from '../../config.js';
+import { getStatsProvider } from './stats-api.js';
 
 export function createStatsRoute() {
   const app = new Hono();
 
   // 统计页面
-  app.get('/admin/stats', (c) => {
+  app.get('/admin/stats', async (c) => {
     try {
       const date = c.req.query('date');
       const week = c.req.query('week');
       const month = c.req.query('month');
       const byHour = c.req.query('byHour') === 'true';
+      const logDirOverride = c.req.query('logDir');
 
-      // 使用统一的日志目录
-      const logDir = getLogDir();
+      // 获取日志目录
+      let logDir: string;
+      const statsProvider = getStatsProvider();
+      if (logDirOverride) {
+        logDir = logDirOverride;
+      } else if (statsProvider) {
+        logDir = statsProvider.getLogDir();
+      } else {
+        logDir = getLogDir();
+      }
 
       // 构建查询选项
       const options: { date?: string; week?: string; month?: string; byHour?: boolean } = {};
@@ -45,15 +55,14 @@ export function createStatsRoute() {
       let dateRange = '今日';
       if (date) dateRange = date;
       else if (week) {
-        // 简单显示周数
         dateRange = week;
       } else if (month) {
         dateRange = month;
       }
 
       return c.html(
-        <StatsPage 
-          stats={stats} 
+        <StatsPage
+          stats={stats}
           dateRange={dateRange}
           currentType={currentType}
           currentValue={currentValue}

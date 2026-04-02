@@ -30,8 +30,17 @@ export function createStatsApiRoute() {
       const logDir = c.req.query('logDir');
       const forceReload = c.req.query('forceReload') === 'true';
 
-      // 使用统一的日志目录，支持通过参数覆盖
-      const actualLogDir = logDir || getLogDir();
+      // 使用统一的日志目录
+      // 优先通过 query 参数指定的 logDir，否则从全局 StatsProvider 获取
+      // 这样即使服务器启动时使用了 --log-dir 参数，API 也能找到正确的日志目录
+      let actualLogDir: string;
+      if (logDir) {
+        actualLogDir = logDir;
+      } else if (statsProvider) {
+        actualLogDir = statsProvider.getLogDir();
+      } else {
+        actualLogDir = getLogDir();
+      }
 
       // 构建查询选项
       const options: { date?: string; week?: string; month?: string; byHour?: boolean; forceReload?: boolean } = {};

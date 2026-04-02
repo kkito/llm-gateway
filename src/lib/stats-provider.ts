@@ -91,6 +91,13 @@ export class StatsProvider {
   }
 
   /**
+   * 获取日志目录路径（用于路由中动态获取正确的日志目录）
+   */
+  getLogDir(): string {
+    return this.logDir;
+  }
+
+  /**
    * 获取统计数据
    */
   async getStats(options: StatsOptions = {}): Promise<Stats> {
