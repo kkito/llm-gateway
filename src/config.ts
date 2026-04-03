@@ -1,10 +1,11 @@
-import { createHash } from 'crypto';
 import { randomUUID } from 'crypto';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
-import { homedir } from 'os';
 import { join } from 'path';
 
 export type ProviderType = 'openai' | 'anthropic';
+
+export * from './lib/password.js';
+export * from './lib/paths.js';
 
 /**
  * 模型使用限制配置
@@ -64,55 +65,6 @@ export interface ProxyConfig {
 }
 
 const REQUIRED_FIELDS = ['customModel', 'realModel', 'apiKey', 'baseUrl', 'provider'] as const;
-
-/**
- * 对密码进行 SHA256 加密
- * @param password 明文密码
- * @returns SHA256 哈希值
- */
-export function hashPassword(password: string): string {
-  return createHash('sha256').update('llm-gateway' + password).digest('hex');
-}
-
-/**
- * 验证密码是否正确
- * @param password 明文密码
- * @param digest 存储的哈希值
- * @returns 是否匹配
- */
-export function verifyPassword(password: string, digest: string): boolean {
-  return hashPassword(password) === digest;
-}
-
-/**
- * 获取默认代理配置目录
- */
-export function getProxyDir(): string {
-  return join(homedir(), '.llm-gateway');
-}
-
-/**
- * 获取配置文件路径（默认）
- */
-export function getConfigPath(): string {
-  return join(getProxyDir(), 'config.json');
-}
-
-/**
- * 获取日志目录路径（结构化日志）
- * 默认：~/.llm-gateway/logs/proxy
- */
-export function getLogDir(): string {
-  return join(getProxyDir(), 'logs/proxy');
-}
-
-/**
- * 获取详细日志目录路径（请求/响应完整内容）
- * 默认：~/.llm-gateway/logs
- */
-export function getDetailLogDir(): string {
-  return join(getProxyDir(), 'logs');
-}
 
 /**
  * 验证配置项是否包含所有必需字段

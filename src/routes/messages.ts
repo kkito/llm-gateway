@@ -7,39 +7,12 @@ import { buildHeaders, buildUrl } from '../providers/index.js';
 import { convertAnthropicRequestToOpenAI, convertOpenAIResponseToAnthropic } from '../converters/anthropic-to-openai.js';
 import { ModelGroupResolver } from '../lib/model-group-resolver.js';
 import {
-  convertOpenAIStreamChunkToAnthropic,
-  formatAnthropicEventToSSE,
-  parseOpenAISSEData,
   createOpenAIToAnthropicStreamState,
   type OpenAIToAnthropicStreamState
 } from '../converters/openai-to-anthropic.js';
 import { getCurrentUser } from '../user/middleware/auth.js';
 import { RateLimiter } from '../lib/rate-limiter.js';
-
-/**
- * 解析 OpenAI SSE 块并转换为 Anthropic 格式
- */
-function parseAndConvertOpenAISSE(
-  sseBlock: string,
-  state: OpenAIToAnthropicStreamState
-): string[] {
-  const anthropicChunks: string[] = [];
-  const lines = sseBlock.split('\n');
-  
-  for (const line of lines) {
-    const parsed = parseOpenAISSEData(line);
-    if (!parsed?.data) continue;
-    
-    // 将 OpenAI chunk 转换为 Anthropic 事件
-    const anthropicEvents = convertOpenAIStreamChunkToAnthropic(parsed.data, state);
-    
-    for (const event of anthropicEvents) {
-      anthropicChunks.push(formatAnthropicEventToSSE(event));
-    }
-  }
-  
-  return anthropicChunks;
-}
+import { parseAndConvertOpenAISSE } from './utils/sse-handlers-messages.js';
 
 export function createMessagesRoute(
   config: ProxyConfig | (() => ProxyConfig),
