@@ -4,71 +4,10 @@ import type { LogEntry } from '../logger.js';
 import type { ModelLimit } from '../config.js';
 import { getTodayDate, getWeekStart, getMonthStart, getPeriodRange } from './period-utils.js';
 import { calculateCost, type Pricing } from './cost-calculator.js';
+import type { SlidingWindowEntry, SlidingWindowCounter, ModelUsageCounter, ParsedLogEntry } from './types/usage.js';
 
-/**
- * 滑动窗口条目
- */
-interface SlidingWindowEntry {
-  timestamp: number;  // 秒级时间戳
-  requests: number;
-  inputTokens: number;
-  cost: number;
-}
-
-/**
- * 滑动窗口计数器
- */
-interface SlidingWindowCounter {
-  windowHours: number;
-  entries: SlidingWindowEntry[];
-  loaded: boolean;
-}
-
-/**
- * 模型用量计数器
- */
-export interface ModelUsageCounter {
-  model: string;
-  lastChecked: number;
-  
-  today: {
-    date: string;
-    requests: number;
-    inputTokens: number;
-    cost: number;
-    loaded: boolean;
-  };
-  
-  thisWeek: {
-    weekStart: string;
-    requests: number;
-    inputTokens: number;
-    cost: number;
-    loaded: boolean;
-  };
-  
-  thisMonth: {
-    month: string;
-    requests: number;
-    inputTokens: number;
-    cost: number;
-    loaded: boolean;
-  };
-  
-  slidingWindows: Map<number, SlidingWindowCounter>;
-}
-
-/**
- * 日志条目解析结果
- */
-interface ParsedLogEntry {
-  timestamp: string;
-  customModel: string;
-  statusCode: number;
-  promptTokens?: number;
-  completionTokens?: number;
-  cachedTokens?: number;
-}
+// Re-export for backward compatibility
+export type { SlidingWindowEntry, SlidingWindowCounter, ModelUsageCounter, ParsedLogEntry };
 
 /**
  * 用量追踪器类
