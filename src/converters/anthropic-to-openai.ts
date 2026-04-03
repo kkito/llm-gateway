@@ -5,124 +5,17 @@
  * 参考 LiteLLM 实现：refproj/litellm/litellm/llms/anthropic/experimental_pass_through/adapters/
  */
 
-// ==================== 类型定义 ====================
-
-interface AnthropicContentBlock {
-  type: 'text' | 'image' | 'tool_use' | 'tool_result';
-  text?: string;
-  source?: {
-    type: 'base64' | 'url';
-    media_type: string;
-    data: string;
-  };
-  id?: string;
-  name?: string;
-  input?: any;
-  tool_use_id?: string;
-  content?: any;
-}
-
-interface AnthropicMessage {
-  role: 'user' | 'assistant' | 'system';
-  content: string | AnthropicContentBlock[];
-}
-
-interface AnthropicTool {
-  name: string;
-  description: string;
-  input_schema: any;
-}
-
-interface AnthropicRequest {
-  model: string;
-  messages: AnthropicMessage[];
-  system?: string | Array<{ type: 'text'; text: string }>;
-  tools?: AnthropicTool[];
-  max_tokens: number;
-  stream?: boolean;
-  temperature?: number;
-}
-
-interface OpenAIMessage {
-  role: 'system' | 'user' | 'assistant' | 'tool';
-  content: string | Array<{
-    type: 'text' | 'image_url';
-    text?: string;
-    image_url?: { url: string };
-  }> | null;
-  tool_calls?: Array<{
-    id: string;
-    type: 'function';
-    function: {
-      name: string;
-      arguments: string;
-    };
-  }>;
-  tool_call_id?: string;
-}
-
-interface OpenAITool {
-  type: 'function';
-  function: {
-    name: string;
-    description: string;
-    parameters: any;
-  };
-}
-
-interface OpenAIRequest {
-  model: string;
-  messages: OpenAIMessage[];
-  tools?: OpenAITool[];
-  max_tokens?: number;
-  stream?: boolean;
-  temperature?: number;
-}
-
-interface AnthropicResponse {
-  id: string;
-  type: 'message';
-  role: 'assistant';
-  model: string;
-  content: Array<{
-    type: 'text' | 'tool_use';
-    text?: string;
-    id?: string;
-    name?: string;
-    input?: any;
-  }>;
-  stop_reason: 'end_turn' | 'max_tokens' | 'tool_use' | 'stop_sequence';
-  stop_sequence: string | null;
-  usage: {
-    input_tokens: number;
-    output_tokens: number;
-  };
-}
-
-interface OpenAIResponse {
-  id: string;
-  model: string;
-  choices: Array<{
-    message: {
-      role: string;
-      content: string | null;
-      tool_calls?: Array<{
-        id: string;
-        type: string;
-        function: {
-          name: string;
-          arguments: string;
-        };
-      }>;
-    };
-    finish_reason: string | null;
-  }>;
-  usage?: {
-    prompt_tokens: number;
-    completion_tokens: number;
-    total_tokens: number;
-  };
-}
+import {
+  type AnthropicContentBlock,
+  type AnthropicMessage,
+  type AnthropicRequest,
+  type AnthropicTool,
+  type AnthropicResponse,
+  type OpenAIMessage,
+  type OpenAITool,
+  type OpenAIRequest,
+  type OpenAIResponse
+} from './types.js';
 
 // ==================== 请求转换：Anthropic → OpenAI ====================
 
