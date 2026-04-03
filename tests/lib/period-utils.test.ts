@@ -16,7 +16,8 @@ describe('period-utils', () => {
 
     it('should return today date', () => {
       const date = getTodayDate();
-      const today = new Date().toISOString().split('T')[0];
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       expect(date).toBe(today);
     });
   });
@@ -75,11 +76,12 @@ describe('period-utils', () => {
     it('should return hours range with custom value', () => {
       const range = getPeriodRange('hours', 5);
       expect(range.description).toBe('last 5 hours');
-      
+
       // 验证开始时间是 5 小时前
       const now = new Date();
       const past = new Date(now.getTime() - 5 * 3600 * 1000);
-      expect(range.start).toBe(past.toISOString().split('T')[0]);
+      const expected = `${past.getFullYear()}-${String(past.getMonth() + 1).padStart(2, '0')}-${String(past.getDate()).padStart(2, '0')}`;
+      expect(range.start).toBe(expected);
     });
 
     it('should use default 24 hours when periodValue not provided', () => {

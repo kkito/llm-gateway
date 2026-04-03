@@ -1,8 +1,18 @@
 /**
+ * 将 Date 对象转换为本地 YYYY-MM-DD 格式
+ */
+function toLocalDateString(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/**
  * 获取今日日期字符串 (YYYY-MM-DD)
  */
 export function getTodayDate(): string {
-  return new Date().toISOString().split('T')[0];
+  return toLocalDateString(new Date());
 }
 
 /**
@@ -13,7 +23,7 @@ export function getWeekStart(): string {
   const day = now.getDay() || 7; // 周日转为 7
   const monday = new Date(now);
   monday.setDate(now.getDate() - day + 1);
-  return monday.toISOString().split('T')[0];
+  return toLocalDateString(monday);
 }
 
 /**
@@ -66,7 +76,7 @@ export function getPeriodRange(period: 'day' | 'hours' | 'week' | 'month', perio
       const now = new Date();
       const past = new Date(now.getTime() - hours * 3600 * 1000);
       return {
-        start: past.toISOString().split('T')[0],
+        start: toLocalDateString(past),
         end: today,
         description: `last ${hours} hours`
       };
