@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import type { ProviderConfig, ProxyConfig } from '../../config.js';
+import type { ProviderConfig, ProxyConfig, ModelGroup } from '../../config.js';
 import { HomePage } from '../views/home.js';
 import { getCurrentUser } from '../middleware/auth.js';
 import { loadFullConfig } from '../../config.js';
@@ -25,7 +25,7 @@ export function createHomeRoute(config: ProxyConfig | (() => ProxyConfig), confi
     if (!isAuthEnabled) {
       const currentConfig = typeof config === 'function' ? config() : config;
       // 未启用认证时，不显示用户名（无 Guest 概念）
-      return c.html(<HomePage models={currentConfig.models} userName={undefined} />);
+      return c.html(<HomePage models={currentConfig.models} modelGroups={currentConfig.modelGroups} userName={undefined} />);
     }
 
     // 已启用认证，需要登录
@@ -35,7 +35,7 @@ export function createHomeRoute(config: ProxyConfig | (() => ProxyConfig), confi
     }
 
     const currentConfig = typeof config === 'function' ? config() : config;
-    return c.html(<HomePage models={currentConfig.models} userName={currentUser.name} />);
+    return c.html(<HomePage models={currentConfig.models} modelGroups={currentConfig.modelGroups} userName={currentUser.name} />);
   });
 
   return app;

@@ -1,9 +1,10 @@
 import { FC } from 'hono/jsx';
 import { Layout } from '../components/Layout.js';
-import type { ProviderConfig } from '../../config.js';
+import type { ProviderConfig, ModelGroup } from '../../config.js';
 
 interface Props {
   models: ProviderConfig[];
+  modelGroups?: ModelGroup[];
   userName?: string;
 }
 
@@ -207,6 +208,41 @@ export const HomePage: FC<Props> = (props) => {
               display: block;
             }
 
+            /* Model Group 切换 */
+            .model-group-toggle {
+              display: flex;
+              gap: 1rem;
+              margin-bottom: 0.5rem;
+              padding-bottom: 0.5rem;
+              border-bottom: 1px solid var(--border);
+            }
+
+            .toggle-option {
+              display: flex;
+              align-items: center;
+              gap: 0.3rem;
+              cursor: pointer;
+            }
+
+            .toggle-option input[type="radio"] {
+              accent-color: var(--primary);
+              cursor: pointer;
+            }
+
+            .toggle-option label {
+              font-size: 0.8rem;
+              color: var(--text-primary);
+              cursor: pointer;
+            }
+
+            .model-inputs {
+              flex-wrap: wrap;
+            }
+
+            .model-inputs select.input-value {
+              min-width: 120px;
+            }
+
             /* API Key 成功提示 */
             .api-key-success {
               display: flex;
@@ -401,14 +437,34 @@ export const HomePage: FC<Props> = (props) => {
           <span class="card-icon">🤖</span>
           <h2>
             Model
-            <span class="model-count">（{props.models.length} 个可选）</span>
+            {props.modelGroups && props.modelGroups.length > 0 ? (
+              <span class="model-count">（{props.models.length} 个模型 / {props.modelGroups.length} 个模型组）</span>
+            ) : (
+              <span class="model-count">（{props.models.length} 个可选）</span>
+            )}
           </h2>
         </div>
-        <div class="input-wrapper">
+        
+        {props.modelGroups && props.modelGroups.length > 0 ? (
+          /* 启用 Model Group 时的双下拉框 UI */
+          <div class="model-group-toggle">
+            <div class="toggle-option">
+              <input type="radio" id="toggle-model" name="model-toggle" value="model" checked />
+              <label for="toggle-model">模型</label>
+            </div>
+            <div class="toggle-option">
+              <input type="radio" id="toggle-group" name="model-toggle" value="group" />
+              <label for="toggle-group">模型组</label>
+            </div>
+          </div>
+        ) : null}
+
+        <div class="input-wrapper model-inputs">
           <select
             id="model-select"
             class="input-value"
             value={firstModel}
+            disabled={props.modelGroups && props.modelGroups.length > 0}
           >
             {props.models.map((model) => (
               <option key={model.customModel} value={model.customModel}>
@@ -416,6 +472,22 @@ export const HomePage: FC<Props> = (props) => {
               </option>
             ))}
           </select>
+          
+          {props.modelGroups && props.modelGroups.length > 0 && (
+            <select
+              id="model-group-select"
+              class="input-value"
+              disabled={true}
+            >
+              <option value="">选择模型组...</option>
+              {props.modelGroups.map((group) => (
+                <option key={group.name} value={group.name}>
+                  {group.name} ({group.models.length} 个模型)
+                </option>
+              ))}
+            </select>
+          )}
+          
           <button id="copy-model" class="copy-btn">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -424,6 +496,7 @@ export const HomePage: FC<Props> = (props) => {
           </button>
         </div>
         <div id="model-desc" class="model-desc"></div>
+        <div id="model-group-desc" class="model-desc"></div>
       </div>
 
       {/* API Key 卡片 */}
@@ -481,6 +554,15 @@ export const HomePage: FC<Props> = (props) => {
                 return acc;
               }, {} as Record<string, string>))};
 
+              // 模型组描述数据
+              var modelGroupDescs = ${JSON.stringify((props.modelGroups || []).reduce((acc, g) => {
+                acc[g.name] = g.desc || '';
+                return acc;
+              }, {} as Record<string, string>))};
+
+              // 是否有 Model Group 配置
+              var hasModelGroups = ${props.modelGroups && props.modelGroups.length > 0};
+
               // 初始化 Base URL
               var baseUrl = window.location.origin;
               document.getElementById('base-url-display').value = baseUrl;
@@ -502,12 +584,64 @@ export const HomePage: FC<Props> = (props) => {
                 }
               }
 
+              // 更新模型组描述
+              function updateModelGroupDesc(groupName) {
+                var desc = modelGroupDescs[groupName] || '';
+                var descElement = document.getElementById('model-group-desc');
+                if (desc) {
+                  descElement.textContent = desc;
+                  descElement.classList.add('visible');
+                } else {
+                  descElement.textContent = '';
+                  descElement.classList.remove('visible');
+                }
+              }
+
+              // 切换模型/模型组
+              function setupToggle() {
+                if (!hasModelGroups) return;
+
+                var toggleModel = document.getElementById('toggle-model');
+                var toggleGroup = document.getElementById('toggle-group');
+                var modelSelect = document.getElementById('model-select');
+                var groupSelect = document.getElementById('model-group-select');
+
+                toggleModel.addEventListener('change', function() {
+                  if (this.checked) {
+                    modelSelect.disabled = false;
+                    groupSelect.disabled = true;
+                    groupSelect.value = '';
+                    document.getElementById('model-desc').style.display = 'block';
+                    document.getElementById('model-group-desc').style.display = 'none';
+                    updateModelDesc(modelSelect.value);
+                  }
+                });
+
+                toggleGroup.addEventListener('change', function() {
+                  if (this.checked) {
+                    modelSelect.disabled = true;
+                    groupSelect.disabled = false;
+                    document.getElementById('model-desc').style.display = 'none';
+                    document.getElementById('model-group-desc').style.display = 'block';
+                    updateModelGroupDesc(groupSelect.value);
+                  }
+                });
+
+                // 模型组选择变化
+                groupSelect.addEventListener('change', function(e) {
+                  updateModelGroupDesc(e.target.value);
+                });
+              }
+
+              // 初始化切换功能
+              setupToggle();
+
               // Toast 提示
               function showToast(message, type) {
                 var toast = document.getElementById('toast');
                 toast.textContent = message;
                 toast.className = 'toast show ' + (type || '');
-                
+
                 setTimeout(function() {
                   toast.classList.remove('show');
                 }, 2000);
@@ -554,11 +688,28 @@ export const HomePage: FC<Props> = (props) => {
               });
 
               document.getElementById('copy-model').addEventListener('click', function() {
-                var select = document.getElementById('model-select');
-                var text = select.value;
-                copyToClipboard(text, function(success) {
-                  showToast(success ? '✅ Model 已复制' : '❌ 复制失败', success ? 'success' : 'error');
-                });
+                var modelSelect = document.getElementById('model-select');
+                var groupSelect = document.getElementById('model-group-select');
+                var text;
+                var message;
+
+                if (hasModelGroups && document.getElementById('toggle-group').checked) {
+                  // copy model group name
+                  text = groupSelect.value;
+                  message = text ? '✅ Model Group 已复制' : '❌ Please select a model group first';
+                } else {
+                  // copy model name
+                  text = modelSelect.value;
+                  message = '✅ Model 已复制';
+                }
+
+                if (text) {
+                  copyToClipboard(text, function(success) {
+                    showToast(success ? message : '❌ 复制失败', success ? 'success' : 'error');
+                  });
+                } else {
+                  showToast('❌ 请先选择', 'error');
+                }
               });
             })();
           `
