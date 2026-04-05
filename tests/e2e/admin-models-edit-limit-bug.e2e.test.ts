@@ -148,8 +148,8 @@ describe('Admin Models Edit - 限制管理独立页面 E2E', () => {
 
       const html = await response.text();
 
-      // 页面应该包含返回模型列表的链接
-      expect(html).toContain('返回模型列表');
+      // 页面标题应该包含模型名称，且顶部菜单有模型管理链接
+      expect(html).toContain('限制规则管理 - gateway-LongCat-Flash-Lite');
       expect(html).toContain('/admin/models');
     });
   });

@@ -1,4 +1,5 @@
 import { FC } from 'hono/jsx';
+import { TopbarNav } from '../components/TopbarNav.js';
 import type { ProviderConfig } from '../../config.js';
 
 interface Props {
@@ -43,65 +44,6 @@ export const ModelsPage: FC<Props> = (props) => {
             color: var(--text-primary);
             line-height: 1.6;
             min-height: 100vh;
-          }
-
-          /* ───── 顶部导航 ───── */
-          .topbar {
-            background: var(--bg-card);
-            border-bottom: 1px solid var(--border-color);
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            backdrop-filter: blur(12px);
-            background: rgba(255,255,255,0.88);
-          }
-          .topbar-inner {
-            max-width: 1280px;
-            margin: 0 auto;
-            padding: 0 2rem;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            height: 64px;
-          }
-          .topbar-brand {
-            font-family: 'Outfit', sans-serif;
-            font-weight: 700;
-            font-size: 1.2rem;
-            background: var(--accent-gradient);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            text-decoration: none;
-            letter-spacing: -0.02em;
-          }
-          .topbar-nav {
-            display: flex;
-            gap: 0.25rem;
-            list-style: none;
-          }
-          .topbar-nav a {
-            text-decoration: none;
-            color: var(--text-secondary);
-            font-weight: 500;
-            font-size: 0.9rem;
-            padding: 0.5rem 0.85rem;
-            border-radius: 8px;
-            transition: all 0.2s ease;
-          }
-          .topbar-nav a:hover {
-            color: var(--accent-color);
-            background: hsl(245 80% 96%);
-          }
-          .topbar-nav a.active {
-            color: var(--accent-color);
-            background: hsl(245 80% 94%);
-          }
-
-          /* ───── 主内容区 ───── */
-          .main-content {
-            max-width: 1280px;
-            margin: 0 auto;
-            padding: 2.5rem 2rem 4rem;
           }
 
           /* Header */
@@ -454,18 +396,8 @@ export const ModelsPage: FC<Props> = (props) => {
 
           /* ───── Responsive ───── */
           @media (max-width: 768px) {
-            .topbar-inner {
-              flex-direction: column;
-              height: auto;
-              padding: 0.75rem 1rem;
-              gap: 0.5rem;
-            }
-            .topbar-nav {
-              flex-wrap: wrap;
-              justify-content: center;
-            }
             .main-content {
-              padding: 1.5rem 1rem 3rem;
+              padding: 1.5rem 1rem 3rem !important;
             }
             .page-header {
               flex-direction: column;
@@ -479,26 +411,9 @@ export const ModelsPage: FC<Props> = (props) => {
             }
           }
         `}</style>
-        <link rel="stylesheet" href="/assets/pico.min.css" />
       </head>
       <body>
-
-        {/* ───── 顶部导航 ───── */}
-        <nav class="topbar">
-          <div class="topbar-inner">
-            <a href="/user/main" class="topbar-brand">LLM Gateway</a>
-            <ul class="topbar-nav">
-              <li><a href="/admin/models" class="active">模型管理</a></li>
-              <li><a href="/admin/users">用户管理</a></li>
-              <li><a href="/admin/stats">统计 Dashboard</a></li>
-              <li><a href="/admin/password">密码设置</a></li>
-              <li><a href="/admin/api-keys">API Key 管理</a></li>
-            </ul>
-          </div>
-        </nav>
-
-        <main class="main-content">
-
+        <TopbarNav title="模型管理" activePath="/admin/models">
           {/* ───── 页面标题区 ───── */}
           <div class="page-header">
             <div>
@@ -562,7 +477,7 @@ export const ModelsPage: FC<Props> = (props) => {
                     <div class="meta-row">
                       <span class="meta-label">Provider</span>
                       <span
-                        class={`provider-badge ${
+                        class={
                           model.provider === 'openai'
                             ? 'provider-openai'
                             : model.provider === 'anthropic'
@@ -570,7 +485,7 @@ export const ModelsPage: FC<Props> = (props) => {
                             : model.provider === 'azure'
                             ? 'provider-azure'
                             : 'provider-default'
-                        }`}
+                        }
                       >
                         {model.provider}
                       </span>
@@ -611,8 +526,7 @@ export const ModelsPage: FC<Props> = (props) => {
               ))}
             </div>
           )}
-
-        </main>
+        </TopbarNav>
 
         <script
           dangerouslySetInnerHTML={{
@@ -649,7 +563,6 @@ export const ModelsPage: FC<Props> = (props) => {
             `
           }}
         />
-
       </body>
     </html>
   );

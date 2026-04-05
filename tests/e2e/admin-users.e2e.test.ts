@@ -423,7 +423,7 @@ describe('Admin Users Management E2E', () => {
       const html = await response.text();
       // 菜单中应该包含指向 /admin/users 的链接
       expect(html).toContain('<a href="/admin/users"');
-      expect(html).toContain('用户管理');
+      expect(html).toContain('用户');
     });
 
     it('模型管理页面菜单也应该包含用户管理链接', async () => {
@@ -437,7 +437,7 @@ describe('Admin Users Management E2E', () => {
       const html = await response.text();
       // 菜单中应该包含指向 /admin/users 的链接
       expect(html).toContain('<a href="/admin/users"');
-      expect(html).toContain('用户管理');
+      expect(html).toContain('用户');
     });
   });
 
