@@ -15,7 +15,7 @@ export const ModelsPage: FC<Props> = (props) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>模型管理 - LLM Gateway</title>
         <style>{`
-          @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=DM+Sans:wght@400;500;600&display=swap');
+          @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap');
 
           :root {
             --bg-page: #f8f9fb;
@@ -98,6 +98,10 @@ export const ModelsPage: FC<Props> = (props) => {
             box-shadow: var(--shadow-sm);
             border: 1px solid var(--border-color);
           }
+          .btn-secondary:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+          }
           .btn-icon {
             width: 32px;
             height: 32px;
@@ -107,8 +111,19 @@ export const ModelsPage: FC<Props> = (props) => {
             font-size: 0.85rem;
           }
           .btn-sm {
-            padding: 0.45rem 0.85rem;
-            font-size: 0.82rem;
+            padding: 0.4rem 0.75rem;
+            font-size: 0.8rem;
+            font-weight: 500;
+          }
+          .btn-danger {
+            background: var(--danger-bg);
+            color: var(--danger-color);
+            border: 1px solid #fecaca;
+          }
+          .btn-danger:hover {
+            background: var(--danger-color);
+            color: #fff;
+            border-color: var(--danger-color);
           }
 
           /* Error banner */
@@ -155,196 +170,139 @@ export const ModelsPage: FC<Props> = (props) => {
             margin-bottom: 1.5rem;
           }
 
-          /* ───── 卡片网格 ───── */
-          .models-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
-            gap: 1.25rem;
-          }
-
-          @media (max-width: 480px) {
-            .models-grid {
-              grid-template-columns: 1fr;
-            }
-          }
-
-          .model-card {
+          /* ───── 列表表格 ───── */
+          .models-table-wrapper {
             background: var(--bg-card);
             border: 1px solid var(--border-color);
             border-radius: var(--radius);
-            padding: 1.75rem;
-            position: relative;
             overflow: hidden;
-          }
-          .model-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: var(--accent-gradient);
-          }
-          .model-card:hover {
-            box-shadow: var(--shadow-lg);
-            border-color: transparent;
-          }
-          .model-card:hover::before {
-            opacity: 1;
+            animation: fadeUp 0.6s ease-out both;
           }
 
-          /* Card header */
-          .model-card-header {
-            display: flex;
-            align-items: flex-start;
-            justify-content: space-between;
-            gap: 1rem;
-            margin-bottom: 1.25rem;
+          .models-table {
+            width: 100%;
+            border-collapse: collapse;
           }
-          .model-name-block {
-            flex: 1;
+
+          .models-table thead {
+            background: #fafbfc;
+            border-bottom: 1px solid var(--border-color);
           }
-          .model-tag {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.35rem;
-            background: hsl(245 80% 94%);
-            color: var(--accent-color);
-            padding: 0.3rem 0.7rem;
-            border-radius: 6px;
+
+          .models-table th {
+            padding: 0.75rem 1rem;
             font-size: 0.78rem;
             font-weight: 600;
-            margin-bottom: 0.6rem;
-          }
-          .model-tag-icon {
-            font-size: 0.7rem;
-          }
-          .model-custom-name {
-            font-family: 'Outfit', sans-serif;
-            font-weight: 600;
-            font-size: 1.15rem;
-            color: var(--text-primary);
-            letter-spacing: -0.02em;
-          }
-          .model-real-name {
-            display: block;
-            font-size: 0.85rem;
             color: var(--text-secondary);
-            margin-top: 0.25rem;
+            text-align: left;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            white-space: nowrap;
           }
-          .model-real-name span {
-            color: var(--text-primary);
-            font-weight: 500;
+
+          .models-table td {
+            padding: 0.85rem 1rem;
+            font-size: 0.88rem;
+            border-bottom: 1px solid #f3f4f6;
+            vertical-align: middle;
           }
-          .order-controls {
+
+          .models-table tbody tr:last-child td {
+            border-bottom: none;
+          }
+
+          .models-table tbody tr {
+            transition: background 0.2s ease;
+          }
+
+          .models-table tbody tr:hover {
+            background: #fafbfc;
+          }
+
+          .model-name-cell {
             display: flex;
             flex-direction: column;
-            gap: 0.35rem;
-            flex-shrink: 0;
+            gap: 0.15rem;
           }
-          .order-btn {
-            width: 28px;
-            height: 28px;
-            padding: 0;
+
+          .model-custom-name {
+            font-weight: 600;
+            font-family: 'Outfit', sans-serif;
+            color: var(--text-primary);
+            font-size: 0.92rem;
+          }
+
+          .model-real-name {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+          }
+
+          .model-desc-cell {
+            max-width: 280px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: var(--text-secondary);
+            font-size: 0.84rem;
+          }
+
+          .actions-cell {
             display: flex;
+            gap: 0.4rem;
+            align-items: center;
+            flex-wrap: nowrap;
+          }
+
+          .order-btn {
+            width: 26px;
+            height: 26px;
+            padding: 0;
+            display: inline-flex;
             align-items: center;
             justify-content: center;
             border: 1px solid var(--border-color);
-            border-radius: 6px;
+            border-radius: 5px;
             background: var(--bg-card);
             color: var(--text-secondary);
             cursor: pointer;
             font-size: 0.75rem;
             font-weight: 600;
+            transition: all 0.2s;
+            flex-shrink: 0;
           }
+
           .order-btn:hover:not(:disabled) {
             border-color: var(--accent-color);
             color: var(--accent-color);
           }
+
           .order-btn:disabled {
-            opacity: 0.3em;
+            opacity: 0.3;
             cursor: not-allowed;
           }
 
-          /* Card body */
-          .model-card-body {
-            display: flex;
-            flex-direction: column;
-            gap: 0.6rem;
-            margin-bottom: 1.25rem;
-          }
-          .meta-row {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.88rem;
-          }
-          .meta-label {
-            color: var(--text-secondary);
-            min-width: 65px;
-            font-weight: 500;
-          }
-          .meta-value {
-            color: var(--text-primary);
-            font-family: 'DM Mono', 'Fira Code', monospace;
-            font-size: 0.82rem;
-            background: #f3f4f6;
-            padding: 0.25rem 0.55rem;
-            border-radius: 5px;
-          }
-          .provider-badge {
+          .index-badge {
             display: inline-flex;
             align-items: center;
-            gap: 0.3rem;
-            font-size: 0.78rem;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: hsl(245 80% 94%);
+            color: var(--accent-color);
+            font-size: 0.75rem;
             font-weight: 600;
-            text-transform: lowercase;
-            padding: 0.2rem 0.65rem;
-            border-radius: 5px;
-          }
-          .provider-openai {
-            background: #ecfdf5;
-            color: #059669;
-          }
-          .provider-anthropic {
-            background: #fef3c7;
-            color: #b45309;
-          }
-          .provider-azure {
-            background: #eff6ff;
-            color: #1d4ed8;
-          }
-          .provider-default {
-            background: #f3f4f6;
-            color: #4b5563;
-          }
-          .model-desc {
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-            line-height: 1.55;
-            padding: 0.75rem;
-            background: #fafafa;
-            border-radius: var(--radius-sm);
-            border-left: 3px solid hsl(245 20% 85%);
+            flex-shrink: 0;
           }
 
-          /* Card actions */
-          .model-card-actions {
-            display: flex;
-            gap: 0.5rem;
-            padding-top: 1rem;
-            border-top: 1px solid var(--border-color);
+          /* ───── Animations ───── */
+          @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
           }
-
-          .btn-danger {
-            background: var(--danger-bg);
-            color: var(--danger-color);
-            border: 1px solid #fecaca;
-          }
-          .btn-danger:hover {
-            background: var(--danger-color);
-            color: #fff;
-            border-color: var(--danger-color);
+          @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
           }
 
           /* ───── Responsive ───── */
@@ -359,8 +317,11 @@ export const ModelsPage: FC<Props> = (props) => {
             .page-title {
               font-size: 1.5rem;
             }
-            .model-card {
-              padding: 1.25rem;
+            .models-table-wrapper {
+              overflow-x: auto;
+            }
+            .models-table {
+              min-width: 700px;
             }
           }
         `}</style>
@@ -393,90 +354,81 @@ export const ModelsPage: FC<Props> = (props) => {
               <a href="/admin/models/new" class="btn btn-primary">新增模型</a>
             </div>
           ) : (
-            <div class="models-grid">
-              {props.models.map((model, index) => (
-                <div class="model-card">
-                  <div class="model-card-header">
-                    <div class="model-name-block">
-                      <span class="model-tag">
-                        <span class="model-tag-icon">⚡</span> 模型 #{index + 1}
-                      </span>
-                      <span class="model-custom-name">{model.customModel}</span>
-                      <span class="model-real-name">真实模型: <span>{model.realModel}</span></span>
-                    </div>
-                    <div class="order-controls">
-                      <button
-                        type="button"
-                        class="order-btn"
-                        data-move-url={`/admin/models/move/${model.customModel}`}
-                        data-direction="up"
-                        disabled={index === 0}
-                      >
-                        ↑
-                      </button>
-                      <button
-                        type="button"
-                        class="order-btn"
-                        data-move-url={`/admin/models/move/${model.customModel}`}
-                        data-direction="down"
-                        disabled={index === props.models.length - 1}
-                      >
-                        ↓
-                      </button>
-                    </div>
-                  </div>
-
-                  <div class="model-card-body">
-                    <div class="meta-row">
-                      <span class="meta-label">Provider</span>
-                      <span
-                        class={
-                          model.provider === 'openai'
-                            ? 'provider-openai'
-                            : model.provider === 'anthropic'
-                            ? 'provider-anthropic'
-                            : model.provider === 'azure'
-                            ? 'provider-azure'
-                            : 'provider-default'
-                        }
-                      >
-                        {model.provider}
-                      </span>
-                    </div>
-                    <div class="meta-row">
-                      <span class="meta-label">Base URL</span>
-                      <span class="meta-value">{model.baseUrl}</span>
-                    </div>
-                    {model.desc && (
-                      <div class="model-desc">
-                        {model.desc}
-                      </div>
-                    )}
-                  </div>
-
-                  <div class="model-card-actions">
-                    <a
-                      href={`/admin/models/edit/${model.customModel}`}
-                      class="btn btn-secondary btn-sm"
-                    >
-                      编辑
-                    </a>
-                    <a
-                      href={`/admin/models/${encodeURIComponent(model.customModel)}/limits`}
-                      class="btn btn-secondary btn-sm"
-                    >
-                      管理限制
-                    </a>
-                    <button
-                      type="button"
-                      class="btn btn-sm btn-danger"
-                      data-delete-url={`/admin/models/delete/${model.customModel}`}
-                    >
-                      删除
-                    </button>
-                  </div>
-                </div>
-              ))}
+            <div class="models-table-wrapper">
+              <table class="models-table">
+                <thead>
+                  <tr>
+                    <th style="width: 50px;">#</th>
+                    <th>模型名称</th>
+                    <th>描述</th>
+                    <th style="width: 140px;">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {props.models.map((model, index) => (
+                    <tr>
+                      <td>
+                        <span class="index-badge">{index + 1}</span>
+                      </td>
+                      <td>
+                        <div class="model-name-cell">
+                          <span class="model-custom-name">{model.customModel}</span>
+                          <span class="model-real-name">→ {model.realModel}</span>
+                        </div>
+                      </td>
+                      <td class="model-desc-cell">
+                        {model.desc || '—'}
+                      </td>
+                      <td>
+                        <div class="actions-cell">
+                          <button
+                            type="button"
+                            class="order-btn"
+                            data-move-url={`/admin/models/move/${model.customModel}`}
+                            data-direction="up"
+                            disabled={index === 0}
+                            title="上移"
+                          >
+                            ↑
+                          </button>
+                          <button
+                            type="button"
+                            class="order-btn"
+                            data-move-url={`/admin/models/move/${model.customModel}`}
+                            data-direction="down"
+                            disabled={index === props.models.length - 1}
+                            title="下移"
+                          >
+                            ↓
+                          </button>
+                          <a
+                            href={`/admin/models/edit/${model.customModel}`}
+                            class="btn btn-secondary btn-sm"
+                            title="编辑"
+                          >
+                            编辑
+                          </a>
+                          <a
+                            href={`/admin/models/${encodeURIComponent(model.customModel)}/limits`}
+                            class="btn btn-secondary btn-sm"
+                            title="管理限制"
+                          >
+                            限制
+                          </a>
+                          <button
+                            type="button"
+                            class="btn btn-sm btn-danger"
+                            data-delete-url={`/admin/models/delete/${model.customModel}`}
+                            title="删除"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </TopbarNav>
