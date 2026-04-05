@@ -16,8 +16,6 @@ export const ModelGroupsPage: FC<Props> = (props) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Model Groups - LLM Gateway</title>
         <style>{`
-          @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=DM+Sans:wght@400;500;600&display=swap');
-
           :root {
             --bg-page: #f8f9fb;
             --bg-card: #ffffff;
@@ -40,7 +38,7 @@ export const ModelGroupsPage: FC<Props> = (props) => {
           * { margin: 0; padding: 0; box-sizing: border-box; }
 
           body {
-            font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+            font-family: system-ui, -apple-system, sans-serif;
             background: var(--bg-page);
             color: var(--text-primary);
             line-height: 1.6;
@@ -57,7 +55,7 @@ export const ModelGroupsPage: FC<Props> = (props) => {
             gap: 1rem;
           }
           .page-title {
-            font-family: 'Outfit', sans-serif;
+            font-family: system-ui, -apple-system, sans-serif;
             font-weight: 700;
             font-size: 1.85rem;
             letter-spacing: -0.03em;
@@ -159,7 +157,7 @@ export const ModelGroupsPage: FC<Props> = (props) => {
             color: var(--accent-color);
           }
           .empty-state h3 {
-            font-family: 'Outfit', sans-serif;
+            font-family: system-ui, -apple-system, sans-serif;
             font-size: 1.2rem;
             margin-bottom: 0.5rem;
           }
@@ -230,7 +228,7 @@ export const ModelGroupsPage: FC<Props> = (props) => {
             flex-shrink: 0;
           }
           .group-name {
-            font-family: 'Outfit', sans-serif;
+            font-family: system-ui, -apple-system, sans-serif;
             font-weight: 600;
             font-size: 1.15rem;
             color: var(--text-primary);

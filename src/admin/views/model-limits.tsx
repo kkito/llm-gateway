@@ -37,8 +37,6 @@ export const ModelLimitsPage: FC<Props> = (props) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>限制规则管理 - {model.customModel}</title>
         <style>{`
-          @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=DM+Sans:wght@400;500;600&display=swap');
-
           :root {
             --bg-page: #f8f9fb;
             --bg-card: #ffffff;
@@ -55,7 +53,7 @@ export const ModelLimitsPage: FC<Props> = (props) => {
           * { margin: 0; padding: 0; box-sizing: border-box; }
 
           body {
-            font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+            font-family: system-ui, -apple-system, sans-serif;
             background: var(--bg-page);
             color: var(--text-primary);
             line-height: 1.6;
@@ -71,7 +69,7 @@ export const ModelLimitsPage: FC<Props> = (props) => {
           }
 
           .limits-title {
-            font-family: 'Outfit', sans-serif;
+            font-family: system-ui, -apple-system, sans-serif;
             font-weight: 700;
             font-size: 1.5rem;
             margin-bottom: 0.5rem;
@@ -103,7 +101,7 @@ export const ModelLimitsPage: FC<Props> = (props) => {
           }
 
           .section-title {
-            font-family: 'Outfit', sans-serif;
+            font-family: system-ui, -apple-system, sans-serif;
             font-weight: 700;
             font-size: 1.25rem;
             margin: 1.5rem 0 1rem;

@@ -115,6 +115,11 @@ export function createServer(
 
   // 404 处理
   app.notFound((c) => {
+    // 忽略浏览器扩展或自动补全产生的无效请求（如 /admin/&）
+    if (c.req.path === '/admin/&' || c.req.path === '/admin/') {
+      return c.body(null, 204); // 返回空响应，不记录日志
+    }
+    
     console.log(`⚠️  [404] ${c.req.method} ${c.req.path}`);
     return c.json({ error: { message: 'Not Found' } }, 404);
   });

@@ -60,8 +60,6 @@ export const StatsPage: FC<Props> = (props) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>统计 Dashboard - LLM Gateway</title>
         <style>{`
-          @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap');
-
           :root {
             --bg-page: #f8f9fb;
             --bg-card: #ffffff;
@@ -89,7 +87,7 @@ export const StatsPage: FC<Props> = (props) => {
           * { margin: 0; padding: 0; box-sizing: border-box; }
 
           body {
-            font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+            font-family: system-ui, -apple-system, sans-serif;
             background: var(--bg-page);
             color: var(--text-primary);
             line-height: 1.6;
@@ -113,7 +111,7 @@ export const StatsPage: FC<Props> = (props) => {
             gap: 1rem;
           }
           .page-title {
-            font-family: 'Outfit', sans-serif;
+            font-family: system-ui, -apple-system, sans-serif;
             font-weight: 700;
             font-size: 2rem;
             letter-spacing: -0.03em;
@@ -318,7 +316,7 @@ export const StatsPage: FC<Props> = (props) => {
           .overview-card--purple .overview-card-label { color: #7c3aed; }
 
           .overview-card-value {
-            font-family: 'Outfit', sans-serif;
+            font-family: system-ui, -apple-system, sans-serif;
             font-size: 2.25rem;
             font-weight: 700;
             line-height: 1.1;
@@ -363,7 +361,7 @@ export const StatsPage: FC<Props> = (props) => {
             box-shadow: var(--shadow-md);
           }
           .token-card-title {
-            font-family: 'Outfit', sans-serif;
+            font-family: system-ui, -apple-system, sans-serif;
             font-weight: 700;
             font-size: 1.25rem;
             margin-bottom: 1.25rem;
@@ -377,7 +375,7 @@ export const StatsPage: FC<Props> = (props) => {
             gap: 1.5rem;
           }
           .token-item-value {
-            font-family: 'Outfit', sans-serif;
+            font-family: system-ui, -apple-system, sans-serif;
             font-size: 1.5rem;
             font-weight: 700;
             color: var(--accent-color);
@@ -404,7 +402,7 @@ export const StatsPage: FC<Props> = (props) => {
             box-shadow: var(--shadow-md);
           }
           .stats-section-title {
-            font-family: 'Outfit', sans-serif;
+            font-family: system-ui, -apple-system, sans-serif;
             font-weight: 700;
             font-size: 1.1rem;
             margin-bottom: 1.25rem;
@@ -463,7 +461,7 @@ export const StatsPage: FC<Props> = (props) => {
             box-shadow: var(--shadow-sm);
           }
           .stat-mini-name {
-            font-family: 'Outfit', sans-serif;
+            font-family: system-ui, -apple-system, sans-serif;
             font-weight: 600;
             font-size: 1rem;
             margin-bottom: 0.5rem;
@@ -473,7 +471,7 @@ export const StatsPage: FC<Props> = (props) => {
             font-size: 1.5rem;
             font-weight: 700;
             color: var(--accent-color);
-            font-family: 'Outfit', sans-serif;
+            font-family: system-ui, -apple-system, sans-serif;
           }
           .stat-mini-meta {
             display: flex;
@@ -501,7 +499,7 @@ export const StatsPage: FC<Props> = (props) => {
             box-shadow: var(--shadow-sm);
           }
           .hour-chart-title {
-            font-family: 'Outfit', sans-serif;
+            font-family: system-ui, -apple-system, sans-serif;
             font-weight: 700;
             font-size: 1.1rem;
             margin-bottom: 1.5rem;
@@ -517,7 +515,7 @@ export const StatsPage: FC<Props> = (props) => {
           }
           .hour-label {
             width: 60px;
-            font-family: 'Outfit', sans-serif;
+            font-family: system-ui, -apple-system, sans-serif;
             font-weight: 500;
             font-size: 0.9rem;
             color: var(--text-secondary);

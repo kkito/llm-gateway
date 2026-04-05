@@ -33,8 +33,6 @@ export const ModelFormPage: FC<Props> = (props) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>{isEdit ? '编辑模型' : '新增模型'} - LLM Gateway</title>
         <style>{`
-          @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=DM+Sans:wght@400;500;600&display=swap');
-
           :root {
             --bg-page: #f8f9fb;
             --bg-card: #ffffff;
@@ -51,7 +49,7 @@ export const ModelFormPage: FC<Props> = (props) => {
           * { margin: 0; padding: 0; box-sizing: border-box; }
 
           body {
-            font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+            font-family: system-ui, -apple-system, sans-serif;
             background: var(--bg-page);
             color: var(--text-primary);
             line-height: 1.6;
@@ -67,7 +65,7 @@ export const ModelFormPage: FC<Props> = (props) => {
           }
 
           .form-title {
-            font-family: 'Outfit', sans-serif;
+            font-family: system-ui, -apple-system, sans-serif;
             font-weight: 700;
             font-size: 1.5rem;
             margin-bottom: 1.5rem;
@@ -163,7 +161,7 @@ export const ModelFormPage: FC<Props> = (props) => {
           }
 
           .limits-title {
-            font-family: 'Outfit', sans-serif;
+            font-family: system-ui, -apple-system, sans-serif;
             font-weight: 700;
             font-size: 1.25rem;
             margin-bottom: 1rem;

@@ -19,8 +19,6 @@ export const ApiKeysPage: FC<Props> = (props) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>API Key 管理 - LLM Gateway</title>
         <style>{`
-          @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap');
-
           :root {
             --bg-page: #f8f9fb;
             --bg-card: #ffffff;
@@ -43,7 +41,7 @@ export const ApiKeysPage: FC<Props> = (props) => {
           * { margin: 0; padding: 0; box-sizing: border-box; }
 
           body {
-            font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+            font-family: system-ui, -apple-system, sans-serif;
             background: var(--bg-page);
             color: var(--text-primary);
             line-height: 1.6;
@@ -60,7 +58,7 @@ export const ApiKeysPage: FC<Props> = (props) => {
             gap: 1rem;
           }
           .page-title {
-            font-family: 'Outfit', sans-serif;
+            font-family: system-ui, -apple-system, sans-serif;
             font-weight: 700;
             font-size: 1.85rem;
             letter-spacing: -0.03em;
@@ -158,7 +156,7 @@ export const ApiKeysPage: FC<Props> = (props) => {
             color: var(--accent-color);
           }
           .empty-state h3 {
-            font-family: 'Outfit', sans-serif;
+            font-family: system-ui, -apple-system, sans-serif;
             font-size: 1.2rem;
             margin-bottom: 0.5rem;
           }
@@ -184,7 +182,7 @@ export const ApiKeysPage: FC<Props> = (props) => {
           .keys-section {
           }
           .keys-section-title {
-            font-family: 'Outfit', sans-serif;
+            font-family: system-ui, -apple-system, sans-serif;
             font-weight: 700;
             font-size: 1.15rem;
             margin-bottom: 1.25rem;
@@ -243,7 +241,7 @@ export const ApiKeysPage: FC<Props> = (props) => {
             margin-left: 0.85rem;
           }
           .key-name {
-            font-family: 'Outfit', sans-serif;
+            font-family: system-ui, -apple-system, sans-serif;
             font-weight: 600;
             font-size: 1.05rem;
             color: var(--text-primary);
@@ -288,7 +286,7 @@ export const ApiKeysPage: FC<Props> = (props) => {
             box-shadow: var(--shadow-sm);
           }
           .form-title {
-            font-family: 'Outfit', sans-serif;
+            font-family: system-ui, -apple-system, sans-serif;
             font-weight: 700;
             font-size: 1.25rem;
             margin-bottom: 1.5rem;
