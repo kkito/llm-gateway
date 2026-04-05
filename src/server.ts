@@ -7,7 +7,7 @@ import type { ProviderConfig, ProxyConfig } from './config.js';
 import type { Logger } from './logger.js';
 import { DetailLogger } from './detail-logger.js';
 import { createChatCompletionsRoute } from './routes/chat-completions/index.js';
-import { createMessagesRoute } from './routes/messages.js';
+import { createMessagesRoute } from './routes/messages/index.js';
 import { createModelsRoute } from './admin/routes/models.js';
 import { createModelFormRoute } from './admin/routes/model-form.js';
 import { createModelLimitsRoute } from './admin/routes/model-limits.js';

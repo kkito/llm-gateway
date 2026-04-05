@@ -8,7 +8,7 @@ import type { ProviderConfig, ProxyConfig } from '../src/config.js';
 import type { Logger } from '../src/logger.js';
 import type { DetailLogger } from '../src/detail-logger.js';
 import { createChatCompletionsRoute } from '../src/routes/chat-completions/index.js';
-import { createMessagesRoute } from '../src/routes/messages.js';
+import { createMessagesRoute } from '../src/routes/messages/index.js';
 
 // Mock fetch
 global.fetch = vi.fn();
