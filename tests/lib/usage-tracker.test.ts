@@ -220,8 +220,8 @@ describe('usage-tracker', () => {
 
   describe('ensureLoaded', () => {
     it('should load from log files on first access', async () => {
-      // 创建测试日志文件
-      const today = new Date().toISOString().split('T')[0];
+      // 创建测试日志文件（使用本地日期，与 getTodayDate() 一致）
+      const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD in local time
       const logFile = join(testLogDir, `proxy-${today}.log`);
       
       const logEntry = {
