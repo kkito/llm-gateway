@@ -68,12 +68,6 @@ export const ModelLimitsPage: FC<Props> = (props) => {
             border-radius: var(--radius);
             padding: 2rem;
             box-shadow: var(--shadow-sm);
-            animation: fadeUp 0.6s ease-out both;
-          }
-
-          @keyframes fadeUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
           }
 
           .limits-title {
@@ -145,7 +139,6 @@ export const ModelLimitsPage: FC<Props> = (props) => {
             text-decoration: none;
             cursor: pointer;
             border: none;
-            transition: all 0.25s ease;
           }
 
           .btn-secondary {
@@ -153,11 +146,6 @@ export const ModelLimitsPage: FC<Props> = (props) => {
             color: var(--text-primary);
             box-shadow: var(--shadow-sm);
             border: 1px solid var(--border-color);
-          }
-
-          .btn-secondary:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-md);
           }
 
           .btn-danger {
@@ -219,12 +207,6 @@ export const ModelLimitsPage: FC<Props> = (props) => {
             border-radius: var(--radius-sm);
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.25s ease;
-          }
-
-          .btn-submit:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px hsl(245 75% 58% / 0.35);
           }
 
           @media (max-width: 768px) {

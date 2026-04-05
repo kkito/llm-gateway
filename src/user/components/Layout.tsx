@@ -78,7 +78,6 @@ export const UserLayout: FC<Props> = (props) => {
                 text-decoration: none;
                 padding: 0.5rem 0.75rem;
                 border-radius: var(--radius-sm);
-                transition: all 0.2s ease;
               }
 
               .navbar-link:hover {
@@ -112,7 +111,6 @@ export const UserLayout: FC<Props> = (props) => {
                 padding: 0.35rem 0.6rem;
                 border: 1px solid var(--border);
                 border-radius: var(--radius-sm);
-                transition: all 0.2s ease;
               }
 
               .logout-btn:hover {

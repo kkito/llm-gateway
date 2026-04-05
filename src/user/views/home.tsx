@@ -97,13 +97,11 @@ export const HomePage: FC<Props> = (props) => {
               box-shadow: var(--shadow);
               padding: 0.6rem 0.85rem;
               margin-bottom: 0.5rem;
-              transition: all 0.3s ease;
               border: 1px solid var(--border);
             }
 
             .card:hover {
               box-shadow: var(--shadow-lg);
-              transform: translateY(-2px);
             }
 
             .card-header {
@@ -139,7 +137,6 @@ export const HomePage: FC<Props> = (props) => {
               border: 1px solid var(--border);
               border-radius: var(--radius-sm);
               padding: 0.25rem;
-              transition: border-color 0.2s ease;
             }
 
             .input-wrapper:focus-within {
@@ -185,17 +182,7 @@ export const HomePage: FC<Props> = (props) => {
               border: none;
               border-radius: var(--radius-sm);
               cursor: pointer;
-              transition: all 0.2s ease;
               white-space: nowrap;
-            }
-
-            .copy-btn:hover {
-              transform: scale(1.05);
-              box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
-            }
-
-            .copy-btn:active {
-              transform: scale(0.98);
             }
 
             .copy-btn svg {
@@ -218,7 +205,6 @@ export const HomePage: FC<Props> = (props) => {
 
             .model-desc.visible {
               display: block;
-              animation: fadeIn 0.3s ease;
             }
 
             /* API Key 成功提示 */
@@ -289,7 +275,6 @@ export const HomePage: FC<Props> = (props) => {
               color: var(--primary);
               text-decoration: none;
               border-bottom: 1px solid transparent;
-              transition: border-color 0.2s ease;
             }
 
             .reference-link:hover {
@@ -301,7 +286,6 @@ export const HomePage: FC<Props> = (props) => {
               position: fixed;
               top: 0.75rem;
               left: 50%;
-              transform: translateX(-50%) translateY(-100%);
               background: #1f2937;
               color: white;
               padding: 0.5rem 1rem;
@@ -311,11 +295,9 @@ export const HomePage: FC<Props> = (props) => {
               box-shadow: var(--shadow-lg);
               opacity: 0;
               z-index: 9999;
-              transition: all 0.3s ease;
             }
 
             .toast.show {
-              transform: translateX(-50%) translateY(0);
               opacity: 1;
             }
 
@@ -325,33 +307,6 @@ export const HomePage: FC<Props> = (props) => {
 
             .toast.error {
               background: #dc2626;
-            }
-
-            /* 动画 */
-            @keyframes fadeIn {
-              from {
-                opacity: 0;
-                transform: translateY(-8px);
-              }
-              to {
-                opacity: 1;
-                transform: translateY(0);
-              }
-            }
-
-            @keyframes slideDown {
-              from {
-                opacity: 0;
-                transform: translateY(-20px);
-              }
-              to {
-                opacity: 1;
-                transform: translateY(0);
-              }
-            }
-
-            .hero {
-              animation: slideDown 0.5s ease;
             }
 
             /* 响应式 */

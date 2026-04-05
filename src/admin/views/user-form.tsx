@@ -55,12 +55,6 @@ export const UserFormPage: FC<Props> = (props) => {
             border-radius: var(--radius);
             padding: 2rem;
             box-shadow: var(--shadow-sm);
-            animation: fadeUp 0.6s ease-out both;
-          }
-
-          @keyframes fadeUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
           }
 
           .form-title {
@@ -88,7 +82,6 @@ export const UserFormPage: FC<Props> = (props) => {
             padding: 0.7rem 0.9rem;
             border: 1.5px solid var(--border-color);
             border-radius: var(--radius-sm);
-            transition: all 0.2s ease;
             font-size: 0.92rem;
             background: var(--bg-page);
             font-family: inherit;
@@ -151,7 +144,6 @@ export const UserFormPage: FC<Props> = (props) => {
             text-decoration: none;
             cursor: pointer;
             border: none;
-            transition: all 0.25s ease;
           }
 
           .btn-primary {
@@ -160,21 +152,11 @@ export const UserFormPage: FC<Props> = (props) => {
             box-shadow: 0 4px 14px hsl(245 75% 58% / 0.35);
           }
 
-          .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px hsl(245 75% 58% / 0.45);
-          }
-
           .btn-secondary {
             background: var(--bg-card);
             color: var(--text-primary);
             box-shadow: var(--shadow-sm);
             border: 1px solid var(--border-color);
-          }
-
-          .btn-secondary:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-md);
           }
 
           @media (max-width: 768px) {

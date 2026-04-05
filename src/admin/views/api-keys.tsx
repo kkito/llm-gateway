@@ -50,11 +50,6 @@ export const ApiKeysPage: FC<Props> = (props) => {
             min-height: 100vh;
           }
 
-          @keyframes fadeUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-          }
-
           /* Header */
           .page-header {
             display: flex;
@@ -89,7 +84,6 @@ export const ApiKeysPage: FC<Props> = (props) => {
             text-decoration: none;
             cursor: pointer;
             border: none;
-            transition: all 0.25s ease;
             letter-spacing: -0.01em;
           }
           .btn-primary {
@@ -97,19 +91,11 @@ export const ApiKeysPage: FC<Props> = (props) => {
             color: #fff;
             box-shadow: 0 4px 14px hsl(245 75% 58% / 0.35);
           }
-          .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px hsl(245 75% 58% / 0.45);
-          }
           .btn-secondary {
             background: var(--bg-card);
             color: var(--text-primary);
             box-shadow: var(--shadow-sm);
             border: 1px solid var(--border-color);
-          }
-          .btn-secondary:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-md);
           }
           .btn-sm {
             padding: 0.45rem 0.85rem;
@@ -136,7 +122,6 @@ export const ApiKeysPage: FC<Props> = (props) => {
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            animation: slideDown 0.4s ease-out;
           }
           .error-banner {
             background: var(--danger-bg);
@@ -149,12 +134,6 @@ export const ApiKeysPage: FC<Props> = (props) => {
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            animation: slideDown 0.4s ease-out;
-          }
-
-          @keyframes slideDown {
-            from { opacity: 0; transform: translateY(-12px); }
-            to { opacity: 1; transform: translateY(0); }
           }
 
           /* Empty state */
@@ -193,7 +172,6 @@ export const ApiKeysPage: FC<Props> = (props) => {
             display: grid;
             grid-template-columns: 1fr 380px;
             gap: 2rem;
-            animation: fadeUp 0.6s ease-out both;
           }
 
           @media (max-width: 900px) {
@@ -204,9 +182,6 @@ export const ApiKeysPage: FC<Props> = (props) => {
 
           /* Keys List */
           .keys-section {
-            animation: fadeUp 0.6s ease-out both;
-            animation-delay: 0.1s;
-            animation-fill-mode: both;
           }
           .keys-section-title {
             font-family: 'Outfit', sans-serif;
@@ -225,10 +200,8 @@ export const ApiKeysPage: FC<Props> = (props) => {
             border: 1px solid var(--border-color);
             border-radius: var(--radius);
             padding: 1.5rem;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             position: relative;
             overflow: hidden;
-            animation: cardReveal 0.5s ease-out both;
           }
           .key-card::before {
             content: '';
@@ -238,21 +211,13 @@ export const ApiKeysPage: FC<Props> = (props) => {
             right: 0;
             height: 3px;
             background: var(--accent-gradient);
-            opacity: 0;
-            transition: opacity 0.3s ease;
           }
           .key-card:hover {
-            transform: translateY(-3px);
             box-shadow: var(--shadow-lg);
             border-color: transparent;
           }
           .key-card:hover::before {
             opacity: 1;
-          }
-
-          @keyframes cardReveal {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
           }
 
           .key-header {
@@ -307,7 +272,6 @@ export const ApiKeysPage: FC<Props> = (props) => {
             color: var(--danger-color);
             border: none;
             cursor: pointer;
-            transition: all 0.2s ease;
             font-size: 0.85rem;
           }
           .key-delete-btn:hover {
@@ -322,9 +286,6 @@ export const ApiKeysPage: FC<Props> = (props) => {
             border-radius: var(--radius);
             padding: 2rem;
             box-shadow: var(--shadow-sm);
-            animation: fadeUp 0.6s ease-out both;
-            animation-delay: 0.2s;
-            animation-fill-mode: both;
           }
           .form-title {
             font-family: 'Outfit', sans-serif;

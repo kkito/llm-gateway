@@ -117,7 +117,6 @@ export const TopbarNav: FC<Props> = (props) => {
           font-size: 0.9rem;
           padding: 0.5rem 0.85rem;
           border-radius: 8px;
-          transition: all 0.2s ease;
         }
         .topbar-nav a:hover {
           color: var(--accent-color);

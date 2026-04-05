@@ -85,7 +85,6 @@ export const ModelsPage: FC<Props> = (props) => {
             text-decoration: none;
             cursor: pointer;
             border: none;
-            transition: all 0.25s ease;
             letter-spacing: -0.01em;
           }
           .btn-primary {
@@ -93,19 +92,11 @@ export const ModelsPage: FC<Props> = (props) => {
             color: #fff;
             box-shadow: 0 4px 14px hsl(245 75% 58% / 0.35);
           }
-          .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px hsl(245 75% 58% / 0.45);
-          }
           .btn-secondary {
             background: var(--bg-card);
             color: var(--text-primary);
             box-shadow: var(--shadow-sm);
             border: 1px solid var(--border-color);
-          }
-          .btn-secondary:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-md);
           }
           .btn-icon {
             width: 32px;
@@ -132,7 +123,6 @@ export const ModelsPage: FC<Props> = (props) => {
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            animation: slideDown 0.4s ease-out;
           }
 
           /* Empty state */
@@ -170,7 +160,6 @@ export const ModelsPage: FC<Props> = (props) => {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
             gap: 1.25rem;
-            animation: fadeUp 0.6s ease-out both;
           }
 
           @media (max-width: 480px) {
@@ -184,10 +173,8 @@ export const ModelsPage: FC<Props> = (props) => {
             border: 1px solid var(--border-color);
             border-radius: var(--radius);
             padding: 1.75rem;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             position: relative;
             overflow: hidden;
-            animation: cardReveal 0.5s ease-out both;
           }
           .model-card::before {
             content: '';
@@ -197,11 +184,8 @@ export const ModelsPage: FC<Props> = (props) => {
             right: 0;
             height: 3px;
             background: var(--accent-gradient);
-            opacity: 0;
-            transition: opacity 0.3s ease;
           }
           .model-card:hover {
-            transform: translateY(-5px);
             box-shadow: var(--shadow-lg);
             border-color: transparent;
           }
@@ -272,7 +256,6 @@ export const ModelsPage: FC<Props> = (props) => {
             cursor: pointer;
             font-size: 0.75rem;
             font-weight: 600;
-            transition: all 0.2s;
           }
           .order-btn:hover:not(:disabled) {
             border-color: var(--accent-color);
@@ -363,36 +346,6 @@ export const ModelsPage: FC<Props> = (props) => {
             color: #fff;
             border-color: var(--danger-color);
           }
-
-          /* ───── Animations ───── */
-          @keyframes fadeUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-          }
-          @keyframes slideDown {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-          }
-          @keyframes cardReveal {
-            from {
-              opacity: 0;
-              transform: translateY(24px) scale(0.97);
-            }
-            to {
-              opacity: 1;
-              transform: translateY(0) scale(1);
-            }
-          }
-
-          /* Staggered animation delays for cards */
-          .model-card:nth-child(1) { animation-delay: 0.05s; }
-          .model-card:nth-child(2) { animation-delay: 0.10s; }
-          .model-card:nth-child(3) { animation-delay: 0.15s; }
-          .model-card:nth-child(4) { animation-delay: 0.20s; }
-          .model-card:nth-child(5) { animation-delay: 0.25s; }
-          .model-card:nth-child(6) { animation-delay: 0.30s; }
-          .model-card:nth-child(7) { animation-delay: 0.35s; }
-          .model-card:nth-child(8) { animation-delay: 0.40s; }
 
           /* ───── Responsive ───── */
           @media (max-width: 768px) {

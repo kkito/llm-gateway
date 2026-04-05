@@ -101,12 +101,6 @@ export const StatsPage: FC<Props> = (props) => {
             max-width: 1280px;
             margin: 0 auto;
             padding: 2.5rem 2rem 4rem;
-            animation: fadeUp 0.6s ease-out both;
-          }
-
-          @keyframes fadeUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
           }
 
           /* Header */
@@ -143,7 +137,6 @@ export const StatsPage: FC<Props> = (props) => {
             text-decoration: none;
             cursor: pointer;
             border: none;
-            transition: all 0.25s ease;
             letter-spacing: -0.01em;
           }
           .btn-primary {
@@ -151,19 +144,11 @@ export const StatsPage: FC<Props> = (props) => {
             color: #fff;
             box-shadow: 0 4px 14px hsl(245 75% 58% / 0.35);
           }
-          .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px hsl(245 75% 58% / 0.45);
-          }
           .btn-secondary {
             background: var(--bg-card);
             color: var(--text-primary);
             box-shadow: var(--shadow-sm);
             border: 1px solid var(--border-color);
-          }
-          .btn-secondary:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-md);
           }
 
           /* Date picker */
