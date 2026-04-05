@@ -29,10 +29,14 @@ export interface RateLimitError {
  * 限制检查器类
  */
 export class RateLimiter {
-  private tracker: UsageTracker;
+  private logDir: string;
 
   constructor(logDir: string) {
-    this.tracker = UsageTracker.getInstance(logDir);
+    this.logDir = logDir;
+  }
+
+  private get tracker(): UsageTracker {
+    return UsageTracker.getInstance(this.logDir);
   }
 
   /**
@@ -154,4 +158,6 @@ export class RateLimiter {
   getTracker(): UsageTracker {
     return this.tracker;
   }
+
+
 }

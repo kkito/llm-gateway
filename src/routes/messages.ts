@@ -65,59 +65,52 @@ export function createMessagesRoute(
       let provider: ProviderConfig | undefined;
 
       if (model_group) {
-        // Model Group 模式
+        // Model Group 模式：fallback 循环
         modelGroup = model_group;
         console.log(`\n📥 [请求] ${requestId} - 模型组：${model_group} - 流式：${!!stream}`);
-        
+
         const resolver = new ModelGroupResolver();
         const modelNames = resolver.resolveModelGroup(currentConfig.modelGroups, model_group);
         console.log(`   ✓ 匹配 model_group: ${model_group} -> [${modelNames.join(', ')}]`);
-        
-        const result = await resolver.findAvailableModel(modelNames, currentConfig.models, logDir);
-        provider = result.provider;
-        actualModel = result.model;
-        triedModels = result.triedModels;
-        customModel = actualModel;
-        
-        // 记录尝试过的模型
-        for (const tried of triedModels) {
-          if (tried.exceeded) {
-            console.log(`   ⚠️  [跳过] ${tried.model} - ${tried.message}`);
-          }
-        }
-        console.log(`   ✓ 使用模型：${actualModel}`);
+
+        // 遍历模型列表，HTTP 失败后尝试下一个
+        const fallbackResult = await tryMessagesFallback(
+          c, modelNames, currentConfig.models, body, stream,
+          rateLimiter, logger, detailLogger, requestId,
+          startTime, currentUser, model_group, timeoutMs, logDir
+        );
+        actualModel = fallbackResult.actualModel;
+        triedModels = fallbackResult.triedModels;
+        customModel = actualModel || 'unknown';
+        return fallbackResult.response;
       } else {
         // 单个模型模式
         customModel = model;
         console.log(`\n📥 [请求] ${requestId} - 模型：${model} - 流式：${!!stream}`);
 
-        // 尝试查找单个模型配置
-        provider = currentConfig.models.find(p => p.customModel === model);
-        actualModel = model;
-
-        // 如果未找到单个模型，尝试作为 modelGroup 处理（智能识别）
-        if (!provider && currentConfig.modelGroups) {
+        // 先找单个模型，找不到再智能识别为 modelGroup
+        const found = currentConfig.models.find(p => p.customModel === model);
+        if (found) {
+          provider = found;
+          actualModel = model;
+        } else if (currentConfig.modelGroups) {
           try {
             const resolver = new ModelGroupResolver();
             const modelNames = resolver.resolveModelGroup(currentConfig.modelGroups, model);
             console.log(`   🔍 智能识别：${model} 被识别为 modelGroup -> [${modelNames.join(', ')}]`);
-
-            // 自动启用模型组模式
             modelGroup = model;
             console.log(`\n📥 [请求] ${requestId} - 模型组：${model} - 流式：${!!stream}`);
 
-            const result = await resolver.findAvailableModel(modelNames, currentConfig.models, logDir);
-            provider = result.provider;
-            actualModel = result.model;
-            triedModels = result.triedModels;
-            customModel = actualModel;
-
-            for (const tried of triedModels) {
-              if (tried.exceeded) {
-                console.log(`   ⚠️  [跳过] ${tried.model} - ${tried.message}`);
-              }
-            }
-            console.log(`   ✓ 使用模型：${actualModel}`);
+            // 智能识别也走 fallback 循环
+            const fallbackResult = await tryMessagesFallback(
+              c, modelNames, currentConfig.models, body, stream,
+              rateLimiter, logger, detailLogger, requestId,
+              startTime, currentUser, model, timeoutMs, logDir
+            );
+            actualModel = fallbackResult.actualModel;
+            triedModels = fallbackResult.triedModels;
+            customModel = actualModel || 'unknown';
+            return fallbackResult.response;
           } catch (groupError) {
             // 不是有效的 modelGroup，继续查找单个模型（下面会返回 404）
           }
@@ -467,4 +460,324 @@ export function createMessagesRoute(
   router.post('/v1/v1/messages', (c) => handler(c, '/v1/v1/messages'));
 
   return router;
+}
+
+// ============================================================
+// Model Group Fallback for /v1/messages
+// ============================================================
+
+interface MsgFallbackResult {
+  actualModel: string | undefined;
+  triedModels: Array<{ model: string; exceeded: boolean; message?: string }>;
+  response: Response;
+}
+
+/**
+ * Model Group fallback：遍历模型列表，HTTP 失败后尝试下一个
+ */
+async function tryMessagesFallback(
+  c: any,
+  modelNames: string[],
+  allProviders: ProviderConfig[],
+  body: any,
+  stream: boolean,
+  rateLimiter: RateLimiter,
+  logger: Logger,
+  detailLogger: DetailLogger,
+  requestId: string,
+  startTime: number,
+  currentUser: any,
+  modelGroupName: string,
+  timeoutMs: number,
+  logDir: string
+): Promise<MsgFallbackResult> {
+  const triedModels: Array<{ model: string; exceeded: boolean; message?: string }> = [];
+  let lastErrorBody: any = null;
+  let lastErrorStatus = 500;
+
+  for (const modelName of modelNames) {
+    const provider = allProviders.find(p => p.customModel === modelName);
+    if (!provider) {
+      triedModels.push({ model: modelName, exceeded: false, message: 'Model config not found' });
+      continue;
+    }
+
+    const limitResult = await rateLimiter.checkLimits(provider, logDir);
+    if (limitResult.exceeded) {
+      triedModels.push({ model: modelName, exceeded: true, message: limitResult.message });
+      continue;
+    }
+
+    // 构建上游请求
+    let upstreamBody: any;
+    let requestHeaders: Record<string, string>;
+    let upstreamUrl: string;
+
+    if (provider.provider === 'anthropic') {
+      upstreamBody = { ...body, model: provider.realModel };
+      requestHeaders = buildHeaders(provider);
+      upstreamUrl = buildUrl(provider, 'chat');
+      console.log(`   🔄 [Anthropic 透传]`);
+    } else {
+      const openaiRequest = convertAnthropicRequestToOpenAI(body);
+      upstreamBody = { ...openaiRequest, model: provider.realModel };
+      requestHeaders = buildHeaders(provider);
+      upstreamUrl = buildUrl(provider, 'chat');
+      console.log(`   🔄 [Anthropic→OpenAI 转换]`);
+    }
+
+    detailLogger.logUpstreamRequest(requestId, upstreamBody);
+    console.log(`   📤 [Proxy 转发] ${upstreamUrl}`);
+
+    const response = await fetch(upstreamUrl, {
+      method: 'POST',
+      headers: requestHeaders,
+      body: JSON.stringify(upstreamBody),
+      signal: AbortSignal.timeout(timeoutMs)
+    });
+
+    console.log(`   📤 [响应] 状态码：${response.status}`);
+
+    // 非 2xx 响应
+    if (!response.ok) {
+      try {
+        const errorText = await response.clone().text();
+        console.log(`   ❌ [错误详情] ${errorText}`);
+      } catch { /* ignore */ }
+      console.log(`   ❌ [模型 ${modelName} 失败] HTTP ${response.status}，尝试下一个`);
+      triedModels.push({ model: modelName, exceeded: false, message: `HTTP ${response.status}` });
+
+      try {
+        lastErrorBody = await response.json();
+      } catch {
+        lastErrorBody = { error: { message: `HTTP ${response.status}` } };
+      }
+      lastErrorStatus = response.status;
+      continue;
+    }
+
+    // 成功！处理响应
+    console.log(`   ✓ 使用模型：${modelName}`);
+    const processedResponse = await processMessagesSuccess(
+      c, response, provider, modelName, stream, body,
+      rateLimiter, logger, detailLogger, requestId,
+      startTime, currentUser, modelGroupName, triedModels
+    );
+
+    return {
+      actualModel: modelName,
+      triedModels,
+      response: processedResponse
+    };
+  }
+
+  // 所有模型都失败
+  for (const tried of triedModels) {
+    if (tried.exceeded) {
+      console.log(`   ⚠️  [跳过] ${tried.model} - ${tried.message}`);
+    }
+  }
+  logger.log({
+    timestamp: new Date().toISOString(),
+    requestId,
+    customModel: modelNames[0] || 'unknown',
+    modelGroup: modelGroupName,
+    actualModel: undefined,
+    triedModels: triedModels.length > 0 ? triedModels : undefined,
+    endpoint: c.req.path,
+    method: 'POST',
+    statusCode: lastErrorStatus,
+    durationMs: Date.now() - startTime,
+    isStreaming: !!stream,
+    userName: currentUser?.name
+  });
+
+  return {
+    actualModel: undefined,
+    triedModels,
+    response: c.json(lastErrorBody, lastErrorStatus)
+  };
+}
+
+/**
+ * 处理成功响应（非流式/流式）- /v1/messages 端点
+ */
+async function processMessagesSuccess(
+  c: any,
+  response: Response,
+  provider: ProviderConfig,
+  modelName: string,
+  stream: boolean,
+  body: any,
+  rateLimiter: RateLimiter,
+  logger: Logger,
+  detailLogger: DetailLogger,
+  requestId: string,
+  startTime: number,
+  currentUser: any,
+  modelGroup: string | undefined,
+  triedModels: Array<{ model: string; exceeded: boolean; message?: string }>
+): Promise<Response> {
+  const logEntry: any = {
+    timestamp: new Date().toISOString(),
+    requestId,
+    customModel: modelGroup ? modelName : body.model,
+    modelGroup,
+    actualModel: modelName,
+    triedModels: triedModels.length > 0 ? triedModels : undefined,
+    realModel: provider.realModel,
+    provider: provider.provider,
+    endpoint: c.req.path,
+    method: 'POST',
+    statusCode: response.status,
+    durationMs: Date.now() - startTime,
+    isStreaming: !!stream,
+    userName: currentUser?.name
+  };
+
+  // 非流式响应处理
+  if (!stream) {
+    try {
+      const responseData = await response.clone().json() as any;
+
+      let resultResponse: any;
+      if (provider.provider === 'openai') {
+        const anthropicResponse = convertOpenAIResponseToAnthropic(responseData, body.model);
+        logEntry.promptTokens = responseData.usage?.prompt_tokens;
+        logEntry.completionTokens = responseData.usage?.completion_tokens;
+        logEntry.totalTokens = responseData.usage?.total_tokens;
+        logEntry.cachedTokens = responseData.usage?.prompt_tokens_details?.cached_tokens ?? null;
+        console.log(`   🔄 [OpenAI→Anthropic 转换]`);
+        resultResponse = anthropicResponse;
+      } else {
+        logEntry.promptTokens = responseData.usage?.input_tokens;
+        logEntry.completionTokens = responseData.usage?.output_tokens;
+        logEntry.totalTokens = responseData.usage?.input_tokens + responseData.usage?.output_tokens;
+        logEntry.cachedTokens = responseData.usage?.cache_read_input_tokens ?? null;
+        resultResponse = responseData;
+      }
+
+      logger.log(logEntry);
+      const pricing = provider.inputPricePer1M !== undefined && provider.outputPricePer1M !== undefined && provider.cachedPricePer1M !== undefined
+        ? { inputPricePer1M: provider.inputPricePer1M, outputPricePer1M: provider.outputPricePer1M, cachedPricePer1M: provider.cachedPricePer1M }
+        : undefined;
+      rateLimiter.recordUsage(modelName, logEntry, pricing);
+      return c.json(resultResponse);
+    } catch {
+      // 忽略解析错误
+    }
+  }
+
+  logger.log(logEntry);
+
+  if (!response.body) {
+    console.log(`\n❌ [错误] 上游响应体为空 ${requestId}`);
+    return c.json({ error: { message: 'No response body' } }, 500);
+  }
+
+  // 流式响应处理
+  if (stream) {
+    const providerFormat = provider.provider;
+    const streamState = providerFormat === 'openai' ? createOpenAIToAnthropicStreamState() : undefined;
+
+    const chunks: string[] = [];
+    const rawChunks: string[] = [];
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+
+    const transformedStream = new ReadableStream({
+      async start(controller) {
+        try {
+          let buffer = '';
+          let finalUsage: any = null;
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+              detailLogger.logStreamResponse(requestId + '_raw', rawChunks);
+
+              // 从最后的 chunk 中提取 cachedTokens 和 usage 信息
+              for (let i = chunks.length - 1; i >= 0; i--) {
+                try {
+                  const chunkText = chunks[i];
+                  const lines = chunkText.split('\n');
+                  for (const line of lines) {
+                    if (line.startsWith('data:')) {
+                      const chunkJson = JSON.parse(line.slice(5).trim());
+                      if (chunkJson.usage?.prompt_tokens_details?.cached_tokens) {
+                        logEntry.cachedTokens = chunkJson.usage.prompt_tokens_details.cached_tokens;
+                        finalUsage = chunkJson.usage;
+                        break;
+                      }
+                      if (chunkJson.usage?.input_tokens_details?.cached_tokens) {
+                        logEntry.cachedTokens = chunkJson.usage.input_tokens_details.cached_tokens;
+                        finalUsage = chunkJson.usage;
+                        break;
+                      }
+                      if (chunkJson.usage && !finalUsage) {
+                        finalUsage = chunkJson.usage;
+                      }
+                    }
+                  }
+                } catch { /* ignore */ }
+              }
+
+              if (finalUsage) {
+                logEntry.promptTokens = finalUsage.prompt_tokens || finalUsage.input_tokens;
+                logEntry.completionTokens = finalUsage.completion_tokens || finalUsage.output_tokens;
+                logEntry.totalTokens = finalUsage.total_tokens || (logEntry.promptTokens || 0) + (logEntry.completionTokens || 0);
+              }
+
+              logger.log(logEntry);
+              const pricing = provider.inputPricePer1M !== undefined && provider.outputPricePer1M !== undefined && provider.cachedPricePer1M !== undefined
+                ? { inputPricePer1M: provider.inputPricePer1M, outputPricePer1M: provider.outputPricePer1M, cachedPricePer1M: provider.cachedPricePer1M }
+                : undefined;
+              rateLimiter.recordUsage(modelName, logEntry, pricing);
+              detailLogger.logStreamResponse(requestId, chunks);
+              controller.close();
+              break;
+            }
+
+            const chunk = decoder.decode(value, { stream: false });
+            rawChunks.push(chunk);
+            buffer += chunk;
+
+            const parts = buffer.split('\n\n');
+            buffer = parts.pop() || '';
+
+            for (const part of parts) {
+              if (!part.trim()) continue;
+
+              if (providerFormat === 'openai') {
+                const anthropicChunks = parseAndConvertOpenAISSE(part, streamState!);
+                for (const anthropicChunk of anthropicChunks) {
+                  chunks.push(anthropicChunk);
+                  controller.enqueue(new TextEncoder().encode(anthropicChunk));
+                }
+              } else {
+                let sseLine = part;
+                sseLine += '\n\n';
+                chunks.push(sseLine);
+                try {
+                  controller.enqueue(new TextEncoder().encode(sseLine));
+                } catch (err: any) {
+                  if (err?.name === 'AbortError' || err?.code === 'ERR_INVALID_STATE' || err?.message?.includes('Controller is already closed')) return;
+                  throw err;
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.log(`   ❌ [流式处理错误] ${error}`);
+          try { controller.error(error); } catch { /* ignore */ }
+        }
+      }
+    });
+
+    console.log(`\n✅ [完成] ${requestId} - 耗时：${Date.now() - startTime}ms\n`);
+    return c.body(transformedStream);
+  }
+
+  console.log(`\n✅ [完成] ${requestId} - 耗时：${Date.now() - startTime}ms\n`);
+  return c.body(response.body);
 }
