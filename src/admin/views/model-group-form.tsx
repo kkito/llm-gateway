@@ -1,5 +1,5 @@
 import { FC } from 'hono/jsx';
-import { Layout } from '../components/Layout.js';
+import { TopbarNav } from '../components/TopbarNav.js';
 import type { ModelGroup, ProviderConfig } from '../../config.js';
 
 interface Props {
@@ -31,10 +31,10 @@ export const ModelGroupFormPage: FC<Props> = (props) => {
   const availableModels = models.filter(m => !selectedModels.includes(m.customModel));
 
   return (
-    <Layout title={isEdit ? '编辑 Model Group' : '新增 Model Group'}>
+    <TopbarNav title={isEdit ? '编辑 Model Group' : '新增 Model Group'} activePath="/admin/model-groups">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
         <h1>{isEdit ? '编辑' : '新增'} Model Group</h1>
-        <a href="/admin/model-groups" role="button" class="secondary">返回列表</a>
+        <a href="/admin/model-groups" role="button" class="secondary outline">返回列表</a>
       </div>
 
       {error && (
@@ -73,7 +73,7 @@ export const ModelGroupFormPage: FC<Props> = (props) => {
 
         <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
           <button type="submit">{isEdit ? '保存修改' : '添加 Model Group'}</button>
-          <a href="/admin/model-groups" role="button" class="secondary">
+          <a href="/admin/model-groups" role="button" class="secondary outline">
             取消
           </a>
         </div>
@@ -86,10 +86,10 @@ export const ModelGroupFormPage: FC<Props> = (props) => {
           /* 编辑模式：使用左右列表 + 添加/删除/移动按钮 */
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '1rem', marginTop: '0.5rem' }}>
             {/* 左侧：可用模型 */}
-            <div style={{ border: '1px solid #ddd', borderRadius: '0.5rem', padding: '0.75rem', maxHeight: '20rem', overflowY: 'auto' }}>
-              <h3 style={{ margin: '0 0 0.75rem 0', fontSize: '0.9rem', color: '#666' }}>可用模型</h3>
+            <div style={{ border: '1px solid #e5e7eb', borderRadius: '8px', padding: '0.75rem', maxHeight: '20rem', overflowY: 'auto', background: '#fff' }}>
+              <h3 style={{ margin: '0 0 0.75rem 0', fontSize: '0.9rem', color: '#646a7e' }}>可用模型</h3>
               {availableModels.length === 0 ? (
-                <p style={{ color: '#666', fontSize: '0.85rem' }}>暂无可用模型</p>
+                <p style={{ color: '#646a7e', fontSize: '0.85rem' }}>暂无可用模型</p>
               ) : (
                 availableModels.map((model) => (
                   <div
@@ -100,17 +100,17 @@ export const ModelGroupFormPage: FC<Props> = (props) => {
                       alignItems: 'center',
                       padding: '0.5rem',
                       marginBottom: '0.25rem',
-                      borderRadius: '0.25rem',
-                      backgroundColor: '#f9fafb',
+                      borderRadius: '6px',
+                      backgroundColor: '#f8f9fb',
                     }}
                   >
                     <span style={{ fontSize: '0.85rem' }}>
                       {model.customModel}
-                      {model.desc ? <span style={{ color: '#666' }}> ({model.desc})</span> : null}
+                      {model.desc ? <span style={{ color: '#646a7e' }}> ({model.desc})</span> : null}
                     </span>
                     <a
                       href={`/admin/model-groups/edit/${groupName}/add-model?modelName=${encodeURIComponent(model.customModel)}`}
-                      class="secondary"
+                      class="secondary outline"
                       style={{ padding: '2px 8px', fontSize: '12px', textDecoration: 'none', display: 'inline-block' }}
                     >
                       + 添加
@@ -121,16 +121,16 @@ export const ModelGroupFormPage: FC<Props> = (props) => {
             </div>
 
             {/* 中间：操作提示 */}
-            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', color: '#666', fontSize: '0.85rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', color: '#646a7e', fontSize: '0.85rem' }}>
               <span>← 添加 →</span>
               <span>← 删除/移动 →</span>
             </div>
 
             {/* 右侧：已选模型 */}
-            <div style={{ border: '1px solid #ddd', borderRadius: '0.5rem', padding: '0.75rem', maxHeight: '20rem', overflowY: 'auto', backgroundColor: '#f0f9ff' }}>
-              <h3 style={{ margin: '0 0 0.75rem 0', fontSize: '0.9rem', color: '#666' }}>已选模型（按顺序）</h3>
+            <div style={{ border: '1px solid #c7d2fe', borderRadius: '8px', padding: '0.75rem', maxHeight: '20rem', overflowY: 'auto', backgroundColor: '#eef2ff' }}>
+              <h3 style={{ margin: '0 0 0.75rem 0', fontSize: '0.9rem', color: '#646a7e' }}>已选模型（按顺序）</h3>
               {selectedModels.length === 0 ? (
-                <p style={{ color: '#666', fontSize: '0.85rem' }}>暂无已选模型</p>
+                <p style={{ color: '#646a7e', fontSize: '0.85rem' }}>暂无已选模型</p>
               ) : (
                 selectedModels.map((modelName, index) => {
                   const model = models.find(m => m.customModel === modelName);
@@ -144,16 +144,16 @@ export const ModelGroupFormPage: FC<Props> = (props) => {
                         alignItems: 'center',
                         padding: '0.5rem',
                         marginBottom: '0.25rem',
-                        borderRadius: '0.25rem',
+                        borderRadius: '6px',
                         backgroundColor: '#fff',
-                        border: '1px solid #bfdbfe',
+                        border: '1px solid #c7d2fe',
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <span style={{ color: '#666', fontSize: '12px', minWidth: '20px' }}>{index + 1}.</span>
+                        <span style={{ color: '#646a7e', fontSize: '12px', minWidth: '20px' }}>{index + 1}.</span>
                         <span style={{ fontSize: '0.85rem' }}>
                           {modelName}
-                          {modelDesc && <span style={{ color: '#666' }}> ({modelDesc})</span>}
+                          {modelDesc && <span style={{ color: '#646a7e' }}> ({modelDesc})</span>}
                         </span>
                       </div>
                       <div style={{ display: 'flex', gap: '0.25rem' }}>
@@ -161,31 +161,31 @@ export const ModelGroupFormPage: FC<Props> = (props) => {
                         {index > 0 ? (
                           <a
                             href={`/admin/model-groups/edit/${groupName}/move-model?modelName=${encodeURIComponent(modelName)}&direction=up`}
-                            class="secondary"
+                            class="secondary outline"
                             style={{ padding: '2px 6px', fontSize: '12px', textDecoration: 'none', display: 'inline-block' }}
                           >
                             ↑
                           </a>
                         ) : (
-                          <span class="secondary" style={{ padding: '2px 6px', fontSize: '12px', display: 'inline-block', opacity: 0.5 }}>↑</span>
+                          <span class="secondary outline" style={{ padding: '2px 6px', fontSize: '12px', display: 'inline-block', opacity: 0.5 }}>↑</span>
                         )}
                         {/* 下移按钮 */}
                         {index < selectedModels.length - 1 ? (
                           <a
                             href={`/admin/model-groups/edit/${groupName}/move-model?modelName=${encodeURIComponent(modelName)}&direction=down`}
-                            class="secondary"
+                            class="secondary outline"
                             style={{ padding: '2px 6px', fontSize: '12px', textDecoration: 'none', display: 'inline-block' }}
                           >
                             ↓
                           </a>
                         ) : (
-                          <span class="secondary" style={{ padding: '2px 6px', fontSize: '12px', display: 'inline-block', opacity: 0.5 }}>↓</span>
+                          <span class="secondary outline" style={{ padding: '2px 6px', fontSize: '12px', display: 'inline-block', opacity: 0.5 }}>↓</span>
                         )}
                         {/* 删除按钮 */}
                         {selectedModels.length > 1 && (
                           <a
                             href={`/admin/model-groups/edit/${groupName}/remove-model?modelName=${encodeURIComponent(modelName)}`}
-                            class="secondary"
+                            class="secondary outline"
                             style={{ padding: '2px 6px', fontSize: '12px', textDecoration: 'none', display: 'inline-block' }}
                           >
                             ×
@@ -200,9 +200,9 @@ export const ModelGroupFormPage: FC<Props> = (props) => {
           </div>
         ) : (
           /* 新增模式：使用复选框选择模型 */
-          <div style={{ border: '1px solid #ddd', borderRadius: '0.5rem', padding: '0.75rem', maxHeight: '20rem', overflowY: 'auto', marginTop: '0.5rem' }}>
+          <div style={{ border: '1px solid #e5e7eb', borderRadius: '8px', padding: '0.75rem', maxHeight: '20rem', overflowY: 'auto', marginTop: '0.5rem', background: '#fff' }}>
             {models.length === 0 ? (
-              <p style={{ color: '#666', fontSize: '0.85rem' }}>暂无可用模型</p>
+              <p style={{ color: '#646a7e', fontSize: '0.85rem' }}>暂无可用模型</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 {models.map((model) => (
@@ -213,8 +213,8 @@ export const ModelGroupFormPage: FC<Props> = (props) => {
                       alignItems: 'center',
                       gap: '0.5rem',
                       padding: '0.5rem',
-                      borderRadius: '0.25rem',
-                      backgroundColor: '#f9fafb',
+                      borderRadius: '6px',
+                      backgroundColor: '#f8f9fb',
                       cursor: 'pointer',
                     }}
                   >
@@ -226,7 +226,7 @@ export const ModelGroupFormPage: FC<Props> = (props) => {
                     />
                     <span style={{ fontSize: '0.85rem' }}>
                       {model.customModel}
-                      {model.desc ? <span style={{ color: '#666' }}> ({model.desc})</span> : null}
+                      {model.desc ? <span style={{ color: '#646a7e' }}> ({model.desc})</span> : null}
                     </span>
                   </label>
                 ))}
@@ -249,6 +249,6 @@ export const ModelGroupFormPage: FC<Props> = (props) => {
           });
         `}} />
       )}
-    </Layout>
+    </TopbarNav>
   );
 };
