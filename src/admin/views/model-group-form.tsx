@@ -462,7 +462,7 @@ export const ModelGroupFormPage: FC<Props> = (props) => {
                   </div>
                 )}
                 <span class="form-hint">至少选择一个模型{isEdit ? '，可按需调整顺序' : ''}</span>
-              </div>
+              </label>
 
               {/* 新增模式：添加 JavaScript 处理复选框变化 */}
               {!isEdit && (
