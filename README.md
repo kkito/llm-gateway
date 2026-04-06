@@ -116,4 +116,4 @@ curl http://localhost:4000/v1/messages \
 
 ## License
 
-MIT
+GPLv3
