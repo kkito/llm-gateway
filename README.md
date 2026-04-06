@@ -96,6 +96,12 @@ curl http://localhost:4000/v1/messages \
 - 详细使用教程：[docs/user-guide.md](docs/user-guide.md)
 - Admin 密码认证功能：[docs/admin-password.md](docs/admin-password.md)
 
+## 开发心得
+
+- [全程使用 Qwen Code 编程](docs/development/use-qwen-code.md)
+- [Cache Token 实现的艰辛](docs/development/cache-token-struggle.md)
+- [龙猫平台 Omni 模型兼容性问题](docs/development/longcat-omni-bug.md)
+
 ## License
 
 MIT
