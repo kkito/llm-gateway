@@ -261,15 +261,28 @@ describe('Admin 认证 E2E 测试', () => {
     beforeEach(async () => {
       // 确保已登录并获取 Session
       sessions.clear();
-      // 先确保有密码（首次设置）
-      await app.request('/admin/login', {
+      
+      // 直接删除配置文件中的密码，确保从干净的状态开始
+      const fs = await import('fs');
+      const configContent = fs.readFileSync(testConfigPath, 'utf-8');
+      const proxyConfig = JSON.parse(configContent);
+      if (proxyConfig.adminPassword) {
+        delete proxyConfig.adminPassword;
+        fs.writeFileSync(testConfigPath, JSON.stringify(proxyConfig, null, 2));
+      }
+      
+      // 首次设置密码
+      const firstLogin = await app.request('/admin/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded'
         },
         body: 'password=testpassword123'
       });
+      // 确保首次设置成功
+      expect(firstLogin.status).toBe(302);
 
+      // 再次登录获取 session
       const loginResponse = await app.request('/admin/login', {
         method: 'POST',
         headers: {
@@ -277,7 +290,11 @@ describe('Admin 认证 E2E 测试', () => {
         },
         body: 'password=testpassword123'
       });
+      // 确保登录成功
+      expect(loginResponse.status).toBe(302);
       sessionCookie = loginResponse.headers.get('Set-Cookie') || '';
+      expect(sessionCookie).toBeTruthy();
+      expect(sessionCookie).toContain('session=');
     });
 
     it('应该拦截未登录的 /admin/password 访问', async () => {
