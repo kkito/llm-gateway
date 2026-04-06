@@ -2,6 +2,17 @@
 
 LLM Proxy Gateway - 统一管理多个大模型 API 的代理服务器
 
+## 使用场景
+
+- [个人开发者统一管理 API](docs/scenarios/personal-api-management.md)
+- [团队共享 LLM 资源](docs/scenarios/team-resource-sharing.md)
+- [API 用量统计与计费](docs/scenarios/usage-statistics-billing.md)
+- [多模型切换测试](docs/scenarios/multi-model-switching.md)
+- [国内访问海外 API](docs/scenarios/domestic-access-overseas.md)
+- [替代复杂开源方案](docs/scenarios/lightweight-alternative.md)
+- [国产模型格式兼容](docs/scenarios/domestic-model-compat.md)
+- [多平台轮询规避限制](docs/scenarios/multi-platform-fallback.md)
+
 ## 功能特性
 
 - 🔄 **格式互转**: 支持 OpenAI 和 Anthropic 两种 API 格式互相转换
@@ -101,17 +112,6 @@ curl http://localhost:4000/v1/messages \
 - [全程使用 Qwen Code 编程](docs/development/use-qwen-code.md)
 - [Cache Token 实现的艰辛](docs/development/cache-token-struggle.md)
 - [龙猫平台 Omni 模型兼容性问题](docs/development/longcat-omni-bug.md)
-
-## 使用场景
-
-- [个人开发者统一管理 API](docs/scenarios/personal-api-management.md)
-- [团队共享 LLM 资源](docs/scenarios/team-resource-sharing.md)
-- [API 用量统计与计费](docs/scenarios/usage-statistics-billing.md)
-- [多模型切换测试](docs/scenarios/multi-model-switching.md)
-- [国内访问海外 API](docs/scenarios/domestic-access-overseas.md)
-- [替代复杂开源方案](docs/scenarios/lightweight-alternative.md)
-- [国产模型格式兼容](docs/scenarios/domestic-model-compat.md)
-- [多平台轮询规避限制](docs/scenarios/multi-platform-fallback.md)
 
 ## License
 
