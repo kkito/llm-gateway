@@ -102,6 +102,17 @@ curl http://localhost:4000/v1/messages \
 - [Cache Token 实现的艰辛](docs/development/cache-token-struggle.md)
 - [龙猫平台 Omni 模型兼容性问题](docs/development/longcat-omni-bug.md)
 
+## 使用场景
+
+- [个人开发者统一管理 API](docs/scenarios/personal-api-management.md)
+- [团队共享 LLM 资源](docs/scenarios/team-resource-sharing.md)
+- [API 用量统计与计费](docs/scenarios/usage-statistics-billing.md)
+- [多模型切换测试](docs/scenarios/multi-model-switching.md)
+- [国内访问海外 API](docs/scenarios/domestic-access-overseas.md)
+- [替代复杂开源方案](docs/scenarios/lightweight-alternative.md)
+- [国产模型格式兼容](docs/scenarios/domestic-model-compat.md)
+- [多平台轮询规避限制](docs/scenarios/multi-platform-fallback.md)
+
 ## License
 
 MIT
