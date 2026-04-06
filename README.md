@@ -8,7 +8,6 @@ LLM Proxy Gateway - 统一管理多个大模型 API 的代理服务器
 - [团队共享 LLM 资源](docs/scenarios/team-resource-sharing.md)
 - [API 用量统计与计费](docs/scenarios/usage-statistics-billing.md)
 - [多模型切换测试](docs/scenarios/multi-model-switching.md)
-- [国内访问海外 API](docs/scenarios/domestic-access-overseas.md)
 - [替代复杂开源方案](docs/scenarios/lightweight-alternative.md)
 - [国产模型格式兼容](docs/scenarios/domestic-model-compat.md)
 - [多平台轮询规避限制](docs/scenarios/multi-platform-fallback.md)
