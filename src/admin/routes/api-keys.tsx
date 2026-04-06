@@ -1,17 +1,46 @@
 import { Hono } from 'hono';
 import { loadFullConfig, saveConfig, addApiKey, updateApiKey, deleteApiKey, getApiKey, getApiKeyOptions, type ApiKey } from '../../config.js';
 import { ApiKeysPage } from '../views/api-keys.js';
+import { isPasswordConfigured, sessions } from '../middleware/auth.js';
 
 interface RouteDeps {
   configPath: string;
+}
+
+// 认证检查辅助函数
+function checkAuth(c: any): boolean {
+  let sessionId: string | undefined;
+  const cookieHeader = c.req.header('Cookie');
+  if (cookieHeader) {
+    sessionId = cookieHeader.split(';').find((cookie: string) => cookie.trim().startsWith('session='))?.split('=')[1];
+  }
+  if (!sessionId) {
+    const authHeader = c.req.header('Authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      sessionId = authHeader.substring(7);
+    }
+  }
+  if (!sessionId) {
+    sessionId = c.req.query('session');
+  }
+  return !!(sessionId && sessions.has(sessionId));
 }
 
 export function createApiKeysRoute(deps: RouteDeps) {
   const { configPath } = deps;
   const app = new Hono();
 
+  // 需要认证的路由包装器
+  const requireAuth = async (c: any, next: () => Promise<void>) => {
+    const proxyConfig = loadFullConfig(configPath);
+    if (isPasswordConfigured(proxyConfig.adminPassword) && !checkAuth(c)) {
+      return c.redirect('/admin/login');
+    }
+    await next();
+  };
+
   // GET /admin/api-keys - 列表页面
-  app.get('/admin/api-keys', async (c) => {
+  app.get('/admin/api-keys', requireAuth, async (c) => {
     try {
       const proxyConfig = loadFullConfig(configPath);
       const apiKeys = getApiKeyOptions(proxyConfig.apiKeys || []);
@@ -22,7 +51,7 @@ export function createApiKeysRoute(deps: RouteDeps) {
   });
 
   // POST /admin/api-keys - 新增
-  app.post('/admin/api-keys', async (c) => {
+  app.post('/admin/api-keys', requireAuth, async (c) => {
     try {
       const body = await c.req.parseBody();
       const name = body.name as string;
@@ -50,7 +79,7 @@ export function createApiKeysRoute(deps: RouteDeps) {
   });
 
   // GET /admin/api-keys/edit/:id - 编辑页面
-  app.get('/admin/api-keys/edit/:id', async (c) => {
+  app.get('/admin/api-keys/edit/:id', requireAuth, async (c) => {
     try {
       const id = c.req.param('id');
       const proxyConfig = loadFullConfig(configPath);
@@ -72,7 +101,7 @@ export function createApiKeysRoute(deps: RouteDeps) {
   });
 
   // POST /admin/api-keys/edit/:id - 更新
-  app.post('/admin/api-keys/edit/:id', async (c) => {
+  app.post('/admin/api-keys/edit/:id', requireAuth, async (c) => {
     try {
       const id = c.req.param('id');
       const body = await c.req.parseBody();
@@ -109,7 +138,7 @@ export function createApiKeysRoute(deps: RouteDeps) {
   });
 
   // POST /admin/api-keys/delete/:id - 删除
-  app.post('/admin/api-keys/delete/:id', async (c) => {
+  app.post('/admin/api-keys/delete/:id', requireAuth, async (c) => {
     try {
       const id = c.req.param('id');
       const proxyConfig = loadFullConfig(configPath);

@@ -171,22 +171,8 @@ export function createServer(
     logDir
   ));
 
-  // 登录路由（无需认证）
-  if (configPath) {
-    app.route('', createLoginRoute({ configPath }));
-  }
-
-  // 密码管理路由（需在认证中间件之前注册，因为它内部处理认证逻辑）
-  if (configPath) {
-    app.route('', createPasswordRoute({ configPath }));
-  }
-
-  // API Keys 管理路由
-  if (configPath) {
-    app.route('', createApiKeysRoute({ configPath }));
-  }
-
-  // 为 /admin/* 路由添加认证中间件（仅在已配置密码时）
+  // 认证中间件 - 必须在这里注册（在所有 admin 路由之前），这样才能拦截所有 /admin/* 路由
+  // 注意：/admin/login 路径会被单独处理，不需要认证
   if (configPath) {
     app.use('/admin/*', async (c, next) => {
       // 登录页无需认证
@@ -201,7 +187,7 @@ export function createServer(
         const hasPassword = isPasswordConfigured(config.adminPassword);
 
         if (hasPassword) {
-          // 已设置密码，需要认证（密码页也不例外）
+          // 已设置密码，需要认证
           // 支持多种 Session 传递方式：Cookie、Authorization Header、Query 参数
           let sessionId: string | undefined;
 
@@ -233,13 +219,28 @@ export function createServer(
             return c.redirect('/admin/login');
           }
         }
-        // 未设置密码时，允许访问所有 admin 页面（包括首次设置密码）
+        // 未设置密码时，允许访问所有 admin 页面
       } catch (error) {
         console.error('认证检查失败:', error);
       }
 
       await next();
     });
+  }
+
+  // 登录路由（无需认证）
+  if (configPath) {
+    app.route('', createLoginRoute({ configPath }));
+  }
+
+  // 密码管理路由（内部也做了认证检查，作为双重保障）
+  if (configPath) {
+    app.route('', createPasswordRoute({ configPath }));
+  }
+
+  // API Keys 管理路由
+  if (configPath) {
+    app.route('', createApiKeysRoute({ configPath }));
   }
 
   // 模型列表路由
