@@ -446,13 +446,13 @@ export const UsersPage: FC<Props> = (props) => {
                   {/* API Key 行 */}
                   <div class="user-apikey-row">
                     <span class="user-apikey-label">Key</span>
-                    <code class="user-apikey-value" title={`sk-${user.apikey}`}>
-                      sk-<span dangerouslySetInnerHTML={{__html: user.apikey}} />
+                    <code class="user-apikey-value" title={user.apikey}>
+                      {user.apikey}
                     </code>
                     <button
                       class="user-apikey-copy"
                       title="复制 Key"
-                      onclick={`navigator.clipboard.writeText('sk-${user.apikey}'); this.textContent = '✓'; setTimeout(() => this.textContent = '📋', 1500);`}
+                      onclick={`navigator.clipboard.writeText('${user.apikey}'); this.textContent = '✓'; setTimeout(() => this.textContent = '📋', 1500);`}
                     >
                       📋
                     </button>
