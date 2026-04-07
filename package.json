@@ -1,12 +1,17 @@
 {
   "name": "@kkito/llm-gateway",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "LLM Proxy Gateway - 统一管理多个大模型 API",
+  "author": "kkito",
   "type": "module",
   "repository": {
     "type": "git",
     "url": "https://github.com/kkito/llm-gateway"
   },
+  "publishConfig": {
+    "access": "public"
+  },
+  "license": "GPLv3",
   "bin": {
     "kkito-llm-gateway": "dist/cli/start.js"
   },
