@@ -230,6 +230,17 @@ export function createModelFormRoute(deps: RouteDeps) {
       // 保存到文件 - 保留 apiKeys 等其他配置
       const proxyConfig = loadFullConfig(configPath);
       proxyConfig.models = newConfigList;
+
+      // 清理所有 model group 中对该模型的引用
+      if (proxyConfig.modelGroups && proxyConfig.modelGroups.length > 0) {
+        proxyConfig.modelGroups = proxyConfig.modelGroups
+          .map(group => ({
+            ...group,
+            models: group.models.filter(m => m !== modelParam)
+          }))
+          .filter(group => group.models.length > 0); // 删除变为空的 group
+      }
+
       saveConfig(proxyConfig, configPath);
 
       // 触发配置更新回调
