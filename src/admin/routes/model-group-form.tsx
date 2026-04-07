@@ -95,25 +95,12 @@ export function createModelGroupFormRoute(deps: RouteDeps) {
     const body = await c.req.parseBody();
     const name = body.name as string;
     const desc = body.desc as string;
-    let modelsParam = body.models as string | undefined;
 
     // 验证组名格式
     if (!name || !/^[-a-zA-Z0-9_]+$/.test(name)) {
       const proxyConfig = loadFullConfig(configPath);
       const group = proxyConfig.modelGroups?.find(g => g.name === oldName);
       return c.html(<ModelGroupFormPage models={proxyConfig.models} group={group} error="组名只能包含字母、数字、下划线、中划线" isEdit />);
-    }
-
-    // 解析 JSON 格式的模型数组
-    let models: string[] = [];
-    if (modelsParam) {
-      try {
-        models = JSON.parse(modelsParam);
-      } catch (e: any) {
-        const proxyConfig = loadFullConfig(configPath);
-        const group = proxyConfig.modelGroups?.find(g => g.name === oldName);
-        return c.html(<ModelGroupFormPage models={proxyConfig.models} group={group} error="模型数据格式错误" isEdit />);
-      }
     }
 
     try {
@@ -125,16 +112,11 @@ export function createModelGroupFormRoute(deps: RouteDeps) {
         return c.html(<ModelGroupFormPage models={proxyConfig.models} group={group} error={`组名 "${name}" 已存在`} isEdit />);
       }
 
-      // 检查是否至少选择一个模型
-      if (models.length === 0) {
-        const group = proxyConfig.modelGroups?.find(g => g.name === oldName);
-        return c.html(<ModelGroupFormPage models={proxyConfig.models} group={group} error="请至少选择一个模型" isEdit />);
-      }
-
-      // 更新配置
+      // 更新配置（只更新名称和描述，models 通过 add-model/remove-model/move-model 单独处理）
       const idx = proxyConfig.modelGroups?.findIndex(g => g.name === oldName);
       if (idx !== undefined && idx !== -1) {
-        proxyConfig.modelGroups![idx] = { name, models, desc: desc || undefined };
+        const oldGroup = proxyConfig.modelGroups![idx];
+        proxyConfig.modelGroups![idx] = { name, models: oldGroup.models, desc: desc || undefined };
         saveConfig(proxyConfig, configPath);
         onConfigChange(proxyConfig);
       }
