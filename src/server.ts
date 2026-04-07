@@ -35,6 +35,10 @@ import { StatsProvider } from './lib/stats-provider.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// 全局变量：确保信号处理器只注册一次
+let hasSetupSignalHandlers = false;
+let cleanupInterval: ReturnType<typeof setInterval> | null = null;
+
 export function createServer(
   config: ProxyConfig,
   logger: Logger,
@@ -58,21 +62,26 @@ export function createServer(
   initStatsProvider(statsProvider);
 
   // 定期清理过期的滑动窗口数据（每小时清理一次）
-  const cleanupInterval = setInterval(() => {
-    statsProvider.cleanup();
-    console.log('🧹 已清理过期的滑动窗口数据');
-  }, 60 * 60 * 1000); // 1 小时
+  if (!cleanupInterval) {
+    cleanupInterval = setInterval(() => {
+      statsProvider.cleanup();
+      console.log('🧹 已清理过期的滑动窗口数据');
+    }, 60 * 60 * 1000); // 1 小时
+  }
 
-  // 确保进程退出时清理定时器
-  process.on('SIGINT', () => {
-    clearInterval(cleanupInterval);
-    process.exit(0);
-  });
+  // 确保进程退出时清理定时器（只注册一次）
+  if (!hasSetupSignalHandlers) {
+    hasSetupSignalHandlers = true;
+    process.on('SIGINT', () => {
+      if (cleanupInterval) clearInterval(cleanupInterval);
+      process.exit(0);
+    });
 
-  process.on('SIGTERM', () => {
-    clearInterval(cleanupInterval);
-    process.exit(0);
-  });
+    process.on('SIGTERM', () => {
+      if (cleanupInterval) clearInterval(cleanupInterval);
+      process.exit(0);
+    });
+  }
 
   // 可变配置引用，用于后台 API 更新
   let currentConfig = config;
