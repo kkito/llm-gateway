@@ -68,10 +68,44 @@ pnpm start
 # 后台启动
 pnpm start -- --daemon
 
-# 或使用全局命令（安装后）
-llm-gateway-start
-llm-gateway-stats
+# 或使用全局命令（npm 安装后）
+kkito-llm-gateway
 ```
+
+#### 全局命令使用
+
+```bash
+# 前台启动
+kkito-llm-gateway
+
+# 后台启动（守护进程模式）
+kkito-llm-gateway -D
+
+# 停止后台服务
+kkito-llm-gateway --stop
+
+# 指定端口
+kkito-llm-gateway -p 8080
+
+# 指定配置文件和日志目录
+kkito-llm-gateway -c /path/to/config.json -l /path/to/logs
+
+# 启用调试日志
+kkito-llm-gateway --debug
+```
+
+#### CLI 参数说明
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `-p, --port <number>` | 服务端口 | `4000` |
+| `-D, --daemon` | 后台启动（守护进程模式） | - |
+| `--stop` | 停止后台运行的服务 | - |
+| `-d, --dir <path>` | 工作目录 | `~/.llm-gateway/` |
+| `-c, --config <path>` | 配置文件路径 | `<dir>/config.json` |
+| `-l, --log-dir <path>` | 日志目录 | 系统默认 |
+| `-t, --timeout <ms>` | 请求超时时间（毫秒） | `300000` |
+| `--debug` | 启用详细日志（记录完整请求/响应内容） | - |
 
 ### 使用
 

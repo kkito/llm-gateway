@@ -68,10 +68,44 @@ pnpm start
 # Daemon mode
 pnpm start -- --daemon
 
-# Or use global commands (after installation)
-llm-gateway-start
-llm-gateway-stats
+# Or use global command (after npm installation)
+kkito-llm-gateway
 ```
+
+#### Global Command Usage
+
+```bash
+# Start in foreground
+kkito-llm-gateway
+
+# Start in daemon mode (background)
+kkito-llm-gateway -D
+
+# Stop daemon service
+kkito-llm-gateway --stop
+
+# Specify port
+kkito-llm-gateway -p 8080
+
+# Specify config file and log directory
+kkito-llm-gateway -c /path/to/config.json -l /path/to/logs
+
+# Enable debug logging
+kkito-llm-gateway --debug
+```
+
+#### CLI Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-p, --port <number>` | Server port | `4000` |
+| `-D, --daemon` | Run in background (daemon mode) | - |
+| `--stop` | Stop the running daemon service | - |
+| `-d, --dir <path>` | Working directory | `~/.llm-gateway/` |
+| `-c, --config <path>` | Config file path | `<dir>/config.json` |
+| `-l, --log-dir <path>` | Log directory | System default |
+| `-t, --timeout <ms>` | Request timeout (ms) | `300000` |
+| `--debug` | Enable verbose logging (full request/response) | - |
 
 ### Usage
 

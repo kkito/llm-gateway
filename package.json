@@ -1,11 +1,14 @@
 {
-  "name": "llm-gateway",
+  "name": "@kkito/llm-gateway",
   "version": "1.0.0",
   "description": "LLM Proxy Gateway - 统一管理多个大模型 API",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kkito/llm-gateway"
+  },
   "bin": {
-    "llm-gateway-start": "dist/cli/start.js",
-    "llm-gateway-stats": "dist/cli/stats.js"
+    "kkito-llm-gateway": "dist/cli/start.js"
   },
   "scripts": {
     "build": "tsc && npm run copy-assets",
