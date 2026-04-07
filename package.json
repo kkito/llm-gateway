@@ -18,7 +18,11 @@
     "start": "node dist/cli/start.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "version": "git add -A",
+    "postversion": "git push && git push --tags",
+    "publish:dry-run": "npm publish --dry-run",
+    "publish:npm": "npm publish --access public"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.11",
