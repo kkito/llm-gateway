@@ -437,7 +437,7 @@ describe('Admin Model Group Form E2E', () => {
     it('编辑时只更新名称和描述，保留原有模型列表', async () => {
       // 编辑模式下,表单提交不应该处理 models 参数
       // models 应该通过 add-model/remove-model/move-model 单独处理
-      
+
       const formData = new URLSearchParams();
       formData.append('name', 'updated-group-name');
       formData.append('desc', '更新描述');
@@ -458,7 +458,7 @@ describe('Admin Model Group Form E2E', () => {
       // 验证配置已更新
       const configContent = readFileSync(testConfigPath, 'utf-8');
       const config = JSON.parse(configContent) as ProxyConfig;
-      
+
       const group = config.modelGroups!.find(g => g.name === 'updated-group-name');
       expect(group).toBeDefined();
       expect(group!.desc).toBe('更新描述');
@@ -470,13 +470,166 @@ describe('Admin Model Group Form E2E', () => {
       const response = await app.request('/admin/model-groups/edit/existing-group');
       expect(response.status).toBe(200);
       const html = await response.text();
-      
+
       // 检查是否有 models hidden input
       expect(html).toContain('type="hidden"');
       expect(html).toContain('name="models"');
-      
+
       // 检查 value 属性是否存在（即使被转义也没关系，因为编辑模式不处理这个字段）
       expect(html).toMatch(/name="models"\s+value="/);
+    });
+  });
+
+  describe('Model Group名称包含点的场景', () => {
+    it('应该成功创建名称包含点的Model Group', async () => {
+      const formData = new URLSearchParams();
+      formData.append('name', 'gpt.4.pool');
+      formData.append('desc', 'GPT-4模型池');
+      formData.append('models', JSON.stringify(['gpt-4', 'gpt-3.5']));
+
+      const response = await app.request('/admin/model-groups', {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        }
+      });
+
+      expect(response.status).toBe(302);
+      expect(response.headers.get('location')).toBe('/admin/model-groups');
+
+      // 验证配置文件已更新
+      const configContent = readFileSync(testConfigPath, 'utf-8');
+      const config = JSON.parse(configContent) as ProxyConfig;
+
+      const newGroup = config.modelGroups!.find(g => g.name === 'gpt.4.pool');
+      expect(newGroup).toBeDefined();
+      expect(newGroup!.models).toEqual(['gpt-4', 'gpt-3.5']);
+    });
+
+    it('应该能正确访问名称包含点的组的编辑页面', async () => {
+      // 先创建一个包含点的组
+      const config = JSON.parse(readFileSync(testConfigPath, 'utf-8')) as ProxyConfig;
+      config.modelGroups!.push({
+        name: 'test.group.name',
+        models: ['gpt-4'],
+        desc: '测试组'
+      });
+      writeFileSync(testConfigPath, JSON.stringify(config, null, 2));
+
+      // 通过URL访问编辑页面（需要URL编码）
+      const encodedName = encodeURIComponent('test.group.name');
+      const response = await app.request(`/admin/model-groups/edit/${encodedName}`);
+
+      expect(response.status).toBe(200);
+      const html = await response.text();
+      expect(html).toContain('test.group.name');
+      expect(html).toContain('测试组');
+    });
+
+    it('应该成功更新名称包含点的Model Group', async () => {
+      // 先创建一个包含点的组
+      const config = JSON.parse(readFileSync(testConfigPath, 'utf-8')) as ProxyConfig;
+      config.modelGroups!.push({
+        name: 'old.name.group',
+        models: ['gpt-4'],
+        desc: '旧名称'
+      });
+      writeFileSync(testConfigPath, JSON.stringify(config, null, 2));
+
+      // 尝试更新这个组
+      const formData = new URLSearchParams();
+      formData.append('name', 'new.name.group');
+      formData.append('desc', '新名称');
+
+      const encodedName = encodeURIComponent('old.name.group');
+      const response = await app.request(`/admin/model-groups/edit/${encodedName}`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        }
+      });
+
+      expect(response.status).toBe(302);
+
+      // 验证配置已更新
+      const updatedConfig = JSON.parse(readFileSync(testConfigPath, 'utf-8')) as ProxyConfig;
+      const group = updatedConfig.modelGroups!.find(g => g.name === 'new.name.group');
+      expect(group).toBeDefined();
+      expect(group!.desc).toBe('新名称');
+
+      // 确认旧名称已被移除
+      const oldGroup = updatedConfig.modelGroups!.find(g => g.name === 'old.name.group');
+      expect(oldGroup).toBeUndefined();
+    });
+
+    it('应该成功向名称包含点的组添加模型', async () => {
+      // 先创建一个包含点的组
+      const config = JSON.parse(readFileSync(testConfigPath, 'utf-8')) as ProxyConfig;
+      config.modelGroups!.push({
+        name: 'pool.v1',
+        models: ['gpt-4'],
+        desc: '版本池'
+      });
+      writeFileSync(testConfigPath, JSON.stringify(config, null, 2));
+
+      const encodedName = encodeURIComponent('pool.v1');
+      const response = await app.request(`/admin/model-groups/edit/${encodedName}/add-model?modelName=claude-3`);
+
+      expect(response.status).toBe(302);
+
+      // 验证模型已添加
+      const updatedConfig = JSON.parse(readFileSync(testConfigPath, 'utf-8')) as ProxyConfig;
+      const group = updatedConfig.modelGroups!.find(g => g.name === 'pool.v1');
+      expect(group).toBeDefined();
+      expect(group!.models).toContain('gpt-4');
+      expect(group!.models).toContain('claude-3');
+    });
+
+    it('应该成功删除名称包含点的Model Group', async () => {
+      // 先创建一个包含点的组
+      const config = JSON.parse(readFileSync(testConfigPath, 'utf-8')) as ProxyConfig;
+      config.modelGroups!.push({
+        name: 'to.be.deleted',
+        models: ['gpt-4'],
+        desc: '将被删除'
+      });
+      writeFileSync(testConfigPath, JSON.stringify(config, null, 2));
+
+      const encodedName = encodeURIComponent('to.be.deleted');
+      const response = await app.request(`/admin/model-groups/delete/${encodedName}`, {
+        method: 'POST'
+      });
+
+      expect(response.status).toBe(302);
+
+      // 验证组已被删除
+      const updatedConfig = JSON.parse(readFileSync(testConfigPath, 'utf-8')) as ProxyConfig;
+      const group = updatedConfig.modelGroups!.find(g => g.name === 'to.be.deleted');
+      expect(group).toBeUndefined();
+    });
+
+    it('列表页面应该正确显示名称包含点的组', async () => {
+      // 先创建一个包含点的组
+      const config = JSON.parse(readFileSync(testConfigPath, 'utf-8')) as ProxyConfig;
+      config.modelGroups!.push({
+        name: 'visible.group',
+        models: ['gpt-4', 'gpt-3.5'],
+        desc: '可见的组'
+      });
+      writeFileSync(testConfigPath, JSON.stringify(config, null, 2));
+
+      const response = await app.request('/admin/model-groups');
+      expect(response.status).toBe(200);
+      const html = await response.text();
+
+      // 页面应该包含这个组
+      expect(html).toContain('visible.group');
+      expect(html).toContain('可见的组');
+
+      // 链接应该正确编码
+      expect(html).toContain('/admin/model-groups/edit/visible.group');
     });
   });
 });
