@@ -464,7 +464,6 @@ export const HomePage: FC<Props> = (props) => {
             id="model-select"
             class="input-value"
             value={firstModel}
-            disabled={props.modelGroups && props.modelGroups.length > 0}
           >
             {props.models.map((model) => (
               <option key={model.customModel} value={model.customModel}>
