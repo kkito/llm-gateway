@@ -1,6 +1,6 @@
 {
   "name": "@kkito/llm-gateway",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "LLM Proxy Gateway - 统一管理多个大模型 API",
   "author": "kkito",
   "type": "module",
