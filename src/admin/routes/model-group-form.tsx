@@ -30,9 +30,9 @@ export function createModelGroupFormRoute(deps: RouteDeps) {
     let modelsParam = body.models as string | undefined;
 
     // 验证组名格式
-    if (!name || !/^[-a-zA-Z0-9_]+$/.test(name)) {
+    if (!name || !/^[-a-zA-Z0-9_.]+$/.test(name)) {
       const proxyConfig = loadFullConfig(configPath);
-      return c.html(<ModelGroupFormPage models={proxyConfig.models} error="组名只能包含字母、数字、下划线、中划线" />);
+      return c.html(<ModelGroupFormPage models={proxyConfig.models} error="组名只能包含字母、数字、下划线、中划线、点" />);
     }
 
     // 解析 JSON 格式的模型数组
@@ -97,10 +97,10 @@ export function createModelGroupFormRoute(deps: RouteDeps) {
     const desc = body.desc as string;
 
     // 验证组名格式
-    if (!name || !/^[-a-zA-Z0-9_]+$/.test(name)) {
+    if (!name || !/^[-a-zA-Z0-9_.]+$/.test(name)) {
       const proxyConfig = loadFullConfig(configPath);
       const group = proxyConfig.modelGroups?.find(g => g.name === oldName);
-      return c.html(<ModelGroupFormPage models={proxyConfig.models} group={group} error="组名只能包含字母、数字、下划线、中划线" isEdit />);
+      return c.html(<ModelGroupFormPage models={proxyConfig.models} group={group} error="组名只能包含字母、数字、下划线、中划线、点" isEdit />);
     }
 
     try {
