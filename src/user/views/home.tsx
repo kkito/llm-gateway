@@ -478,7 +478,6 @@ export const HomePage: FC<Props> = (props) => {
               class="input-value"
               disabled={true}
             >
-              <option value="">选择模型组...</option>
               {props.modelGroups.map((group) => (
                 <option key={group.name} value={group.name}>
                   {group.name} ({group.models.length} 个模型)
