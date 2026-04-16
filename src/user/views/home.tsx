@@ -408,6 +408,36 @@ export const HomePage: FC<Props> = (props) => {
         </div>
       </div>
 
+      {/* JSON 配置卡片 */}
+      <div class="card">
+        <div class="card-header">
+          <span class="card-icon">📋</span>
+          <h2>JSON 配置</h2>
+        </div>
+        <div class="input-wrapper" style={{flexWrap: 'nowrap'}}>
+          <pre id="json-display" style={{
+            flex: 1,
+            margin: 0,
+            padding: '0.4rem 0.6rem',
+            background: 'transparent',
+            border: 'none',
+            outline: 'none',
+            fontSize: '0.75rem',
+            fontFamily: "'SF Mono', 'Monaco', 'Inconsolata', monospace",
+            color: 'var(--text-primary)',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-all',
+            lineHeight: '1.5'
+          }}>{}</pre>
+          <button id="copy-json" class="copy-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            复制
+          </button>
+        </div>
+      </div>
+
       {/* Base URL 卡片 */}
       <div class="card">
         <div class="card-header">
@@ -449,34 +479,21 @@ export const HomePage: FC<Props> = (props) => {
           /* 启用 Model Group 时的双下拉框 UI */
           <div class="model-group-toggle">
             <div class="toggle-option">
-              <input type="radio" id="toggle-model" name="model-toggle" value="model" checked />
-              <label for="toggle-model">模型</label>
+              <input type="radio" id="toggle-group" name="model-toggle" value="group" checked />
+              <label for="toggle-group">模型组</label>
             </div>
             <div class="toggle-option">
-              <input type="radio" id="toggle-group" name="model-toggle" value="group" />
-              <label for="toggle-group">模型组</label>
+              <input type="radio" id="toggle-model" name="model-toggle" value="model" />
+              <label for="toggle-model">模型</label>
             </div>
           </div>
         ) : null}
 
         <div class="input-wrapper model-inputs">
-          <select
-            id="model-select"
-            class="input-value"
-            value={firstModel}
-          >
-            {props.models.map((model) => (
-              <option key={model.customModel} value={model.customModel}>
-                {model.customModel}
-              </option>
-            ))}
-          </select>
-          
           {props.modelGroups && props.modelGroups.length > 0 && (
             <select
               id="model-group-select"
               class="input-value"
-              disabled={true}
             >
               {props.modelGroups.map((group) => (
                 <option key={group.name} value={group.name}>
@@ -485,7 +502,20 @@ export const HomePage: FC<Props> = (props) => {
               ))}
             </select>
           )}
-          
+
+          <select
+            id="model-select"
+            class="input-value"
+            disabled={true}
+            value={firstModel}
+          >
+            {props.models.map((model) => (
+              <option key={model.customModel} value={model.customModel}>
+                {model.customModel}
+              </option>
+            ))}
+          </select>
+
           <button id="copy-model" class="copy-btn">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -565,9 +595,27 @@ export const HomePage: FC<Props> = (props) => {
               var baseUrl = window.location.origin;
               document.getElementById('base-url-display').value = baseUrl;
 
-              // 初始化模型描述
-              var firstModel = ${JSON.stringify(firstModel)};
-              updateModelDesc(firstModel);
+              // 更新 JSON 配置显示
+              function updateJsonDisplay(modelName) {
+                var jsonConfig = {
+                  baseUrl: baseUrl,
+                  model: modelName || '',
+                  apiKey: ''
+                };
+                document.getElementById('json-display').textContent = JSON.stringify(jsonConfig, null, 2);
+              }
+
+              // 初始化 JSON 显示（默认选中模型组）
+              var hasModelGroups = ${props.modelGroups && props.modelGroups.length > 0};
+              if (hasModelGroups) {
+                var firstGroup = ${JSON.stringify(props.modelGroups?.[0]?.name || '')};
+                updateModelGroupDesc(firstGroup);
+                updateJsonDisplay(firstGroup);
+              } else {
+                var firstModel = ${JSON.stringify(firstModel)};
+                updateModelDesc(firstModel);
+                updateJsonDisplay(firstModel);
+              }
 
               // 更新模型描述
               function updateModelDesc(modelName) {
@@ -580,6 +628,8 @@ export const HomePage: FC<Props> = (props) => {
                   descElement.textContent = '';
                   descElement.classList.remove('visible');
                 }
+                // 联动更新 JSON 显示
+                updateJsonDisplay(modelName);
               }
 
               // 更新模型组描述
@@ -593,6 +643,8 @@ export const HomePage: FC<Props> = (props) => {
                   descElement.textContent = '';
                   descElement.classList.remove('visible');
                 }
+                // 联动更新 JSON 显示
+                updateJsonDisplay(groupName);
               }
 
               // 切换模型/模型组
@@ -608,7 +660,7 @@ export const HomePage: FC<Props> = (props) => {
                   if (this.checked) {
                     modelSelect.disabled = false;
                     groupSelect.disabled = true;
-                    groupSelect.value = '';
+                    modelSelect.value = '';
                     document.getElementById('model-desc').style.display = 'block';
                     document.getElementById('model-group-desc').style.display = 'none';
                     updateModelDesc(modelSelect.value);
@@ -682,6 +734,13 @@ export const HomePage: FC<Props> = (props) => {
                 var text = document.getElementById('base-url-display').value;
                 copyToClipboard(text, function(success) {
                   showToast(success ? '✅ Base URL 已复制' : '❌ 复制失败', success ? 'success' : 'error');
+                });
+              });
+
+              document.getElementById('copy-json').addEventListener('click', function() {
+                var text = document.getElementById('json-display').textContent;
+                copyToClipboard(text, function(success) {
+                  showToast(success ? '✅ JSON 配置已复制' : '❌ 复制失败', success ? 'success' : 'error');
                 });
               });
 

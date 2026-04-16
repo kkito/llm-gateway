@@ -201,22 +201,22 @@ describe('User Home Page E2E', () => {
 
         const html = await response.text();
 
-        // 有 modelGroups 时，"模型"选择器应该默认可用（不应该是 disabled）
+        // 有 modelGroups 时，模型组应该默认选中（模型选择器默认禁用）
         const modelSelectRegex = /<select[^>]*id="model-select"[^>]*>/;
         const modelSelectMatch = html.match(modelSelectRegex);
         expect(modelSelectMatch).not.toBeNull();
 
         const modelSelectHtml = modelSelectMatch[0];
         expect(modelSelectHtml).toContain('class="input-value"');
-        expect(modelSelectHtml).not.toContain('disabled');
+        expect(modelSelectHtml).toContain('disabled');
 
-        // 模型组选择器应该默认禁用
+        // 模型组选择器应该默认可用（不应该是 disabled）
         const groupSelectRegex = /<select[^>]*id="model-group-select"[^>]*>/;
         const groupSelectMatch = html.match(groupSelectRegex);
         expect(groupSelectMatch).not.toBeNull();
 
         const groupSelectHtml = groupSelectMatch[0];
-        expect(groupSelectHtml).toContain('disabled');
+        expect(groupSelectHtml).not.toContain('disabled');
       } finally {
         rmSync(testLogDir, { recursive: true, force: true });
       }
