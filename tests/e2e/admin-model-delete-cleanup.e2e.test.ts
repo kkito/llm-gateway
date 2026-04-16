@@ -154,4 +154,70 @@ describe('Admin Model Delete Cleanup E2E', () => {
       expect(html).toContain('未找到模型');
     });
   });
+
+  describe('修改模型名称时更新 Model Group 引用', () => {
+    it('模型改名后应该更新所有 Model Group 中的引用', async () => {
+      // 修改 gpt-3.5 的名称为 gpt-3.5-new
+      const response = await app.request('/admin/models/edit/gpt-3.5', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          customModel: 'gpt-3.5-new',
+          realModel: 'gpt-3.5-turbo',
+          baseUrl: 'https://api.openai.com/v1',
+          provider: 'openai',
+          apiKey: 'sk-openai-key',
+          desc: 'GPT-3.5 模型'
+        })
+      });
+
+      expect(response.status).toBe(302);
+      expect(response.headers.get('location')).toBe('/admin/models');
+
+      // 验证配置文件已更新
+      const configContent = readFileSync(testConfigPath, 'utf-8');
+      const config = JSON.parse(configContent) as ProxyConfig;
+
+      // 模型应该被重命名
+      expect(config.models.find(m => m.customModel === 'gpt-3.5')).toBeUndefined();
+      expect(config.models.find(m => m.customModel === 'gpt-3.5-new')).toBeDefined();
+
+      // gpt-pool 中的 gpt-3.5 应该被更新为 gpt-3.5-new
+      const gptPool = config.modelGroups?.find(g => g.name === 'gpt-pool');
+      expect(gptPool).toBeDefined();
+      expect(gptPool!.models).not.toContain('gpt-3.5');
+      expect(gptPool!.models).toContain('gpt-3.5-new');
+    });
+
+    it('模型名称不变时不应该影响 Model Group', async () => {
+      // 先确保 gpt-pool 包含 gpt-3.5-new
+      const configBefore = JSON.parse(readFileSync(testConfigPath, 'utf-8')) as ProxyConfig;
+      const gptPoolBefore = configBefore.modelGroups?.find(g => g.name === 'gpt-pool');
+      expect(gptPoolBefore?.models).toContain('gpt-3.5-new');
+
+      // 修改 gpt-3.5-new 的其他属性（不改名）
+      const response = await app.request('/admin/models/edit/gpt-3.5-new', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          customModel: 'gpt-3.5-new', // 名称不变
+          realModel: 'gpt-3.5-turbo-16k', // 修改 realModel
+          baseUrl: 'https://api.openai.com/v1',
+          provider: 'openai',
+          apiKey: 'sk-openai-key',
+          desc: '更新的描述'
+        })
+      });
+
+      expect(response.status).toBe(302);
+
+      // 验证 model group 没有被修改
+      const configContent = readFileSync(testConfigPath, 'utf-8');
+      const config = JSON.parse(configContent) as ProxyConfig;
+
+      const gptPool = config.modelGroups?.find(g => g.name === 'gpt-pool');
+      expect(gptPool).toBeDefined();
+      expect(gptPool!.models).toContain('gpt-3.5-new');
+    });
+  });
 });

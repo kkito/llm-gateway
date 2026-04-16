@@ -207,6 +207,15 @@ export function createModelFormRoute(deps: RouteDeps) {
       // 保存到文件 - 保留 apiKeys 等其他配置
       const proxyConfig = loadFullConfig(configPath);
       proxyConfig.models = newConfigList;
+
+      // 更新 model group 中对该模型的引用（模型改名时）
+      if (oldModel !== customModel && proxyConfig.modelGroups) {
+        proxyConfig.modelGroups = proxyConfig.modelGroups.map(group => ({
+          ...group,
+          models: group.models.map(m => m === oldModel ? customModel : m)
+        }));
+      }
+
       saveConfig(proxyConfig, configPath);
 
       // 触发配置更新回调
