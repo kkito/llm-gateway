@@ -600,7 +600,7 @@ export const HomePage: FC<Props> = (props) => {
                 var jsonConfig = {
                   baseUrl: baseUrl,
                   model: modelName || '',
-                  apiKey: ''
+                  apiKey: 'yourKey_or_whatever'
                 };
                 document.getElementById('json-display').textContent = JSON.stringify(jsonConfig, null, 2);
               }
