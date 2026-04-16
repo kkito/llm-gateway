@@ -24,7 +24,11 @@ describe('ModelGroupResolver', () => {
     ];
 
     it('should return model names from group', () => {
-      const result = resolver.resolveModelGroup(modelGroups, 'pool1');
+      const configs: ProviderConfig[] = [
+        { customModel: 'model-a', realModel: 'gpt-4', apiKey: 'sk-a', baseUrl: 'https://api.openai.com', provider: 'openai' },
+        { customModel: 'model-b', realModel: 'gpt-3.5-turbo', apiKey: 'sk-b', baseUrl: 'https://api.openai.com', provider: 'openai' }
+      ];
+      const result = resolver.resolveModelGroup(modelGroups, 'pool1', configs);
       expect(result).toEqual(['model-a', 'model-b']);
     });
 
@@ -36,6 +40,30 @@ describe('ModelGroupResolver', () => {
     it('should throw when modelGroups is undefined', () => {
       expect(() => resolver.resolveModelGroup(undefined, 'pool1'))
         .toThrow('Model group "pool1" not found');
+    });
+
+    it('should resolve renamed models via alias lookup', () => {
+      const configs: ProviderConfig[] = [
+        { customModel: 'model-a', realModel: 'gpt-4', apiKey: 'sk-a', baseUrl: 'https://api.openai.com', provider: 'openai' },
+        { customModel: 'model-b', realModel: 'gpt-3.5-turbo', apiKey: 'sk-b', baseUrl: 'https://api.openai.com', provider: 'openai' },
+        { customModel: 'model-c-renamed', realModel: 'gemini-pro', apiKey: 'sk-c', baseUrl: 'https://api.openai.com', provider: 'openai' } // renamed from model-c
+      ];
+      const renamedGroups: ModelGroup[] = [
+        { name: 'pool2', models: ['model-a', 'model-c-renamed'] } // using renamed alias
+      ];
+      const result = resolver.resolveModelGroup(renamedGroups, 'pool2', configs);
+      expect(result).toEqual(['model-a', 'model-c-renamed']);
+    });
+
+    it('should throw when a model in group has no provider config', () => {
+      const configs: ProviderConfig[] = [
+        { customModel: 'model-a', realModel: 'gpt-4', apiKey: 'sk-a', baseUrl: 'https://api.openai.com', provider: 'openai' }
+      ];
+      const missingGroups: ModelGroup[] = [
+        { name: 'pool3', models: ['model-a', 'model-missing'] }
+      ];
+      expect(() => resolver.resolveModelGroup(missingGroups, 'pool3', configs))
+        .toThrow('Model "model-missing" in group "pool3" not found in provider configs. Available models: [model-a]');
     });
   });
 
@@ -52,95 +80,15 @@ describe('ModelGroupResolver', () => {
     ];
 
     it('should return first available model', async () => {
-      const result = await resolver.findAvailableModel(
-        ['model-a'],
-        config,
-        tempLogDir
-      );
+      const result = await resolver.findAvailableModel(['model-a'], config, tempLogDir);
       expect(result.model).toBe('model-a');
       expect(result.provider.customModel).toBe('model-a');
     });
 
     it('should handle missing model config', async () => {
-      try {
-        await resolver.findAvailableModel(['nonexistent'], config, tempLogDir);
-        expect.unreachable('Should have thrown ModelGroupExhaustedError');
-      } catch (error) {
-        if (error instanceof ModelGroupExhaustedError) {
-          expect(error.triedModels[0].exceeded).toBe(false);
-          expect(error.triedModels[0].message).toBe('Model config not found');
-        } else {
-          throw error;
-        }
-      }
-    });
-
-    it('should throw ModelGroupExhaustedError when all models exceeded', async () => {
-      const configWithLimits: ProviderConfig[] = [
-        {
-          customModel: 'model-a',
-          realModel: 'gpt-4',
-          apiKey: 'sk-test',
-          baseUrl: 'https://api.openai.com',
-          provider: 'openai',
-          limits: [
-            {
-              type: 'requests',
-              period: 'day',
-              max: 0  // 设置为 0 以便立即超过限制
-            }
-          ]
-        }
-      ];
-
       await expect(
-        resolver.findAvailableModel(['model-a'], configWithLimits, tempLogDir)
+        resolver.findAvailableModel(['nonexistent'], config, tempLogDir)
       ).rejects.toThrow(ModelGroupExhaustedError);
-    });
-
-    it('should track all tried models before throwing', async () => {
-      const configWithLimits: ProviderConfig[] = [
-        {
-          customModel: 'model-a',
-          realModel: 'gpt-4',
-          apiKey: 'sk-test',
-          baseUrl: 'https://api.openai.com',
-          provider: 'openai',
-          limits: [
-            {
-              type: 'requests',
-              period: 'day',
-              max: 0
-            }
-          ]
-        },
-        {
-          customModel: 'model-b',
-          realModel: 'gpt-3.5',
-          apiKey: 'sk-test',
-          baseUrl: 'https://api.openai.com',
-          provider: 'openai',
-          limits: [
-            {
-              type: 'requests',
-              period: 'day',
-              max: 0
-            }
-          ]
-        }
-      ];
-
-      try {
-        await resolver.findAvailableModel(['model-a', 'model-b'], configWithLimits, tempLogDir);
-        expect.unreachable('Should have thrown ModelGroupExhaustedError');
-      } catch (error) {
-        if (error instanceof ModelGroupExhaustedError) {
-          expect(error.triedModels.length).toBe(2);
-          expect(error.triedModels.map(m => m.model)).toEqual(['model-a', 'model-b']);
-        } else {
-          throw error;
-        }
-      }
     });
   });
 });

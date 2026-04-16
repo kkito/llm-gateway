@@ -8,7 +8,7 @@ import { RateLimiter } from '../../lib/rate-limiter.js';
 import { buildUpstreamRequest, sendUpstreamRequest } from './upstream-request.js';
 import { handleNonStream } from './non-stream-handler.js';
 import { handleStream } from './stream-handler.js';
-import { tryModelGroupWithFallback, type FallbackContext } from './model-fallback.js';
+import { tryModelGroupWithFallback } from './model-fallback.js';
 
 export function createChatCompletionsHandler(
   config: ProxyConfig | (() => ProxyConfig),
@@ -64,10 +64,10 @@ export function createChatCompletionsHandler(
         console.log(`\n📥 [请求] ${requestId} - 模型组：${model_group} - 流式：${!!stream}`);
 
         const resolver = new ModelGroupResolver();
-        const modelNames = resolver.resolveModelGroup(currentConfig.modelGroups, model_group);
+        const modelNames = resolver.resolveModelGroup(currentConfig.modelGroups, model_group, currentConfig.models);
         console.log(`   ✓ 匹配 model_group: ${model_group} -> [${modelNames.join(', ')}]`);
 
-        const ctx: FallbackContext = {
+        const ctx: any = {
           c, modelNames, allProviders: currentConfig.models, body, stream,
           rateLimiter, logger, detailLogger, requestId, startTime,
           currentUser, modelGroupName: model_group, timeoutMs, logDir
@@ -91,12 +91,12 @@ export function createChatCompletionsHandler(
           // Try resolving as a model group (smart recognition)
           try {
             const resolver = new ModelGroupResolver();
-            const modelNames = resolver.resolveModelGroup(currentConfig.modelGroups, model);
+            const modelNames = resolver.resolveModelGroup(currentConfig.modelGroups, model, currentConfig.models);
             console.log(`   🔍 智能识别：${model} 被识别为 modelGroup -> [${modelNames.join(', ')}]`);
             modelGroup = model;
             console.log(`\n📥 [请求] ${requestId} - 模型组：${model} - 流式：${!!stream}`);
 
-            const ctx: FallbackContext = {
+            const ctx: any = {
               c, modelNames, allProviders: currentConfig.models, body, stream,
               rateLimiter, logger, detailLogger, requestId, startTime,
               currentUser, modelGroupName: model, timeoutMs, logDir

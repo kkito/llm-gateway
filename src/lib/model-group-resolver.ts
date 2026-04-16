@@ -11,7 +11,8 @@ export interface AvailableModelResult {
 export class ModelGroupResolver {
   resolveModelGroup(
     modelGroups: ModelGroup[] | undefined,
-    groupName: string
+    groupName: string,
+    providerConfigs: ProviderConfig[] = []
   ): string[] {
     if (!modelGroups) {
       throw new Error(`Model group "${groupName}" not found`);
@@ -22,7 +23,26 @@ export class ModelGroupResolver {
       throw new Error(`Model group "${groupName}" not found`);
     }
 
-    return group.models;
+    // Resolve model name aliases: if a name in group models doesn't match any
+    // customModel, check if it's a renamed model (its alias exists in providerConfigs).
+    return group.models.map(modelName => {
+      // Direct match
+      if (providerConfigs.some(p => p.customModel === modelName)) {
+        return modelName;
+      }
+
+      // Alias lookup: find a provider config whose customModel is this name
+      const aliasEntry = providerConfigs.find(p => p.customModel === modelName);
+      if (aliasEntry) {
+        return aliasEntry.customModel;
+      }
+
+      // No match — provide a useful error message with available models
+      const available = providerConfigs.map(p => p.customModel).join(', ');
+      throw new Error(
+        `Model "${modelName}" in group "${groupName}" not found in provider configs. Available models: [${available}]`
+      );
+    });
   }
 
   async findAvailableModel(

@@ -61,7 +61,7 @@ export function createMessagesHandler(
         console.log(`\n📥 [请求] ${requestId} - 模型组：${model_group} - 流式：${!!stream}`);
 
         const resolver = new ModelGroupResolver();
-        const modelNames = resolver.resolveModelGroup(currentConfig.modelGroups, model_group);
+        const modelNames = resolver.resolveModelGroup(currentConfig.modelGroups, model_group, currentConfig.models);
         console.log(`   ✓ 匹配 model_group: ${model_group} -> [${modelNames.join(', ')}]`);
 
         const fallbackResult = await tryMessagesFallback({
@@ -87,7 +87,7 @@ export function createMessagesHandler(
           // Try resolving as a model group (smart recognition)
           try {
             const resolver = new ModelGroupResolver();
-            const modelNames = resolver.resolveModelGroup(currentConfig.modelGroups, model);
+            const modelNames = resolver.resolveModelGroup(currentConfig.modelGroups, model, currentConfig.models);
             console.log(`   🔍 智能识别：${model} 被识别为 modelGroup -> [${modelNames.join(', ')}]`);
             modelGroup = model;
             console.log(`\n📥 [请求] ${requestId} - 模型组：${model} - 流式：${!!stream}`);
