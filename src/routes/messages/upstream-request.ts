@@ -64,6 +64,7 @@ export async function sendMessagesUpstreamRequest(
     try {
       const errorText = await response.clone().text();
       console.log(`   ❌ [错误详情] ${errorText}`);
+      detailLogger.logUpstreamResponse(requestId, { status: response.status, error: errorText });
     } catch {
       // ignore parse errors
     }

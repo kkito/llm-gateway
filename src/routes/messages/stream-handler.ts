@@ -48,10 +48,29 @@ export function handleStream(options: StreamHandlerOptions): Response {
       try {
         let buffer = '';
         let finalUsage: any = null;
+        let eventCounter = 0;
+        let convertedEventCounter = 0;
 
         while (true) {
           const { done, value } = await reader.read();
           if (done) {
+            // 处理缓冲区中剩余的数据
+            if (buffer.trim()) {
+              const part = buffer.trim();
+              if (providerFormat === 'openai') {
+                const anthropicChunks = parseAndConvertOpenAISSE(part, streamState!);
+                for (const anthropicChunk of anthropicChunks) {
+                  chunks.push(anthropicChunk);
+                  controller.enqueue(new TextEncoder().encode(anthropicChunk));
+                  convertedEventCounter += anthropicChunks.length;
+                }
+              } else {
+                const sseLine = part + '\n\n';
+                chunks.push(sseLine);
+                controller.enqueue(new TextEncoder().encode(sseLine));
+              }
+            }
+
             detailLogger.logStreamResponse(requestId + '_raw', rawChunks);
 
             // Extract usage from chunks (reverse order to find the last valid usage)
@@ -122,12 +141,15 @@ export function handleStream(options: StreamHandlerOptions): Response {
           for (const part of parts) {
             if (!part.trim()) continue;
 
+            eventCounter++;
+
             if (providerFormat === 'openai') {
               // OpenAI → Anthropic 流式转换
               const anthropicChunks = parseAndConvertOpenAISSE(part, streamState!);
               for (const anthropicChunk of anthropicChunks) {
                 chunks.push(anthropicChunk);
                 controller.enqueue(new TextEncoder().encode(anthropicChunk));
+                convertedEventCounter++;
               }
             } else {
               // Anthropic provider: 直接透传
@@ -142,6 +164,8 @@ export function handleStream(options: StreamHandlerOptions): Response {
             }
           }
         }
+
+        console.log(`   📊 [SSE 统计] 请求 ${requestId} - 原始 SSE 事件：${eventCounter}, 转换后事件：${convertedEventCounter}`);
       } catch (error) {
         try {
           controller.error(error);

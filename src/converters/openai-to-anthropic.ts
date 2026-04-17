@@ -324,6 +324,8 @@ interface OpenAIStreamChunk {
         };
       }>;
       reasoning_content?: string | null;
+      reasoning?: string | null;
+      reasoning_details?: Array<{ text: string }>;
     };
     finish_reason: string | null;
   }>;
@@ -433,14 +435,16 @@ function mapOpenAIFinishReasonToAnthropic(finishReason: string | null): string |
 
 /**
  * 判断是否应该开始新的 content block
- * 
+ *
  * 参考 LiteLLM 实现：litellm/llms/anthropic/experimental_pass_through/adapters/streaming_iterator.py
- * 
+ *
  * 开始新 block 的场景：
  * 1. 从 text 切换到 tool_use
  * 2. 从 tool_use 切换到 text
  * 3. 从 text 切换到 thinking
  * 4. 检测到新的 tool call（有 id 或 name，表示 parallel tool calls）
+ *
+ * 注意：content 和 thinking 可以同时存在，所以 thinking 不应该阻止 text 的处理
  */
 function shouldStartNewContentBlock(
   chunk: OpenAIStreamChunk,
@@ -458,7 +462,7 @@ function shouldStartNewContentBlock(
   // 检查 tool_calls - 新的 tool call 开始
   if (delta?.tool_calls && delta.tool_calls.length > 0) {
     const toolCall = delta.tool_calls[0];
-    
+
     // 如果是新的 tool call（有 id 或 name，表示新的 parallel tool call）
     if (toolCall.id || toolCall.function?.name) {
       // 当前不是 tool_use 类型，需要开始新 block
@@ -482,13 +486,75 @@ function shouldStartNewContentBlock(
 
   // 检查 reasoning_content（thinking）
   if (delta?.reasoning_content !== undefined && delta.reasoning_content !== null && delta.reasoning_content !== '') {
-    // 当前不是 thinking 类型，需要开始新 block
+    if (state.currentContentBlockType !== 'thinking') {
+      return true;
+    }
+  }
+
+  // 检查 reasoning 字段（OpenRouter 格式）
+  if (delta?.reasoning !== undefined && delta.reasoning !== null && delta.reasoning !== '') {
+    if (state.currentContentBlockType !== 'thinking') {
+      return true;
+    }
+  }
+
+  // 检查 reasoning_details 字段（OpenAI o1 格式）
+  if (delta?.reasoning_details && delta.reasoning_details.length > 0 && delta.reasoning_details[0]?.text) {
     if (state.currentContentBlockType !== 'thinking') {
       return true;
     }
   }
 
   return false;
+}
+
+/**
+ * 处理 thinking delta（reasoning_content, reasoning, reasoning_details）
+ * 提取为独立函数，避免代码重复
+ */
+function handleThinkingDelta(
+  events: AnthropicStreamEvent[],
+  state: OpenAIToAnthropicStreamState,
+  thinkingText: string
+): void {
+  if (state.currentContentBlockType !== 'thinking' || !state.sentContentBlockStart) {
+    // 结束之前的 text 或 tool_use block（如果有）
+    if ((state.currentContentBlockType === 'text' || state.currentContentBlockType === 'tool_use') && state.sentContentBlockStart && !state.sentContentBlockFinish) {
+      events.push({
+        type: 'content_block_stop',
+        index: state.currentContentBlockIndex
+      });
+      state.sentContentBlockFinish = true;
+      state.currentContentBlockIndex++;
+    }
+
+    state.currentContentBlockType = 'thinking';
+    state.sentContentBlockStart = false;
+    state.sentContentBlockFinish = false;
+  }
+
+  if (!state.sentContentBlockStart) {
+    state.sentContentBlockStart = true;
+    events.push({
+      type: 'content_block_start',
+      index: state.currentContentBlockIndex,
+      content_block: {
+        type: 'thinking',
+        text: ''
+      }
+    });
+  }
+
+  if (thinkingText) {
+    events.push({
+      type: 'content_block_delta',
+      index: state.currentContentBlockIndex,
+      delta: {
+        type: 'thinking_delta',
+        thinking: thinkingText
+      }
+    });
+  }
 }
 
 /**
@@ -595,9 +661,19 @@ export function convertOpenAIStreamChunkToAnthropic(
     }
   }
   // 4. 处理文本内容
-  else if (delta?.content !== undefined && delta.content !== null) {
+  if (delta?.content !== undefined && delta.content !== null) {
     // 检查是否需要开始新的 content block（text）
     if (state.currentContentBlockType !== 'text' || !state.sentContentBlockStart) {
+      // 结束之前的 thinking block（如果有）
+      if ((state.currentContentBlockType === 'thinking' || state.currentContentBlockType === 'tool_use') && state.sentContentBlockStart && !state.sentContentBlockFinish) {
+        events.push({
+          type: 'content_block_stop',
+          index: state.currentContentBlockIndex
+        });
+        state.sentContentBlockFinish = true;
+        state.currentContentBlockIndex++;
+      }
+
       // 开始新的 text block
       state.currentContentBlockType = 'text';
       state.sentContentBlockStart = false;
@@ -629,49 +705,25 @@ export function convertOpenAIStreamChunkToAnthropic(
       });
     }
   }
-  // 4. 处理 reasoning_content（thinking）
-  else if (delta?.reasoning_content !== undefined && delta.reasoning_content !== null) {
-    // 类似 text 处理，但使用 thinking 类型
-    if (state.currentContentBlockType !== 'thinking' || !state.sentContentBlockStart) {
-      if (state.currentContentBlockType === 'text' && state.sentContentBlockStart && !state.sentContentBlockFinish) {
-        events.push({
-          type: 'content_block_stop',
-          index: state.currentContentBlockIndex
-        });
-        state.sentContentBlockFinish = true;
-        state.currentContentBlockIndex++;
-      }
-      
-      state.currentContentBlockType = 'thinking';
-      state.sentContentBlockStart = false;
-      state.sentContentBlockFinish = false;
-    }
-    
-    if (!state.sentContentBlockStart) {
-      state.sentContentBlockStart = true;
-      events.push({
-        type: 'content_block_start',
-        index: state.currentContentBlockIndex,
-        content_block: {
-          type: 'thinking',
-          text: ''
-        }
-      });
-    }
-
-    if (delta.reasoning_content) {
-      events.push({
-        type: 'content_block_delta',
-        index: state.currentContentBlockIndex,
-        delta: {
-          type: 'thinking_delta',
-          thinking: delta.reasoning_content
-        }
-      });
+  
+  // 5. 处理 reasoning_content（thinking）- Qwen 格式
+  // 注意：使用独立 if 而非 else if，因为某些模型（如 MiniMax）同时返回 content 和 reasoning_content
+  if (delta?.reasoning_content !== undefined && delta.reasoning_content !== null && delta.reasoning_content !== '') {
+    handleThinkingDelta(events, state, delta.reasoning_content);
+  }
+  // 6. 处理 reasoning 字段（thinking）- OpenRouter 格式
+  else if (delta?.reasoning !== undefined && delta.reasoning !== null && delta.reasoning !== '') {
+    handleThinkingDelta(events, state, delta.reasoning);
+  }
+  // 7. 处理 reasoning_details 字段（thinking）- OpenAI o1 格式
+  else if (delta?.reasoning_details && delta.reasoning_details.length > 0) {
+    const reasoningText = delta.reasoning_details[0]?.text || '';
+    if (reasoningText) {
+      handleThinkingDelta(events, state, reasoningText);
     }
   }
   
-  // 5. 处理 finish_reason（结束消息）
+  // 8. 处理 finish_reason（结束消息）
   if (finishReason) {
     // 结束当前 content block
     if (state.sentContentBlockStart && !state.sentContentBlockFinish) {
