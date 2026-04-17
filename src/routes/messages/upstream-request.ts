@@ -12,21 +12,20 @@ export interface UpstreamRequest {
 /**
  * Build the upstream URL, headers, and body for a messages request.
  *
- * For Anthropic providers: direct passthrough with `model` override.
+ * For Anthropic providers: direct passthrough with `model` override and `stream: false`.
  * For OpenAI providers: converts the body via convertAnthropicRequestToOpenAI.
  */
 export async function buildMessagesUpstreamRequest(
   provider: ProviderConfig,
-  body: any,
-  _stream: boolean
+  body: any
 ): Promise<UpstreamRequest> {
   let requestBody: any;
 
   if (provider.provider === 'anthropic') {
-    requestBody = { ...body, model: provider.realModel };
+    requestBody = { ...body, model: provider.realModel, stream: false };
   } else {
     const openaiRequest = convertAnthropicRequestToOpenAI(body);
-    requestBody = { ...openaiRequest, model: provider.realModel };
+    requestBody = { ...openaiRequest, model: provider.realModel, stream: false };
   }
 
   const requestHeaders = buildHeaders(provider);

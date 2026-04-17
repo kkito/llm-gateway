@@ -51,8 +51,8 @@ describe('buildUpstreamRequest', () => {
   });
 
   describe('OpenAI provider path', () => {
-    it('should pass through body with model override when stream=false', async () => {
-      const result = await buildUpstreamRequest(mockProvider, mockBody, false);
+    it('should pass through body with model override and stream=false', async () => {
+      const result = await buildUpstreamRequest(mockProvider, mockBody);
 
       expect(result.url).toBe('https://api.example.com/v1/chat/completions');
       expect(result.headers).toEqual({ Authorization: 'Bearer test-api-key', 'Content-Type': 'application/json' });
@@ -60,20 +60,13 @@ describe('buildUpstreamRequest', () => {
         model: 'gpt-4o',
         messages: [{ role: 'user', content: 'Hello' }],
         max_tokens: 1024,
-        temperature: 0.7
+        temperature: 0.7,
+        stream: false
       });
-      expect(result.body).not.toHaveProperty('stream_options');
-    });
-
-    it('should add stream_options.include_usage when stream=true', async () => {
-      const result = await buildUpstreamRequest(mockProvider, mockBody, true);
-
-      expect(result.body.stream_options).toEqual({ include_usage: true });
-      expect(result.body.model).toBe('gpt-4o');
     });
 
     it('should use buildUrl and buildHeaders from providers module', async () => {
-      await buildUpstreamRequest(mockProvider, mockBody, false);
+      await buildUpstreamRequest(mockProvider, mockBody);
 
       expect(providersModule.buildUrl).toHaveBeenCalledWith(mockProvider, 'chat');
       expect(providersModule.buildHeaders).toHaveBeenCalledWith(mockProvider);
@@ -82,7 +75,7 @@ describe('buildUpstreamRequest', () => {
 
   describe('Anthropic provider path', () => {
     it('should convert body via convertOpenAIRequestToAnthropic and set model', async () => {
-      const result = await buildUpstreamRequest(mockAnthropicProvider, mockBody, true);
+      const result = await buildUpstreamRequest(mockAnthropicProvider, mockBody);
 
       expect(convertersModule.convertOpenAIRequestToAnthropic).toHaveBeenCalledWith(mockBody);
       expect(result.body.model).toBe('claude-3-sonnet-20240229');
@@ -91,18 +84,10 @@ describe('buildUpstreamRequest', () => {
     });
 
     it('should use buildUrl and buildHeaders from providers module', async () => {
-      await buildUpstreamRequest(mockAnthropicProvider, mockBody, false);
+      await buildUpstreamRequest(mockAnthropicProvider, mockBody);
 
       expect(providersModule.buildUrl).toHaveBeenCalledWith(mockAnthropicProvider, 'chat');
       expect(providersModule.buildHeaders).toHaveBeenCalledWith(mockAnthropicProvider);
     });
-  });
-});
-
-describe('sendUpstreamRequest', () => {
-  // Skipping by default because mocking global fetch with AbortSignal.timeout is tricky
-  // We rely on integration-level e2e tests for this function
-  it.skip('should fetch and return response', async () => {
-    // This is tested at e2e level
   });
 });

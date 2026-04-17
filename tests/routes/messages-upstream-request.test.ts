@@ -62,8 +62,8 @@ describe('buildMessagesUpstreamRequest', () => {
   });
 
   describe('Anthropic provider path', () => {
-    it('should pass through body with model override', async () => {
-      const result = await buildMessagesUpstreamRequest(mockAnthropicProvider, mockAnthropicBody, true);
+    it('should pass through body with model override and stream=false', async () => {
+      const result = await buildMessagesUpstreamRequest(mockAnthropicProvider, mockAnthropicBody);
 
       expect(result.url).toBe('https://api.example.com/v1/chat/completions');
       expect(result.headers).toEqual({ Authorization: 'Bearer test-api-key', 'Content-Type': 'application/json' });
@@ -74,13 +74,14 @@ describe('buildMessagesUpstreamRequest', () => {
           { role: 'assistant', content: 'Hi there' }
         ],
         max_tokens: 4096,
-        temperature: 0.7
+        temperature: 0.7,
+        stream: false
       });
       expect(convertersModule.convertAnthropicRequestToOpenAI).not.toHaveBeenCalled();
     });
 
     it('should use buildUrl and buildHeaders from providers module', async () => {
-      await buildMessagesUpstreamRequest(mockAnthropicProvider, mockAnthropicBody, false);
+      await buildMessagesUpstreamRequest(mockAnthropicProvider, mockAnthropicBody);
 
       expect(providersModule.buildUrl).toHaveBeenCalledWith(mockAnthropicProvider, 'chat');
       expect(providersModule.buildHeaders).toHaveBeenCalledWith(mockAnthropicProvider);
@@ -89,7 +90,7 @@ describe('buildMessagesUpstreamRequest', () => {
 
   describe('OpenAI provider path', () => {
     it('should convert body via convertAnthropicRequestToOpenAI and set model', async () => {
-      const result = await buildMessagesUpstreamRequest(mockOpenAIProvider, mockOpenAIBody, true);
+      const result = await buildMessagesUpstreamRequest(mockOpenAIProvider, mockOpenAIBody);
 
       expect(convertersModule.convertAnthropicRequestToOpenAI).toHaveBeenCalledWith(mockOpenAIBody);
       expect(result.body.model).toBe('gpt-4o');
@@ -98,7 +99,7 @@ describe('buildMessagesUpstreamRequest', () => {
     });
 
     it('should use buildUrl and buildHeaders from providers module', async () => {
-      await buildMessagesUpstreamRequest(mockOpenAIProvider, mockOpenAIBody, false);
+      await buildMessagesUpstreamRequest(mockOpenAIProvider, mockOpenAIBody);
 
       expect(providersModule.buildUrl).toHaveBeenCalledWith(mockOpenAIProvider, 'chat');
       expect(providersModule.buildHeaders).toHaveBeenCalledWith(mockOpenAIProvider);

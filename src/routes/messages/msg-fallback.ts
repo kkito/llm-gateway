@@ -3,7 +3,7 @@ import type { Logger } from '../../logger.js';
 import type { DetailLogger } from '../../detail-logger.js';
 import type { RateLimiter } from '../../lib/rate-limiter.js';
 import { buildMessagesUpstreamRequest, sendMessagesUpstreamRequest } from './upstream-request.js';
-import { processMessagesSuccess } from './msg-response.js';
+import { handleMessagesNonStream } from './non-stream-handler.js';
 
 export interface MsgFallbackResult {
   actualModel: string | undefined;
@@ -16,7 +16,6 @@ export interface MsgFallbackContext {
   modelNames: string[];
   allProviders: ProviderConfig[];
   body: any;
-  stream: boolean;
   rateLimiter: RateLimiter;
   logger: Logger;
   detailLogger: DetailLogger;
@@ -29,7 +28,7 @@ export interface MsgFallbackContext {
 }
 
 export async function tryMessagesFallback(ctx: MsgFallbackContext): Promise<MsgFallbackResult> {
-  const { c, modelNames, allProviders, body, stream, rateLimiter, logger, detailLogger, requestId, startTime, currentUser, modelGroupName, timeoutMs, logDir } = ctx;
+  const { c, modelNames, allProviders, body, rateLimiter, logger, detailLogger, requestId, startTime, currentUser, modelGroupName, timeoutMs, logDir } = ctx;
   const triedModels: Array<{ model: string; exceeded: boolean; message?: string }> = [];
   let lastErrorBody: any = null;
   let lastErrorStatus = 500;
@@ -50,7 +49,7 @@ export async function tryMessagesFallback(ctx: MsgFallbackContext): Promise<MsgF
     }
 
     // 3. Build and send upstream request
-    const upstream = await buildMessagesUpstreamRequest(provider, body, stream);
+    const upstream = await buildMessagesUpstreamRequest(provider, body);
     const response = await sendMessagesUpstreamRequest(upstream, detailLogger, requestId, timeoutMs);
 
     // 4. If response is not OK, save error and try next model
@@ -68,28 +67,42 @@ export async function tryMessagesFallback(ctx: MsgFallbackContext): Promise<MsgF
     }
 
     // 5. Success — process and return
-    const processedResponse = await processMessagesSuccess({
-      c,
-      response,
-      provider,
-      modelName,
-      actualModel: modelName,
-      stream,
-      body,
-      rateLimiter,
-      logger,
-      detailLogger,
+    const logEntry: any = {
+      timestamp: new Date().toISOString(),
       requestId,
-      startTime,
-      currentUser,
+      customModel: modelName,
       modelGroup: modelGroupName,
-      triedModels
-    });
+      actualModel: modelName,
+      triedModels: triedModels.length > 0 ? triedModels : undefined,
+      realModel: provider.realModel,
+      provider: provider.provider,
+      endpoint: c.req.path,
+      method: 'POST',
+      statusCode: response.status,
+      durationMs: Date.now() - startTime,
+      userName: currentUser?.name
+    };
+
+    const result = await handleMessagesNonStream(response, provider, modelName, logEntry, logger);
+    if (result) {
+      logger.log(result.logEntry);
+      const pricing =
+        provider.inputPricePer1M !== undefined &&
+        provider.outputPricePer1M !== undefined &&
+        provider.cachedPricePer1M !== undefined
+          ? {
+              inputPricePer1M: provider.inputPricePer1M,
+              outputPricePer1M: provider.outputPricePer1M,
+              cachedPricePer1M: provider.cachedPricePer1M
+            }
+          : undefined;
+      rateLimiter.recordUsage(modelName, result.logEntry, pricing);
+    }
 
     return {
       actualModel: modelName,
       triedModels,
-      response: processedResponse
+      response: c.json(result!.responseData)
     };
   }
 
@@ -110,7 +123,6 @@ export async function tryMessagesFallback(ctx: MsgFallbackContext): Promise<MsgF
     method: 'POST',
     statusCode: lastErrorStatus,
     durationMs: Date.now() - startTime,
-    isStreaming: stream,
     userName: currentUser?.name
   });
 

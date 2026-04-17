@@ -7,7 +7,6 @@ import { getCurrentUser } from '../../user/middleware/auth.js';
 import { RateLimiter } from '../../lib/rate-limiter.js';
 import { buildMessagesUpstreamRequest, sendMessagesUpstreamRequest } from './upstream-request.js';
 import { handleMessagesNonStream } from './non-stream-handler.js';
-import { handleStream as handleMessagesStream } from './stream-handler.js';
 import { tryMessagesFallback } from './msg-fallback.js';
 
 export function createMessagesHandler(
@@ -65,7 +64,7 @@ export function createMessagesHandler(
         console.log(`   ✓ 匹配 model_group: ${model_group} -> [${modelNames.join(', ')}]`);
 
         const fallbackResult = await tryMessagesFallback({
-          c, modelNames, allProviders: currentConfig.models, body, stream,
+          c, modelNames, allProviders: currentConfig.models, body,
           rateLimiter, logger, detailLogger, requestId, startTime,
           currentUser, modelGroupName: model_group, timeoutMs, logDir
         });
@@ -76,7 +75,7 @@ export function createMessagesHandler(
       } else {
         // Single model mode
         customModel = model;
-        console.log(`\n📥 [请求] ${requestId} - 模型：${model} - 流式：${!!stream}`);
+        console.log(`\n📥 [请求] ${requestId} - 模型：${model}`);
 
         // Try direct provider lookup first
         const found = currentConfig.models.find(p => p.customModel === model);
@@ -90,10 +89,10 @@ export function createMessagesHandler(
             const modelNames = resolver.resolveModelGroup(currentConfig.modelGroups, model, currentConfig.models);
             console.log(`   🔍 智能识别：${model} 被识别为 modelGroup -> [${modelNames.join(', ')}]`);
             modelGroup = model;
-            console.log(`\n📥 [请求] ${requestId} - 模型组：${model} - 流式：${!!stream}`);
+            console.log(`\n📥 [请求] ${requestId} - 模型组：${model}`);
 
             const fallbackResult = await tryMessagesFallback({
-              c, modelNames, allProviders: currentConfig.models, body, stream,
+              c, modelNames, allProviders: currentConfig.models, body,
               rateLimiter, logger, detailLogger, requestId, startTime,
               currentUser, modelGroupName: model, timeoutMs, logDir
             });
@@ -140,7 +139,7 @@ export function createMessagesHandler(
       }
 
       // Build and send upstream request
-      const upstream = await buildMessagesUpstreamRequest(provider, body, stream);
+      const upstream = await buildMessagesUpstreamRequest(provider, body);
       const response = await sendMessagesUpstreamRequest(upstream, detailLogger, requestId, timeoutMs);
 
       // Build log entry
@@ -157,7 +156,6 @@ export function createMessagesHandler(
         method: 'POST',
         statusCode: response.status,
         durationMs: Date.now() - startTime,
-        isStreaming: !!stream,
         userName: currentUser?.name
       };
 
@@ -172,44 +170,27 @@ export function createMessagesHandler(
           method: 'POST',
           statusCode: 401,
           durationMs: Date.now() - startTime,
-          isStreaming: !!stream,
           userName: currentUser?.name,
           error: { message: 'Authentication required' }
         });
         return c.json({ error: { message: 'Authentication required' } }, 401);
       }
 
-      // Non-stream response handling
-      if (response.ok && !stream) {
-        const result = await handleMessagesNonStream(response, provider, model, logEntry, logger);
-        if (result) {
-          logger.log(result.logEntry);
-          const pricing = provider.inputPricePer1M !== undefined && provider.outputPricePer1M !== undefined && provider.cachedPricePer1M !== undefined
-            ? { inputPricePer1M: provider.inputPricePer1M, outputPricePer1M: provider.outputPricePer1M, cachedPricePer1M: provider.cachedPricePer1M }
-            : undefined;
-          rateLimiter.recordUsage(actualModel || model, result.logEntry, pricing);
-          return c.json(result.responseData);
-        }
+      // Get full response and convert if needed
+      const result = await handleMessagesNonStream(response, provider, model, logEntry, logger);
+      if (result) {
+        logger.log(result.logEntry);
+        const pricing = provider.inputPricePer1M !== undefined && provider.outputPricePer1M !== undefined && provider.cachedPricePer1M !== undefined
+          ? { inputPricePer1M: provider.inputPricePer1M, outputPricePer1M: provider.outputPricePer1M, cachedPricePer1M: provider.cachedPricePer1M }
+          : undefined;
+        rateLimiter.recordUsage(actualModel || model, result.logEntry, pricing);
+        console.log(`\n✅ [完成] ${requestId} - 耗时：${Date.now() - startTime}ms\n`);
+        return c.json(result.responseData);
       }
-
-      logger.log(logEntry);
 
       // Fallback for non-OK or empty body
-      if (!response.body) {
-        console.log(`\n❌ [错误] 上游响应体为空 ${requestId}`);
-        return c.json({ error: { message: 'No response body' } }, 500);
-      }
-
-      // Stream response handling
-      if (stream && response.ok) {
-        return handleMessagesStream({
-          response, provider, model, actualModel: actualModel || model,
-          requestId, startTime, logEntry, rateLimiter, logger, detailLogger, c
-        });
-      }
-
-      console.log(`\n✅ [完成] ${requestId} - 耗时：${Date.now() - startTime}ms\n`);
-      return c.body(response.body);
+      console.log(`\n❌ [错误] 上游响应体为空 ${requestId}`);
+      return c.json({ error: { message: 'No response body' } }, 500);
 
     } catch (error: any) {
       console.log(`   ❌ [错误] ${error?.message || 'Unknown error'}`);

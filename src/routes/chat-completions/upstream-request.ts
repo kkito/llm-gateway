@@ -12,13 +12,12 @@ export interface UpstreamRequest {
 /**
  * Build the upstream URL, headers, and body for a chat completions request.
  *
- * For OpenAI providers: passes through the body with `stream_options` added when stream=true.
+ * For OpenAI providers: passes through the body with `stream: false`.
  * For Anthropic providers: converts the body via convertOpenAIRequestToAnthropic.
  */
 export async function buildUpstreamRequest(
   provider: ProviderConfig,
-  body: any,
-  stream: boolean
+  body: any
 ): Promise<UpstreamRequest> {
   let requestBody: any;
 
@@ -26,11 +25,11 @@ export async function buildUpstreamRequest(
     requestBody = {
       ...body,
       model: provider.realModel,
-      ...(stream ? { stream_options: { include_usage: true } } : {})
+      stream: false
     };
   } else {
     const anthropicRequest = await convertOpenAIRequestToAnthropic(body);
-    requestBody = { ...anthropicRequest, model: provider.realModel };
+    requestBody = { ...anthropicRequest, model: provider.realModel, stream: false };
   }
 
   const requestHeaders = buildHeaders(provider);

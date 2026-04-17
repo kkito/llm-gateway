@@ -11,7 +11,7 @@ export interface LogEntry {
   method: string;
   statusCode: number;
   durationMs: number;
-  isStreaming: boolean;
+  isStreaming?: boolean;
   promptTokens?: number;
   completionTokens?: number;
   totalTokens?: number;
