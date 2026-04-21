@@ -660,7 +660,10 @@ export const HomePage: FC<Props> = (props) => {
                   if (this.checked) {
                     modelSelect.disabled = false;
                     groupSelect.disabled = true;
-                    modelSelect.value = '';
+                    // 如果当前 model 选择框为空，则选中第一个 model
+                    if (!modelSelect.value && modelSelect.options.length > 0) {
+                      modelSelect.value = modelSelect.options[0].value;
+                    }
                     document.getElementById('model-desc').style.display = 'block';
                     document.getElementById('model-group-desc').style.display = 'none';
                     updateModelDesc(modelSelect.value);
