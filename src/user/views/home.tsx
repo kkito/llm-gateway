@@ -688,6 +688,12 @@ export const HomePage: FC<Props> = (props) => {
                 updateJsonDisplay(firstGroup);
               } else {
                 var firstModel = ${JSON.stringify(firstModel)};
+                // 确保 model select 选中第一个选项
+                var modelSelectEl = document.getElementById('model-select');
+                if (modelSelectEl && modelSelectEl.options.length > 0) {
+                  modelSelectEl.value = modelSelectEl.options[0].value;
+                  firstModel = modelSelectEl.value;
+                }
                 updateModelDesc(firstModel);
                 updateJsonDisplay(firstModel);
               }
@@ -735,8 +741,8 @@ export const HomePage: FC<Props> = (props) => {
                   if (this.checked) {
                     modelSelect.disabled = false;
                     groupSelect.disabled = true;
-                    // 如果当前 model 选择框为空，则选中第一个 model
-                    if (!modelSelect.value && modelSelect.options.length > 0) {
+                    // 直接选中第一个 model
+                    if (modelSelect.options.length > 0) {
                       modelSelect.value = modelSelect.options[0].value;
                     }
                     document.getElementById('model-desc').style.display = 'block';
