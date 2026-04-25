@@ -539,6 +539,37 @@ export const HomePage: FC<Props> = (props) => {
         </div>
       </div>
 
+      {/* 可用模型列表 */}
+      <div class="card">
+        <div class="card-header">
+          <span class="card-icon">📋</span>
+          <h2>可用模型列表</h2>
+          <span class="model-count">（{props.models.filter(m => !m.hidden).length} 个）</span>
+        </div>
+        <div style="overflow-x: auto;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.78rem;">
+            <thead>
+              <tr style="border-bottom: 1px solid var(--border);">
+                <th style="text-align: left; padding: 0.4rem 0.6rem; color: var(--text-secondary); font-weight: 600;">模型名称</th>
+                <th style="text-align: left; padding: 0.4rem 0.6rem; color: var(--text-secondary); font-weight: 600;">真实模型</th>
+                <th style="text-align: left; padding: 0.4rem 0.6rem; color: var(--text-secondary); font-weight: 600;">描述</th>
+              </tr>
+            </thead>
+            <tbody>
+              {props.models
+                .filter(m => !m.hidden)
+                .map((model) => (
+                  <tr style="border-bottom: 1px solid #f3f4f6;">
+                    <td style="padding: 0.35rem 0.6rem; font-weight: 600;">{model.customModel}</td>
+                    <td style="padding: 0.35rem 0.6rem; color: var(--text-secondary);">{model.realModel}</td>
+                    <td style="padding: 0.35rem 0.6rem; color: var(--text-secondary);">{model.desc || '—'}</td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       {/* 参考信息区域 */}
       <div class="reference-section">
         <h3 class="reference-title">
