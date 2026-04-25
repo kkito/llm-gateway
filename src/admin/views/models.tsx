@@ -274,6 +274,16 @@ export const ModelsPage: FC<Props> = (props) => {
             color: var(--accent-color);
           }
 
+          .order-btn.is-hidden {
+            background: #fef3c7;
+            border-color: #f59e0b;
+            color: #d97706;
+          }
+          .order-btn.is-hidden:hover {
+            background: #f59e0b;
+            color: #fff;
+          }
+
           .order-btn:disabled {
             opacity: 0.3;
             cursor: not-allowed;
@@ -364,7 +374,7 @@ export const ModelsPage: FC<Props> = (props) => {
                 </thead>
                 <tbody>
                   {props.models.map((model, index) => (
-                    <tr>
+                    <tr style={model.hidden ? 'opacity: 0.5; background: #f9fafb;' : ''}>
                       <td>
                         <span class="index-badge">{index + 1}</span>
                       </td>
@@ -398,6 +408,24 @@ export const ModelsPage: FC<Props> = (props) => {
                             title="下移"
                           >
                             ↓
+                          </button>
+                          {/* 隐藏开关 */}
+                          <button
+                            type="button"
+                            class={`order-btn ${model.hidden ? 'is-hidden' : ''}`}
+                            data-toggle-url={`/admin/models/toggle-hidden/${model.customModel}`}
+                            title={model.hidden ? '取消隐藏' : '隐藏'}
+                          >
+                            {model.hidden ? '👁' : '👁\u200d🗨'}
+                          </button>
+                          {/* 复制按钮 */}
+                          <button
+                            type="button"
+                            class="btn btn-secondary btn-sm"
+                            data-copy-url={`/admin/models/copy/${model.customModel}`}
+                            title="复制"
+                          >
+                            复制
                           </button>
                           <a
                             href={`/admin/models/edit/${model.customModel}`}
@@ -458,6 +486,33 @@ export const ModelsPage: FC<Props> = (props) => {
                     var form = document.createElement('form');
                     form.method = 'POST';
                     form.action = url + '?direction=' + direction;
+                    document.body.appendChild(form);
+                    form.submit();
+                  });
+                });
+
+                // 复制功能
+                document.querySelectorAll('button[data-copy-url]').forEach(function(btn) {
+                  btn.addEventListener('click', function() {
+                    var url = this.getAttribute('data-copy-url');
+                    var modelName = url.split('/').pop();
+                    if (confirm('确定要复制模型 "' + modelName + '" 吗？\n复制后名称将添加时间戳后缀。')) {
+                      var form = document.createElement('form');
+                      form.method = 'POST';
+                      form.action = url;
+                      document.body.appendChild(form);
+                      form.submit();
+                    }
+                  });
+                });
+
+                // 切换隐藏状态
+                document.querySelectorAll('button[data-toggle-url]').forEach(function(btn) {
+                  btn.addEventListener('click', function() {
+                    var url = this.getAttribute('data-toggle-url');
+                    var form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = url;
                     document.body.appendChild(form);
                     form.submit();
                   });
