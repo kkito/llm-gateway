@@ -22,13 +22,12 @@ describe('Model Copy Logic', () => {
       { customModel: 'claude', realModel: 'claude-3', apiKey: 'key2', baseUrl: 'https://api.anthropic.com', provider: 'anthropic' },
     ];
 
-    const result = copyModel(models, 'gpt-4', '20260425143022');
+    const result = copyModel(models, 'gpt-4', Date.now().toString());
 
-    expect(result[0].customModel).toBe('gpt-4-20260425143022');
+    expect(result[0].customModel).toMatch(/^gpt-4-\d{13}$/);
     expect(result[0].realModel).toBe('gpt-4');
     expect(result[0].hidden).toBe(false);
     expect(result.length).toBe(3);
-    expect(result[0].customModel).toBe('gpt-4-20260425143022');
     expect(result[1].customModel).toBe('gpt-4');
     expect(result[2].customModel).toBe('claude');
   });

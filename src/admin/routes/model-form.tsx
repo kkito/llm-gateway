@@ -272,14 +272,20 @@ export function createModelFormRoute(deps: RouteDeps) {
       return c.html(<ModelsPage models={currentConfig.models} error={`未找到模型：${modelParam}`} />);
     }
 
-    // 生成新名称：原名 + 时间戳
-    const timestamp = new Date()
-      .toISOString()
-      .replace(/[-:T]/g, '')
-      .slice(0, 14); // 20260425143022
+    // 生成新名称：原名 + 毫秒时间戳
+    const timestamp = Date.now().toString();
     const newModelName = `${modelParam}-${timestamp}`;
 
     try {
+      // 加载完整配置
+      const proxyConfig = loadFullConfig(configPath);
+
+      // 检查新名称是否已存在（极低概率但安全起见）
+      const existingIndex = proxyConfig.models.findIndex(p => p.customModel === newModelName);
+      if (existingIndex >= 0) {
+        return c.html(<ModelsPage models={currentConfig.models} error={`模型 "${newModelName}" 已存在，请稍后重试`} />);
+      }
+
       // 复制配置，新模型 hidden=false
       const newEntry: ProviderConfig = {
         ...source,
@@ -288,7 +294,6 @@ export function createModelFormRoute(deps: RouteDeps) {
       };
 
       // 插入到数组第一个位置
-      const proxyConfig = loadFullConfig(configPath);
       proxyConfig.models = [newEntry, ...proxyConfig.models];
       saveConfig(proxyConfig, configPath);
 
