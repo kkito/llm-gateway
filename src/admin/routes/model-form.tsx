@@ -190,6 +190,9 @@ export function createModelFormRoute(deps: RouteDeps) {
 
     try {
       // 更新配置（保留原有的 limits 和价格配置）
+      // 从表单获取 hidden 状态
+      const hidden = body.hidden === 'on';
+
       const newEntry: ProviderConfig = {
         customModel,
         realModel,
@@ -200,13 +203,29 @@ export function createModelFormRoute(deps: RouteDeps) {
         limits: oldEntry.limits,
         inputPricePer1M: oldEntry.inputPricePer1M,
         outputPricePer1M: oldEntry.outputPricePer1M,
-        cachedPricePer1M: oldEntry.cachedPricePer1M
+        cachedPricePer1M: oldEntry.cachedPricePer1M,
+        hidden: hidden || undefined,
       };
 
       const newConfigList = updateConfigEntry(currentConfig.models, oldModel, newEntry);
+
+      // 处理排序：隐藏→排最后，显示→排第一
+      let finalList = newConfigList;
+      if (hidden && !oldEntry.hidden) {
+        // 从显示变为隐藏：移到末尾
+        const others = newConfigList.filter(p => p.customModel !== customModel);
+        const target = newConfigList.find(p => p.customModel === customModel);
+        if (target) finalList = [...others, target];
+      } else if (!hidden && oldEntry.hidden) {
+        // 从隐藏变为显示：移到开头
+        const others = newConfigList.filter(p => p.customModel !== customModel);
+        const target = newConfigList.find(p => p.customModel === customModel);
+        if (target) finalList = [target, ...others];
+      }
+
       // 保存到文件 - 保留 apiKeys 等其他配置
       const proxyConfig = loadFullConfig(configPath);
-      proxyConfig.models = newConfigList;
+      proxyConfig.models = finalList;
 
       // 更新 model group 中对该模型的引用（模型改名时）
       if (oldModel !== customModel && proxyConfig.modelGroups) {
