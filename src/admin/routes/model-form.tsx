@@ -262,6 +262,46 @@ export function createModelFormRoute(deps: RouteDeps) {
     }
   });
 
+  // 复制模型
+  app.post('/admin/models/copy/:model', async (c) => {
+    const modelParam = c.req.param('model');
+    const currentConfig = typeof config === 'function' ? config() : config;
+    const source = currentConfig.models.find(p => p.customModel === modelParam);
+
+    if (!source) {
+      return c.html(<ModelsPage models={currentConfig.models} error={`未找到模型：${modelParam}`} />);
+    }
+
+    // 生成新名称：原名 + 时间戳
+    const timestamp = new Date()
+      .toISOString()
+      .replace(/[-:T]/g, '')
+      .slice(0, 14); // 20260425143022
+    const newModelName = `${modelParam}-${timestamp}`;
+
+    try {
+      // 复制配置，新模型 hidden=false
+      const newEntry: ProviderConfig = {
+        ...source,
+        customModel: newModelName,
+        hidden: false,
+      };
+
+      // 插入到数组第一个位置
+      const proxyConfig = loadFullConfig(configPath);
+      proxyConfig.models = [newEntry, ...proxyConfig.models];
+      saveConfig(proxyConfig, configPath);
+
+      // 触发配置更新回调
+      onConfigChange(proxyConfig);
+
+      // 重定向到新模型的编辑页
+      return c.redirect(`/admin/models/edit/${newModelName}`);
+    } catch (error: any) {
+      return c.html(<ModelsPage models={currentConfig.models} error={`复制失败：${error.message}`} />);
+    }
+  });
+
   // 移动模型顺序
   app.post('/admin/models/move/:model', async (c) => {
     const modelParam = c.req.param('model');
