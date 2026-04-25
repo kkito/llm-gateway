@@ -307,6 +307,38 @@ export function createModelFormRoute(deps: RouteDeps) {
     }
   });
 
+  // 切换模型隐藏状态
+  app.post('/admin/models/toggle-hidden/:model', async (c) => {
+    const modelParam = c.req.param('model');
+    const currentConfig = typeof config === 'function' ? config() : config;
+    const source = currentConfig.models.find(p => p.customModel === modelParam);
+
+    if (!source) {
+      return c.html(<ModelsPage models={currentConfig.models} error={`未找到模型：${modelParam}`} />);
+    }
+
+    try {
+      const newHidden = !source.hidden;
+      const updated = { ...source, hidden: newHidden };
+      const others = currentConfig.models.filter(p => p.customModel !== modelParam);
+
+      // 隐藏：排到最后；取消隐藏：排到第一
+      const newModels = newHidden
+        ? [...others, updated]
+        : [updated, ...others];
+
+      const proxyConfig = loadFullConfig(configPath);
+      proxyConfig.models = newModels;
+      saveConfig(proxyConfig, configPath);
+
+      onConfigChange(proxyConfig);
+
+      return c.redirect('/admin/models');
+    } catch (error: any) {
+      return c.html(<ModelsPage models={currentConfig.models} error={`操作失败：${error.message}`} />);
+    }
+  });
+
   // 移动模型顺序
   app.post('/admin/models/move/:model', async (c) => {
     const modelParam = c.req.param('model');
