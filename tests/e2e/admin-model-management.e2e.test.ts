@@ -12,6 +12,7 @@ describe('Admin Model Management E2E', () => {
   let app: Hono;
   let testLogDir: string;
   let testConfigPath: string;
+  let originalFetch: typeof globalThis.fetch;
 
   const testConfig: ProxyConfig = {
     models: [
@@ -23,6 +24,7 @@ describe('Admin Model Management E2E', () => {
   };
 
   beforeAll(() => {
+    originalFetch = globalThis.fetch;
     testLogDir = join(tmpdir(), 'test-model-mgmt-' + Date.now());
     testConfigPath = join(testLogDir, 'config.json');
     mkdirSync(testLogDir, { recursive: true });
@@ -34,6 +36,7 @@ describe('Admin Model Management E2E', () => {
   });
 
   afterAll(() => {
+    globalThis.fetch = originalFetch;
     rmSync(testLogDir, { recursive: true, force: true });
   });
 
