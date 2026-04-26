@@ -50,9 +50,6 @@ export function createMessagesHandler(
         }, 400);
       }
 
-      // Log request details
-      detailLogger.logRequest(requestId, body);
-
       // Get latest config
       const currentConfig = typeof config === 'function' ? config() : config;
       let provider: ProviderConfig | undefined;
@@ -145,6 +142,9 @@ export function createMessagesHandler(
       if (currentConfig.privacySettings?.enabled) {
         body = applyPrivacyProtection(body, currentConfig.privacySettings, requestId);
       }
+
+      // Log request after privacy protection (so logs show sanitized content)
+      detailLogger.logRequest(requestId, body);
 
       // Build and send upstream request
       const upstream = await buildMessagesUpstreamRequest(provider, body, stream);
