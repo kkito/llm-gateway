@@ -402,6 +402,55 @@ describe('handleStream', () => {
     expect(logger.log).toHaveBeenCalled();
   });
 
+  it('calls detailLogger.logStreamResponse in non-privacy mode', async () => {
+    const c = createMockHonoContext();
+    const detailLogger = createMockDetailLogger();
+    const usage = { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 };
+    const stream = createOpenAIStreamChunks('Test', usage);
+    const options: StreamHandlerOptions = {
+      response: new Response(stream),
+      provider: { customModel: 'gpt-4', realModel: 'gpt-4', apiKey: 'x', baseUrl: 'https://api.openai.com', provider: 'openai' },
+      model: 'gpt-4',
+      actualModel: 'gpt-4',
+      requestId: 'req-123',
+      startTime: Date.now(),
+      logEntry: {},
+      rateLimiter: createMockRateLimiter(),
+      logger: createMockLogger(),
+      detailLogger,
+      c,
+    };
+
+    handleStream(options);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(detailLogger.logStreamResponse).toHaveBeenCalled();
+    expect(detailLogger.logConvertedResponse).toHaveBeenCalled();
+  });
+
+  it('calls detailLogger.logStreamResponse in non-privacy Anthropic mode', async () => {
+    const c = createMockHonoContext();
+    const detailLogger = createMockDetailLogger();
+    const stream = createAnthropicStreamChunks('Hello');
+    const options: StreamHandlerOptions = {
+      response: new Response(stream),
+      provider: { customModel: 'claude', realModel: 'claude-3-sonnet', apiKey: 'x', baseUrl: 'https://api.anthropic.com', provider: 'anthropic' },
+      model: 'claude',
+      actualModel: 'claude',
+      requestId: 'req-123',
+      startTime: Date.now(),
+      logEntry: {},
+      rateLimiter: createMockRateLimiter(),
+      logger: createMockLogger(),
+      detailLogger,
+      c,
+    };
+
+    handleStream(options);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(detailLogger.logStreamResponse).toHaveBeenCalled();
+    expect(detailLogger.logConvertedResponse).toHaveBeenCalled();
+  });
+
   it('discards incomplete SSE buffer for non-OpenRouter providers', async () => {
     const c = createMockHonoContext();
     const encoder = new TextEncoder();
