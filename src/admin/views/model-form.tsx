@@ -1,6 +1,7 @@
 import { FC } from 'hono/jsx';
 import { TopbarNav } from '../components/TopbarNav.js';
 import type { ProviderConfig } from '../../config.js';
+import { ModelTest } from './model-test.js';
 
 interface Props {
   model?: ProviderConfig;
@@ -315,6 +316,8 @@ export const ModelFormPage: FC<Props> = (props) => {
                 </label>
               </div>
               )}
+
+              <ModelTest />
 
               <div class="form-actions">
                 <button type="submit" class="btn btn-primary">{isEdit ? '保存修改' : '添加模型'}</button>
