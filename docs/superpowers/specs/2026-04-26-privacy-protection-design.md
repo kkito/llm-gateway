@@ -38,9 +38,10 @@ src/
 
 ### Config Extension
 
-Add `privacySettings` to `ProxyConfig`:
+Add `privacySettings` to `ProxyConfig` (global, not per-provider):
 
 ```ts
+// In ProxyConfig interface:
 privacySettings?: {
   enabled: boolean;               // Master switch
   stripUserField: boolean;        // Remove `user` field from requests
@@ -51,6 +52,10 @@ privacySettings?: {
 ```
 
 Default values (when not configured): all `false`, `pathPlaceholder: "__USER__"`.
+
+### Integration Points
+
+**Where settings are read:** `privacySettings` is at the `ProxyConfig` level (global config), so it is accessible via `currentConfig.privacySettings` in any route handler.
 
 ### Request Data Flow
 
@@ -169,14 +174,17 @@ export function applyPrivacyProtection(
 **`src/routes/chat-completions/upstream-request.ts`:**
 ```ts
 // In buildUpstreamRequest, before building requestBody:
-if (provider.privacySettings?.enabled) {
-  body = applyPrivacyProtection(body, provider.privacySettings, requestId);
+// Read from global config via config getter
+const privacySettings = getCurrentConfig().privacySettings;
+if (privacySettings?.enabled) {
+  body = applyPrivacyProtection(body, privacySettings, requestId);
 }
 ```
 
 **`src/routes/chat-completions/stream-handler.ts`:**
 - In the SSE processing loop, before `controller.enqueue()`:
 ```ts
+const privacySettings = getCurrentConfig().privacySettings;
 if (privacySettings?.enabled && privacySettings?.sanitizeFilePaths) {
   sseLine = sanitizeSSEChunk(sseLine, requestId);
 }
