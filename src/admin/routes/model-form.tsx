@@ -190,6 +190,9 @@ export function createModelFormRoute(deps: RouteDeps) {
 
     try {
       // 更新配置（保留原有的 limits 和价格配置）
+      // 从表单获取 hidden 状态
+      const hidden = body.hidden === 'on';
+
       const newEntry: ProviderConfig = {
         customModel,
         realModel,
@@ -200,13 +203,29 @@ export function createModelFormRoute(deps: RouteDeps) {
         limits: oldEntry.limits,
         inputPricePer1M: oldEntry.inputPricePer1M,
         outputPricePer1M: oldEntry.outputPricePer1M,
-        cachedPricePer1M: oldEntry.cachedPricePer1M
+        cachedPricePer1M: oldEntry.cachedPricePer1M,
+        hidden: hidden || undefined,
       };
 
       const newConfigList = updateConfigEntry(currentConfig.models, oldModel, newEntry);
+
+      // 处理排序：隐藏→排最后，显示→排第一
+      let finalList = newConfigList;
+      if (hidden && !oldEntry.hidden) {
+        // 从显示变为隐藏：移到末尾
+        const others = newConfigList.filter(p => p.customModel !== customModel);
+        const target = newConfigList.find(p => p.customModel === customModel);
+        if (target) finalList = [...others, target];
+      } else if (!hidden && oldEntry.hidden) {
+        // 从隐藏变为显示：移到开头
+        const others = newConfigList.filter(p => p.customModel !== customModel);
+        const target = newConfigList.find(p => p.customModel === customModel);
+        if (target) finalList = [target, ...others];
+      }
+
       // 保存到文件 - 保留 apiKeys 等其他配置
       const proxyConfig = loadFullConfig(configPath);
-      proxyConfig.models = newConfigList;
+      proxyConfig.models = finalList;
 
       // 更新 model group 中对该模型的引用（模型改名时）
       if (oldModel !== customModel && proxyConfig.modelGroups) {
@@ -259,6 +278,83 @@ export function createModelFormRoute(deps: RouteDeps) {
       return c.redirect('/admin/models');
     } catch (error: any) {
       return c.html(<ModelsPage models={currentConfig.models} error={`删除失败：${error.message}`} />);
+    }
+  });
+
+  // 复制模型
+  app.post('/admin/models/copy/:model', async (c) => {
+    const modelParam = c.req.param('model');
+    const currentConfig = typeof config === 'function' ? config() : config;
+    const source = currentConfig.models.find(p => p.customModel === modelParam);
+
+    if (!source) {
+      return c.html(<ModelsPage models={currentConfig.models} error={`未找到模型：${modelParam}`} />);
+    }
+
+    // 生成新名称：原名 + 毫秒时间戳
+    const timestamp = Date.now().toString();
+    const newModelName = `${modelParam}-${timestamp}`;
+
+    try {
+      // 加载完整配置
+      const proxyConfig = loadFullConfig(configPath);
+
+      // 检查新名称是否已存在（极低概率但安全起见）
+      const existingIndex = proxyConfig.models.findIndex(p => p.customModel === newModelName);
+      if (existingIndex >= 0) {
+        return c.html(<ModelsPage models={currentConfig.models} error={`模型 "${newModelName}" 已存在，请稍后重试`} />);
+      }
+
+      // 复制配置，新模型 hidden=false
+      const newEntry: ProviderConfig = {
+        ...source,
+        customModel: newModelName,
+        hidden: false,
+      };
+
+      // 插入到数组第一个位置
+      proxyConfig.models = [newEntry, ...proxyConfig.models];
+      saveConfig(proxyConfig, configPath);
+
+      // 触发配置更新回调
+      onConfigChange(proxyConfig);
+
+      // 重定向到新模型的编辑页
+      return c.redirect(`/admin/models/edit/${newModelName}`);
+    } catch (error: any) {
+      return c.html(<ModelsPage models={currentConfig.models} error={`复制失败：${error.message}`} />);
+    }
+  });
+
+  // 切换模型隐藏状态
+  app.post('/admin/models/toggle-hidden/:model', async (c) => {
+    const modelParam = c.req.param('model');
+    const currentConfig = typeof config === 'function' ? config() : config;
+    const source = currentConfig.models.find(p => p.customModel === modelParam);
+
+    if (!source) {
+      return c.html(<ModelsPage models={currentConfig.models} error={`未找到模型：${modelParam}`} />);
+    }
+
+    try {
+      const newHidden = !source.hidden;
+      const updated = { ...source, hidden: newHidden };
+      const others = currentConfig.models.filter(p => p.customModel !== modelParam);
+
+      // 隐藏：排到最后；取消隐藏：排到第一
+      const newModels = newHidden
+        ? [...others, updated]
+        : [updated, ...others];
+
+      const proxyConfig = loadFullConfig(configPath);
+      proxyConfig.models = newModels;
+      saveConfig(proxyConfig, configPath);
+
+      onConfigChange(proxyConfig);
+
+      return c.redirect('/admin/models');
+    } catch (error: any) {
+      return c.html(<ModelsPage models={currentConfig.models} error={`操作失败：${error.message}`} />);
     }
   });
 

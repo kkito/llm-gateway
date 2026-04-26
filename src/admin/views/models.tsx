@@ -252,9 +252,9 @@ export const ModelsPage: FC<Props> = (props) => {
           }
 
           .order-btn {
-            width: 26px;
+            min-width: 26px;
             height: 26px;
-            padding: 0;
+            padding: 0 4px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
@@ -272,6 +272,16 @@ export const ModelsPage: FC<Props> = (props) => {
           .order-btn:hover:not(:disabled) {
             border-color: var(--accent-color);
             color: var(--accent-color);
+          }
+
+          .order-btn.is-hidden {
+            background: #fef3c7;
+            border-color: #f59e0b;
+            color: #d97706;
+          }
+          .order-btn.is-hidden:hover {
+            background: #f59e0b;
+            color: #fff;
           }
 
           .order-btn:disabled {
@@ -359,12 +369,12 @@ export const ModelsPage: FC<Props> = (props) => {
                     <th style="width: 50px;">#</th>
                     <th>模型名称</th>
                     <th>描述</th>
-                    <th style="width: 140px;">操作</th>
+                    <th style="min-width: 280px;">操作</th>
                   </tr>
                 </thead>
                 <tbody>
                   {props.models.map((model, index) => (
-                    <tr>
+                    <tr style={model.hidden ? { opacity: 0.5, background: '#f9fafb' } : undefined}>
                       <td>
                         <span class="index-badge">{index + 1}</span>
                       </td>
@@ -382,7 +392,7 @@ export const ModelsPage: FC<Props> = (props) => {
                           <button
                             type="button"
                             class="order-btn"
-                            data-move-url={`/admin/models/move/${model.customModel}`}
+                            data-move-url={`/admin/models/move/${encodeURIComponent(model.customModel)}`}
                             data-direction="up"
                             disabled={index === 0}
                             title="上移"
@@ -392,15 +402,33 @@ export const ModelsPage: FC<Props> = (props) => {
                           <button
                             type="button"
                             class="order-btn"
-                            data-move-url={`/admin/models/move/${model.customModel}`}
+                            data-move-url={`/admin/models/move/${encodeURIComponent(model.customModel)}`}
                             data-direction="down"
                             disabled={index === props.models.length - 1}
                             title="下移"
                           >
                             ↓
                           </button>
+                          {/* 隐藏开关 */}
+                          <button
+                            type="button"
+                            class={`order-btn ${model.hidden ? 'is-hidden' : ''}`}
+                            data-toggle-url={`/admin/models/toggle-hidden/${encodeURIComponent(model.customModel)}`}
+                            title={model.hidden ? '显示' : '隐藏'}
+                          >
+                            {model.hidden ? '显示' : '隐藏'}
+                          </button>
+                          {/* 复制按钮 */}
+                          <button
+                            type="button"
+                            class="btn btn-secondary btn-sm"
+                            data-copy-url={`/admin/models/copy/${encodeURIComponent(model.customModel)}`}
+                            title="复制"
+                          >
+                            复制
+                          </button>
                           <a
-                            href={`/admin/models/edit/${model.customModel}`}
+                            href={`/admin/models/edit/${encodeURIComponent(model.customModel)}`}
                             class="btn btn-secondary btn-sm"
                             title="编辑"
                           >
@@ -416,7 +444,7 @@ export const ModelsPage: FC<Props> = (props) => {
                           <button
                             type="button"
                             class="btn btn-sm btn-danger"
-                            data-delete-url={`/admin/models/delete/${model.customModel}`}
+                            data-delete-url={`/admin/models/delete/${encodeURIComponent(model.customModel)}`}
                             title="删除"
                           >
                             ×
@@ -458,6 +486,33 @@ export const ModelsPage: FC<Props> = (props) => {
                     var form = document.createElement('form');
                     form.method = 'POST';
                     form.action = url + '?direction=' + direction;
+                    document.body.appendChild(form);
+                    form.submit();
+                  });
+                });
+
+                // 复制功能
+                document.querySelectorAll('button[data-copy-url]').forEach(function(btn) {
+                  btn.addEventListener('click', function() {
+                    var url = this.getAttribute('data-copy-url');
+                    var modelName = url.split('/').pop();
+                    if (confirm('确定要复制模型 "' + modelName + '" 吗？\\n复制后名称将添加时间戳后缀。')) {
+                      var form = document.createElement('form');
+                      form.method = 'POST';
+                      form.action = url;
+                      document.body.appendChild(form);
+                      form.submit();
+                    }
+                  });
+                });
+
+                // 切换隐藏状态
+                document.querySelectorAll('button[data-toggle-url]').forEach(function(btn) {
+                  btn.addEventListener('click', function() {
+                    var url = this.getAttribute('data-toggle-url');
+                    var form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = url;
                     document.body.appendChild(form);
                     form.submit();
                   });

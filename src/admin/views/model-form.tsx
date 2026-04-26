@@ -300,6 +300,22 @@ export const ModelFormPage: FC<Props> = (props) => {
                 </label>
               </div>
 
+              {/* 隐藏模型（仅编辑模式） */}
+              {isEdit && (
+              <div style="margin-bottom: 1.25rem;">
+                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.85rem; color: var(--text-secondary);">
+                  <input
+                    type="checkbox"
+                    name="hidden"
+                    value="on"
+                    checked={props.model?.hidden === true}
+                    style="width: 16px; height: 16px; accent-color: var(--accent-color);"
+                  />
+                  <span>隐藏此模型（首页不展示，后台列表排到最后）</span>
+                </label>
+              </div>
+              )}
+
               <div class="form-actions">
                 <button type="submit" class="btn btn-primary">{isEdit ? '保存修改' : '添加模型'}</button>
                 <a href="/admin/models" class="btn btn-secondary">取消</a>

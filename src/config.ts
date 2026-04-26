@@ -36,6 +36,7 @@ export interface ProviderConfig {
   outputPricePer1M?: number;   // 输出 token 每百万价格（美元）
   cachedPricePer1M?: number;   // 缓存 token 每百万价格（美元）
   limits?: ModelLimit[];       // 使用限制配置
+  hidden?: boolean;            // 是否隐藏该模型（不对外展示）
 }
 
 /**

@@ -284,6 +284,37 @@ export const HomePage: FC<Props> = (props) => {
               border: 1px solid var(--border);
             }
 
+            /* 模型列表表格 */
+            .model-list-table {
+              width: 100%;
+              border-collapse: collapse;
+              font-size: 0.75rem;
+            }
+            .model-list-table thead tr {
+              border-bottom: 1px solid var(--border);
+            }
+            .model-list-table th {
+              text-align: left;
+              padding: 0.4rem 0.6rem;
+              color: var(--text-secondary);
+              font-weight: 600;
+            }
+            .model-list-table tbody tr {
+              border-bottom: 1px solid var(--border);
+            }
+            .model-list-table tbody tr:last-child {
+              border-bottom: none;
+            }
+            .model-list-table td {
+              padding: 0.35rem 0.6rem;
+            }
+            .model-list-table td:first-child {
+              font-weight: 600;
+            }
+            .model-list-table td:not(:first-child) {
+              color: var(--text-secondary);
+            }
+
             .reference-item {
               font-size: 0.75rem;
               color: var(--text-secondary);
@@ -536,6 +567,37 @@ export const HomePage: FC<Props> = (props) => {
         <div class="api-key-success">
           <span class="check-icon">✅</span>
           <span>不需要，随便填即可</span>
+        </div>
+      </div>
+
+      {/* 可用模型列表 */}
+      <div class="card">
+        <div class="card-header">
+          <span class="card-icon">🧠</span>
+          <h2>可用模型列表</h2>
+          <span class="model-count">（{props.models.filter(m => !m.hidden).length} 个）</span>
+        </div>
+        <div style="overflow-x: auto;">
+          <table class="model-list-table">
+            <thead>
+              <tr>
+                <th>模型名称</th>
+                <th>真实模型</th>
+                <th>描述</th>
+              </tr>
+            </thead>
+            <tbody>
+              {props.models
+                .filter(m => !m.hidden)
+                .map((model) => (
+                  <tr>
+                    <td>{model.customModel}</td>
+                    <td>{model.realModel}</td>
+                    <td>{model.desc || '—'}</td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
         </div>
       </div>
 
