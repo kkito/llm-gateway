@@ -4,6 +4,7 @@ import type { RateLimiter } from '../../lib/rate-limiter.js';
 import type { Logger } from '../../logger.js';
 import { createStreamConverterState, type StreamConverterState } from '../../converters/anthropic-to-openai.js';
 import { buildFullOpenAIResponse, parseAndConvertAnthropicSSE } from '../utils/sse-handlers.js';
+import { sanitizeSSEChunk } from '../../privacy/sanitizer.js';
 
 export interface StreamHandlerOptions {
   response: Response;
@@ -17,6 +18,7 @@ export interface StreamHandlerOptions {
   logger: Logger;
   detailLogger: DetailLogger;
   c: any;
+  privacySettings?: any;
 }
 
 function isSilentError(err: any): boolean {
@@ -149,7 +151,11 @@ export function handleStream(options: StreamHandlerOptions): Response {
               const openAIChunks = parseAndConvertAnthropicSSE(part, requestId, model, streamState!);
               for (const openAIChunk of openAIChunks) {
                 chunks.push(openAIChunk);
-                controller.enqueue(new TextEncoder().encode(openAIChunk));
+                let sanitizedChunk = openAIChunk;
+                if (options.privacySettings?.enabled && options.privacySettings.sanitizeFilePaths) {
+                  sanitizedChunk = sanitizeSSEChunk(sanitizedChunk, options.requestId);
+                }
+                controller.enqueue(new TextEncoder().encode(sanitizedChunk));
               }
             } else {
               let sseLine = part;
@@ -160,6 +166,9 @@ export function handleStream(options: StreamHandlerOptions): Response {
                 sseLine += '\n\n';
               }
               chunks.push(sseLine);
+              if (options.privacySettings?.enabled && options.privacySettings.sanitizeFilePaths) {
+                sseLine = sanitizeSSEChunk(sseLine, options.requestId);
+              }
               try {
                 controller.enqueue(new TextEncoder().encode(sseLine));
               } catch (err) {

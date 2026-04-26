@@ -220,7 +220,8 @@ export function createChatCompletionsHandler(
       if (stream && response.ok) {
         return handleStream({
           response, provider, model, actualModel: actualModel || model,
-          requestId, startTime, logEntry, rateLimiter, logger, detailLogger, c
+          requestId, startTime, logEntry, rateLimiter, logger, detailLogger, c,
+          privacySettings: currentConfig.privacySettings
         });
       }
 
