@@ -124,13 +124,13 @@ export function handleStream(options: StreamHandlerOptions): Response {
               }
             }
 
-            // Logging (privacy mode only)
+            // Logging: always record stream response, privacy mode only does path restoration
+            const fullResponse = buildFullOpenAIResponse(chunks);
             if (privacyOn) {
-              const fullResponse = buildFullOpenAIResponse(chunks);
               restorePaths(fullResponse, requestId);
-              detailLogger.logStreamResponse(requestId, chunks);
-              detailLogger.logConvertedResponse(requestId, fullResponse);
             }
+            detailLogger.logStreamResponse(requestId, chunks);
+            detailLogger.logConvertedResponse(requestId, fullResponse);
 
             if (finalUsage) {
               const finalChunk = `data: ${JSON.stringify({
