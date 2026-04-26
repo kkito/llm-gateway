@@ -159,5 +159,22 @@ describe('Admin Model Management E2E', () => {
       // 验证限制链接
       expect(html).toMatch(/href="\/admin\/models\/[^"]+\/limits"/);
     });
+
+    it('should have valid JavaScript in script tag (no broken escape sequences)', async () => {
+      const response = await app.request('/admin/models');
+      expect(response.status).toBe(200);
+
+      const html = await response.text();
+      const scriptMatch = html.match(/<script[^>]*>([\s\S]*?)<\/script>/);
+      expect(scriptMatch).not.toBeNull();
+
+      const scriptContent = scriptMatch![1];
+
+      // 验证脚本中没有未转义的实际换行符出现在字符串字面量中
+      // 如果 confirm/alert 中的 \n 被错误解析为实际换行，会导致语法错误
+      expect(() => {
+        new Function(scriptContent);
+      }).not.toThrow();
+    });
   });
 });
