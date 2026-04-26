@@ -4,7 +4,7 @@ import type { RateLimiter } from '../../lib/rate-limiter.js';
 import type { Logger } from '../../logger.js';
 import { createStreamConverterState, type StreamConverterState } from '../../converters/anthropic-to-openai.js';
 import { buildFullOpenAIResponse, parseAndConvertAnthropicSSE } from '../utils/sse-handlers.js';
-import { sanitizeSSEChunk, restorePaths, getPathMappings } from '../../privacy/sanitizer.js';
+import { applyPathMappings, restorePaths } from '../../privacy/sanitizer.js';
 
 export interface StreamHandlerOptions {
   response: Response;
@@ -45,6 +45,9 @@ export function handleStream(options: StreamHandlerOptions): Response {
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
 
+  const privacyOn = privacySettings?.enabled && privacySettings.sanitizeFilePaths;
+  const privacyBuffer: string[] = [];
+
   const transformedStream = new ReadableStream({
     async start(controller) {
       try {
@@ -63,15 +66,25 @@ export function handleStream(options: StreamHandlerOptions): Response {
               if (!sseLine.endsWith('\n\n')) {
                 sseLine += '\n\n';
               }
-              chunks.push(sseLine);
+              if (privacyOn) {
+                privacyBuffer.push(sseLine);
+              } else {
+                chunks.push(sseLine);
+                try {
+                  controller.enqueue(new TextEncoder().encode(sseLine));
+                } catch (err) {
+                  if (isSilentError(err)) { /* ignore */ } else { throw err; }
+                }
+              }
             }
 
             detailLogger.logStreamResponse(requestId + '_raw', rawChunks);
 
-            // Extract usage from chunks (reverse order to find the last valid usage)
-            for (let i = chunks.length - 1; i >= 0; i--) {
+            // Extract usage from chunks
+            const usageSource = privacyOn ? privacyBuffer : chunks;
+            for (let i = usageSource.length - 1; i >= 0; i--) {
               try {
-                const chunkJson = JSON.parse(chunks[i].slice(5).trim());
+                const chunkJson = JSON.parse(usageSource[i].slice(5).trim());
                 if (chunkJson.usage?.prompt_tokens_details?.cached_tokens) {
                   logEntry.cachedTokens = chunkJson.usage.prompt_tokens_details.cached_tokens;
                   finalUsage = chunkJson.usage;
@@ -96,21 +109,32 @@ export function handleStream(options: StreamHandlerOptions): Response {
               logEntry.totalTokens = finalUsage.total_tokens || (logEntry.promptTokens + logEntry.completionTokens);
             }
 
-            const fullResponse = buildFullOpenAIResponse(chunks);
-            // Restore paths in stream response for logging
-            // Note: Individual SSE chunks cannot be reliably restored because
-            // paths are tokenized into tiny fragments that span chunk boundaries.
-            // The aggregated full response (logConvertedResponse) has restored paths.
-            if (privacySettings?.enabled && privacySettings.sanitizeFilePaths) {
-              restorePaths(fullResponse, requestId);
-            }
-            detailLogger.logStreamResponse(requestId, chunks);
-            detailLogger.logConvertedResponse(requestId, fullResponse);
+            // Privacy mode: flush remaining buffer and collect for logging
+            if (privacyOn && privacyBuffer.length > 0) {
+              const originalLengths = privacyBuffer.map(c => c.length);
+              const combined = privacyBuffer.join('');
+              const restored = applyPathMappings(combined, requestId);
+              const split = splitByOriginalLengths(restored, originalLengths);
 
-            // Send restored chunks to user
-            for (const chunk of chunks) {
-              controller.enqueue(new TextEncoder().encode(chunk));
+              for (const chunk of split) {
+                chunks.push(chunk);
+                try {
+                  controller.enqueue(new TextEncoder().encode(chunk));
+                } catch (err) {
+                  if (isSilentError(err)) return;
+                  throw err;
+                }
+              }
             }
+
+            // Logging (privacy mode only)
+            if (privacyOn) {
+              const fullResponse = buildFullOpenAIResponse(chunks);
+              restorePaths(fullResponse, requestId);
+              detailLogger.logStreamResponse(requestId, chunks);
+              detailLogger.logConvertedResponse(requestId, fullResponse);
+            }
+
             if (finalUsage) {
               const finalChunk = `data: ${JSON.stringify({
                 id: requestId,
@@ -158,8 +182,19 @@ export function handleStream(options: StreamHandlerOptions): Response {
             if (providerFormat === 'anthropic') {
               const openAIChunks = parseAndConvertAnthropicSSE(part, requestId, model, streamState!);
               for (const openAIChunk of openAIChunks) {
-                chunks.push(openAIChunk);
-                // Don't enqueue in real-time — we'll restore paths and send all at the end
+                if (!privacyOn) {
+                  chunks.push(openAIChunk);
+                  try {
+                    controller.enqueue(new TextEncoder().encode(openAIChunk));
+                  } catch (err) {
+                    if (!isSilentError(err)) throw err;
+                  }
+                } else {
+                  privacyBuffer.push(openAIChunk);
+                  if (privacyBuffer.length >= 3) {
+                    flushPrivacyWindow(privacyBuffer, requestId, controller, chunks);
+                  }
+                }
               }
             } else {
               let sseLine = part;
@@ -169,8 +204,20 @@ export function handleStream(options: StreamHandlerOptions): Response {
               if (!sseLine.endsWith('\n\n')) {
                 sseLine += '\n\n';
               }
-              chunks.push(sseLine);
-              // Don't enqueue in real-time — we'll restore paths and send all at the end
+              if (!privacyOn) {
+                chunks.push(sseLine);
+                try {
+                  controller.enqueue(new TextEncoder().encode(sseLine));
+                } catch (err) {
+                  if (isSilentError(err)) return;
+                  throw err;
+                }
+              } else {
+                privacyBuffer.push(sseLine);
+                if (privacyBuffer.length >= 3) {
+                  flushPrivacyWindow(privacyBuffer, requestId, controller, chunks);
+                }
+              }
             }
           }
         }
@@ -185,4 +232,60 @@ export function handleStream(options: StreamHandlerOptions): Response {
   });
 
   return c.body(transformedStream);
+}
+
+/**
+ * Flush the first 3 chunks from the privacy buffer as a sliding window.
+ * Joins them, applies path mappings, splits proportionally, sends the first.
+ */
+function flushPrivacyWindow(
+  buffer: string[],
+  requestId: string,
+  controller: ReadableStreamDefaultController,
+  chunks: string[]
+): void {
+  if (buffer.length < 3) return;
+
+  const windowChunks = buffer.slice(0, 3);
+  const originalLengths = windowChunks.map(c => c.length);
+
+  const combined = windowChunks.join('');
+  const restored = applyPathMappings(combined, requestId);
+  const split = splitByOriginalLengths(restored, originalLengths);
+
+  // Add to chunks for logging
+  chunks.push(split[0]);
+
+  // Send the oldest chunk
+  try {
+    controller.enqueue(new TextEncoder().encode(split[0]));
+  } catch (err) {
+    if (isSilentError(err)) return;
+    throw err;
+  }
+
+  // Replace the first 3 buffer entries with the remaining 2 restored chunks
+  buffer.splice(0, 3, split[1], split[2]);
+}
+
+/**
+ * Split a restored string proportionally based on original chunk lengths.
+ * The last chunk takes all remaining characters to avoid rounding loss.
+ */
+function splitByOriginalLengths(restored: string, originalLengths: number[]): string[] {
+  const totalLen = originalLengths.reduce((a, b) => a + b, 0);
+  const result: string[] = [];
+  let offset = 0;
+
+  for (let i = 0; i < originalLengths.length; i++) {
+    const ratio = originalLengths[i] / totalLen;
+    const chunkLen = Math.round(restored.length * ratio);
+    const actualLen = i === originalLengths.length - 1
+      ? restored.length - offset
+      : chunkLen;
+    result.push(restored.slice(offset, offset + actualLen));
+    offset += actualLen;
+  }
+
+  return result;
 }
