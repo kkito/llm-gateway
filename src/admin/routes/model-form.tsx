@@ -3,6 +3,8 @@ import type { ProviderConfig, ProxyConfig } from '../../config.js';
 import { saveConfig, updateConfigEntry, deleteConfigEntry, loadFullConfig, getApiKeyOptions } from '../../config.js';
 import { ModelFormPage } from '../views/model-form.js';
 import { ModelsPage } from '../views/models.js';
+import { OpenAIProvider } from '../../providers/openai.js';
+import { AnthropicProvider } from '../../providers/anthropic.js';
 
 interface RouteDeps {
   config: ProxyConfig | (() => ProxyConfig);
@@ -10,9 +12,123 @@ interface RouteDeps {
   onConfigChange: (newConfig: ProxyConfig) => void;
 }
 
+function createProvider(providerType: 'openai' | 'anthropic') {
+  if (providerType === 'anthropic') {
+    return new AnthropicProvider();
+  }
+  return new OpenAIProvider();
+}
+
+async function testModelConnection(
+  providerType: 'openai' | 'anthropic',
+  baseUrl: string,
+  apiKey: string,
+  realModel: string,
+  message: string
+): Promise<{ success: boolean; model?: string; content?: string; usage?: { prompt_tokens: number; completion_tokens: number }; message?: string; rawResponse?: string }> {
+  const provider = createProvider(providerType);
+  const url = provider.buildUrl({ baseUrl, provider: providerType, apiKey, realModel, customModel: '' }, 'chat');
+  const headers = provider.buildHeaders(apiKey);
+
+  const testBody = {
+    model: realModel,
+    messages: [{ role: 'user', content: message }],
+    max_tokens: 256,
+  };
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        ...headers,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(testBody),
+      signal: AbortSignal.timeout(15000),
+    });
+
+    const rawBody = await response.text();
+
+    if (response.ok) {
+      let data: any;
+      try {
+        data = JSON.parse(rawBody);
+      } catch {
+        return { success: true, model: realModel, content: rawBody };
+      }
+      const content = data.choices?.[0]?.message?.content || data.content?.[0]?.text || JSON.stringify(data);
+      const usage = data.usage ? { prompt_tokens: data.usage.prompt_tokens || 0, completion_tokens: data.usage.completion_tokens || 0 } : undefined;
+      return {
+        success: true,
+        model: data.model || realModel,
+        content,
+        usage,
+      };
+    }
+
+    return {
+      success: false,
+      message: `HTTP ${response.status}: ${rawBody}`,
+      rawResponse: rawBody,
+    };
+  } catch (error: any) {
+    if (error.name === 'AbortError') {
+      return { success: false, message: '请求超时（15秒），请检查网络连接或 API 地址' };
+    }
+    return { success: false, message: `网络错误: ${error.message}` };
+  }
+}
+
 export function createModelFormRoute(deps: RouteDeps) {
   const { config, configPath, onConfigChange } = deps;
   const app = new Hono();
+
+  // 测试模型配置
+  app.post('/admin/models/test', async (c) => {
+    const body = await c.req.json();
+    const { provider, baseUrl, apiKey, apiKeyId, realModel, message } = body as { provider?: 'openai' | 'anthropic'; baseUrl?: string; apiKey?: string; apiKeyId?: string; realModel?: string; message: string };
+
+    if (!provider || !baseUrl || !realModel) {
+      return c.json({ success: false, message: '请填写所有必填字段（Provider、Base URL、实际模型名称）' }, 400);
+    }
+
+    // 解析 API Key：优先手动输入 > 下拉框 ID > 从已保存的模型配置中读取
+    let resolvedApiKey = apiKey || '';
+
+    if (!resolvedApiKey && apiKeyId) {
+      // 从 API Keys 配置中查找
+      try {
+        const proxyConfig = loadFullConfig(configPath);
+        const selectedKey = proxyConfig.apiKeys?.find(k => k.id === apiKeyId);
+        if (selectedKey) {
+          resolvedApiKey = selectedKey.key;
+        }
+      } catch {
+        // 加载失败则继续
+      }
+    }
+
+    if (!resolvedApiKey) {
+      // 尝试从已保存的模型配置中读取（编辑模式下的兜底逻辑）
+      try {
+        const proxyConfig = loadFullConfig(configPath);
+        const savedModel = proxyConfig.models.find(m => m.realModel === realModel || m.customModel === realModel);
+        if (savedModel) {
+          resolvedApiKey = savedModel.apiKey;
+        }
+      } catch {
+        // 加载失败则继续
+      }
+    }
+
+    if (!resolvedApiKey) {
+      return c.json({ success: false, message: '请填写或选择 API Key' }, 400);
+    }
+
+    const testMessage = message || '请介绍一下你自己';
+    const result = await testModelConnection(provider, baseUrl, resolvedApiKey, realModel, testMessage);
+    return c.json(result);
+  });
 
   // 显示新增表单
   app.get('/admin/models/new', (c) => {
