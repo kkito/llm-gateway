@@ -59,6 +59,12 @@ export function createChatCompletionsHandler(
 
       // Get latest config
       const currentConfig = typeof config === 'function' ? config() : config;
+
+      // Apply privacy protections (before any routing, so all paths get protection)
+      if (currentConfig.privacySettings?.enabled) {
+        body = applyPrivacyProtection(body, currentConfig.privacySettings, requestId);
+      }
+
       let provider: ProviderConfig | undefined;
 
       if (model_group) {
@@ -146,14 +152,6 @@ export function createChatCompletionsHandler(
         console.log(`   ❌ [限制检查错误] ${error.message}`);
         return c.json({ error: { message: error.message } }, 500);
       }
-
-      // Apply privacy protections
-      if (currentConfig.privacySettings?.enabled) {
-        body = applyPrivacyProtection(body, currentConfig.privacySettings, requestId);
-      }
-
-      // Log upstream request (after privacy protection — this is what LLM receives)
-      // Note: logUpstreamRequest is called inside sendUpstreamRequest
 
       // Build and send upstream request
       const upstream = await buildUpstreamRequest(provider, body, stream);
