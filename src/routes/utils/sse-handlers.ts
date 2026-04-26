@@ -32,10 +32,16 @@ export function buildFullOpenAIResponse(chunks: string[]): any {
       if (json.choices) {
         for (const choice of json.choices) {
           if (!choices[choice.index]) {
-            choices[choice.index] = { index: choice.index, message: { role: '', content: '' }, finish_reason: '' };
+            choices[choice.index] = { index: choice.index, message: { role: '', content: '', reasoning_content: '' }, finish_reason: '' };
           }
           if (choice.delta?.content) {
             choices[choice.index].message.content += choice.delta.content;
+          }
+          if (choice.delta?.reasoning_content) {
+            choices[choice.index].message.reasoning_content += choice.delta.reasoning_content;
+          }
+          if (choice.delta?.reasoning) {
+            choices[choice.index].message.reasoning_content += choice.delta.reasoning;
           }
           if (choice.delta?.role) {
             choices[choice.index].message.role = choice.delta.role;
