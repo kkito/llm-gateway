@@ -78,6 +78,11 @@ function replacerFn(
     const placeholderPath = prefix + placeholder + suffix;
     const realPath = prefix + username + suffix;
     mapping.set(placeholderPath, realPath);
+    // Also add no-trailing-slash variant so LLM reasoning responses
+    // like "通常是 /Users/kktestuser。" (no slash) are also restored.
+    const placeholderNoSlash = prefix + placeholder;
+    const realNoSlash = prefix + username;
+    mapping.set(placeholderNoSlash, realNoSlash);
     return placeholderPath;
   };
 }
