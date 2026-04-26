@@ -142,3 +142,11 @@ export function sanitizeSSEChunk(
   }
   return result;
 }
+
+/**
+ * Get the path mappings for a request (placeholder -> original).
+ * Useful for restoring paths in SSE chunks after stream ends.
+ */
+export function getPathMappings(requestId: string): Map<string, string> | undefined {
+  return pathMappings.get(requestId);
+}

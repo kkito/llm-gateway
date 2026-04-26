@@ -40,6 +40,27 @@ export function buildFullOpenAIResponse(chunks: string[]): any {
           if (choice.delta?.role) {
             choices[choice.index].message.role = choice.delta.role;
           }
+          if (choice.delta?.tool_calls) {
+            if (!choices[choice.index].message.tool_calls) {
+              choices[choice.index].message.tool_calls = [];
+            }
+            for (const tc of choice.delta.tool_calls) {
+              if (tc.index !== undefined) {
+                if (!choices[choice.index].message.tool_calls[tc.index]) {
+                  choices[choice.index].message.tool_calls[tc.index] = {
+                    id: tc.id || '',
+                    type: tc.type || 'function',
+                    function: { name: '', arguments: '' }
+                  };
+                }
+                const existing = choices[choice.index].message.tool_calls[tc.index];
+                if (tc.id) existing.id = tc.id;
+                if (tc.type) existing.type = tc.type;
+                if (tc.function?.name) existing.function.name += tc.function.name;
+                if (tc.function?.arguments) existing.function.arguments += tc.function.arguments;
+              }
+            }
+          }
           if (choice.finish_reason) {
             choices[choice.index].finish_reason = choice.finish_reason;
           }

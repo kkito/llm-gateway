@@ -4,7 +4,7 @@ import type { RateLimiter } from '../../lib/rate-limiter.js';
 import type { Logger } from '../../logger.js';
 import { createStreamConverterState, type StreamConverterState } from '../../converters/anthropic-to-openai.js';
 import { buildFullOpenAIResponse, parseAndConvertAnthropicSSE } from '../utils/sse-handlers.js';
-import { sanitizeSSEChunk, restorePaths } from '../../privacy/sanitizer.js';
+import { sanitizeSSEChunk, restorePaths, getPathMappings } from '../../privacy/sanitizer.js';
 
 export interface StreamHandlerOptions {
   response: Response;
@@ -64,11 +64,6 @@ export function handleStream(options: StreamHandlerOptions): Response {
                 sseLine += '\n\n';
               }
               chunks.push(sseLine);
-              try {
-                controller.enqueue(new TextEncoder().encode(sseLine));
-              } catch (err) {
-                if (!isSilentError(err)) throw err;
-              }
             }
 
             detailLogger.logStreamResponse(requestId + '_raw', rawChunks);
@@ -101,6 +96,21 @@ export function handleStream(options: StreamHandlerOptions): Response {
               logEntry.totalTokens = finalUsage.total_tokens || (logEntry.promptTokens + logEntry.completionTokens);
             }
 
+            const fullResponse = buildFullOpenAIResponse(chunks);
+            // Restore paths in stream response for logging
+            // Note: Individual SSE chunks cannot be reliably restored because
+            // paths are tokenized into tiny fragments that span chunk boundaries.
+            // The aggregated full response (logConvertedResponse) has restored paths.
+            if (privacySettings?.enabled && privacySettings.sanitizeFilePaths) {
+              restorePaths(fullResponse, requestId);
+            }
+            detailLogger.logStreamResponse(requestId, chunks);
+            detailLogger.logConvertedResponse(requestId, fullResponse);
+
+            // Send restored chunks to user
+            for (const chunk of chunks) {
+              controller.enqueue(new TextEncoder().encode(chunk));
+            }
             if (finalUsage) {
               const finalChunk = `data: ${JSON.stringify({
                 id: requestId,
@@ -113,13 +123,6 @@ export function handleStream(options: StreamHandlerOptions): Response {
               controller.enqueue(new TextEncoder().encode(finalChunk));
             }
 
-            const fullResponse = buildFullOpenAIResponse(chunks);
-            // Restore paths in stream response before logging and rate limiting
-            if (privacySettings?.enabled && privacySettings.sanitizeFilePaths) {
-              restorePaths(fullResponse, requestId);
-            }
-            detailLogger.logStreamResponse(requestId, chunks);
-            detailLogger.logConvertedResponse(requestId, fullResponse);
             logger.log(logEntry);
 
             const pricing =
@@ -156,11 +159,7 @@ export function handleStream(options: StreamHandlerOptions): Response {
               const openAIChunks = parseAndConvertAnthropicSSE(part, requestId, model, streamState!);
               for (const openAIChunk of openAIChunks) {
                 chunks.push(openAIChunk);
-                let sanitizedChunk = openAIChunk;
-                if (options.privacySettings?.enabled && options.privacySettings.sanitizeFilePaths) {
-                  sanitizedChunk = sanitizeSSEChunk(sanitizedChunk, options.requestId);
-                }
-                controller.enqueue(new TextEncoder().encode(sanitizedChunk));
+                // Don't enqueue in real-time — we'll restore paths and send all at the end
               }
             } else {
               let sseLine = part;
@@ -171,15 +170,7 @@ export function handleStream(options: StreamHandlerOptions): Response {
                 sseLine += '\n\n';
               }
               chunks.push(sseLine);
-              if (options.privacySettings?.enabled && options.privacySettings.sanitizeFilePaths) {
-                sseLine = sanitizeSSEChunk(sseLine, options.requestId);
-              }
-              try {
-                controller.enqueue(new TextEncoder().encode(sseLine));
-              } catch (err) {
-                if (isSilentError(err)) return;
-                throw err;
-              }
+              // Don't enqueue in real-time — we'll restore paths and send all at the end
             }
           }
         }
