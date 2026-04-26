@@ -55,12 +55,11 @@ export function createChatCompletionsHandler(
 
       // Log raw request (before privacy protection, for audit)
       // Deep copy to preserve original content since privacy protection mutates in place
-      detailLogger.logRequest(requestId, JSON.parse(JSON.stringify(body)));
-
-      // Get latest config
-      const currentConfig = typeof config === 'function' ? config() : config;
+      const rawBodyCopy = JSON.parse(JSON.stringify(body));
+      detailLogger.logRequest(requestId, rawBodyCopy);
 
       // Apply privacy protections (before any routing, so all paths get protection)
+      const currentConfig = typeof config === 'function' ? config() : config;
       if (currentConfig.privacySettings?.enabled) {
         body = applyPrivacyProtection(body, currentConfig.privacySettings, requestId);
       }

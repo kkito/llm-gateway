@@ -4,7 +4,7 @@ import type { RateLimiter } from '../../lib/rate-limiter.js';
 import type { Logger } from '../../logger.js';
 import { createStreamConverterState, type StreamConverterState } from '../../converters/anthropic-to-openai.js';
 import { buildFullOpenAIResponse, parseAndConvertAnthropicSSE } from '../utils/sse-handlers.js';
-import { sanitizeSSEChunk } from '../../privacy/sanitizer.js';
+import { sanitizeSSEChunk, restorePaths } from '../../privacy/sanitizer.js';
 
 export interface StreamHandlerOptions {
   response: Response;
@@ -30,7 +30,7 @@ function isSilentError(err: any): boolean {
 }
 
 export function handleStream(options: StreamHandlerOptions): Response {
-  const { response, provider, model, actualModel, requestId, startTime, logEntry, rateLimiter, logger, detailLogger, c } = options;
+  const { response, provider, model, actualModel, requestId, startTime, logEntry, rateLimiter, logger, detailLogger, c, privacySettings } = options;
 
   if (!response.body) {
     return c.json({ error: { message: 'No response body' } }, 500);
@@ -113,8 +113,13 @@ export function handleStream(options: StreamHandlerOptions): Response {
               controller.enqueue(new TextEncoder().encode(finalChunk));
             }
 
+            const fullResponse = buildFullOpenAIResponse(chunks);
+            // Restore paths in stream response before logging and rate limiting
+            if (privacySettings?.enabled && privacySettings.sanitizeFilePaths) {
+              restorePaths(fullResponse, requestId);
+            }
             detailLogger.logStreamResponse(requestId, chunks);
-            detailLogger.logConvertedResponse(requestId, buildFullOpenAIResponse(chunks));
+            detailLogger.logConvertedResponse(requestId, fullResponse);
             logger.log(logEntry);
 
             const pricing =
