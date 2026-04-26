@@ -195,6 +195,7 @@ describe('SSE privacy — sliding window', () => {
     expect(chunks.length).toBeGreaterThan(0);
     const allContent = chunks.join('');
     expect(allContent).toContain('/home/zhangsan/');
+    expect(allContent).not.toContain('__USER__');
   });
 
   it('privacy mode: no character loss after replacement', async () => {
@@ -289,5 +290,46 @@ describe('SSE privacy — sliding window', () => {
 
     expect(allContent).toContain('/home/zhangsan/');
     expect(allContent).not.toContain('__USER__');
+  });
+
+  it('privacy mode: placeholder spanning >3 chunks — fragments not replaced (known limitation)', async () => {
+    // If a placeholder is split across more than 3 chunks, the sliding window
+    // flushes before the complete placeholder is assembled. The individual
+    // chunks are sent with placeholder fragments. The aggregated
+    // converted_response.log still has fully restored paths because
+    // buildFullOpenAIResponse + restorePaths works on the complete response.
+    const reqBody = { messages: [{ role: 'user', content: 'Fix /home/zhangsan/app/main.py' }] };
+    sanitizePaths(reqBody, '__USER__', 'req-123');
+
+    // Placeholder split across 4 chunks: no single chunk or 3-chunk window
+    // contains the complete /home/__USER__/ pattern
+    const chunk1 = makeSSEChunk('Path: /home/__');
+    const chunk2 = makeSSEChunk('US');
+    const chunk3 = makeSSEChunk('ER');
+    const chunk4 = makeSSEChunk('__/app/main.py done');
+
+    const stream = new ReadableStream({
+      start(controller) {
+        const enc = new TextEncoder();
+        controller.enqueue(enc.encode(chunk1));
+        controller.enqueue(enc.encode(chunk2));
+        controller.enqueue(enc.encode(chunk3));
+        controller.enqueue(enc.encode(chunk4));
+        controller.close();
+      },
+    });
+
+    const res = handleStream(baseOptions(new Response(stream), {
+      enabled: true,
+      sanitizeFilePaths: true,
+    }));
+    const chunks = await collectStream(res);
+
+    // All 4 chunks should be sent (no data loss)
+    expect(chunks.length).toBeGreaterThan(0);
+    // The placeholder fragments are present (but not replaced — known limitation)
+    const allContent = chunks.join('');
+    expect(allContent).toContain('/home/__');
+    expect(allContent).toContain('ER');
   });
 });
