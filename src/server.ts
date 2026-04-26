@@ -22,6 +22,7 @@ import { createStatsRoute as createUserStatsRoute } from './user/routes/stats.js
 import { createLogoutRoute } from './user/routes/logout.js';
 import { createLoginRoute } from './admin/routes/login.js';
 import { createPasswordRoute } from './admin/routes/password.js';
+import { createPrivacyRoute } from './admin/routes/privacy.js';
 import { createApiKeysRoute } from './admin/routes/api-keys.js';
 import { createUsersRoute } from './admin/routes/users.js';
 import { authMiddleware, isPasswordConfigured, sessions } from './admin/middleware/auth.js';
@@ -245,6 +246,11 @@ export function createServer(
   // 密码管理路由（内部也做了认证检查，作为双重保障）
   if (configPath) {
     app.route('', createPasswordRoute({ configPath }));
+  }
+
+  // 隐私保护路由
+  if (configPath) {
+    app.route('', createPrivacyRoute({ configPath, onConfigChange }));
   }
 
   // API Keys 管理路由
