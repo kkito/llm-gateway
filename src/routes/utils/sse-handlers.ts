@@ -37,10 +37,11 @@ export function buildFullOpenAIResponse(chunks: string[]): any {
           if (choice.delta?.content) {
             choices[choice.index].message.content += choice.delta.content;
           }
+          // Some providers send both reasoning_content and reasoning with identical values.
+          // Only accumulate one to avoid duplication.
           if (choice.delta?.reasoning_content) {
             choices[choice.index].message.reasoning_content += choice.delta.reasoning_content;
-          }
-          if (choice.delta?.reasoning) {
+          } else if (choice.delta?.reasoning) {
             choices[choice.index].message.reasoning_content += choice.delta.reasoning;
           }
           if (choice.delta?.role) {
