@@ -103,3 +103,66 @@ describe('sanitizeSSEChunk', () => {
     expect(result).toBe(sseLine);
   });
 });
+
+describe('sanitizePaths and restorePaths — no trailing slash', () => {
+  beforeEach(() => {
+    clearPathMappings();
+  });
+
+  it('should sanitize paths without trailing slash (e.g. in system prompts)', () => {
+    const body = { messages: [{ role: 'system', content: 'User home is /Users/alice' }] };
+    sanitizePaths(body, '__USER__', 'req-ns');
+    expect(body.messages[0].content).toBe('User home is /Users/__USER__');
+  });
+
+  it('should restore paths without trailing slash in reasoning_content', () => {
+    const reqBody = { messages: [{ role: 'system', content: 'User home is /Users/zhangsan' }] };
+    sanitizePaths(reqBody, '__USER__', 'req-ns');
+
+    const resBody = { choices: [{ message: { reasoning_content: '用户目录是 /Users/__USER__。' } }] };
+    restorePaths(resBody, 'req-ns');
+    expect(resBody.choices[0].message.reasoning_content).toBe('用户目录是 /Users/zhangsan。');
+  });
+
+  it('should handle both trailing and non-trailing slash in same response', () => {
+    const reqBody = { messages: [{ role: 'user', content: 'Fix /Users/lisi/app/main.py' }] };
+    sanitizePaths(reqBody, '__USER__', 'req-mix');
+
+    const resBody = { choices: [{ message: {
+      reasoning_content: 'User home is /Users/__USER__',
+      content: 'Fixed /Users/__USER__/app/main.py'
+    }}]};
+    restorePaths(resBody, 'req-mix');
+    expect(resBody.choices[0].message.reasoning_content).toBe('User home is /Users/lisi');
+    expect(resBody.choices[0].message.content).toBe('Fixed /Users/lisi/app/main.py');
+  });
+
+  it('should restore path placeholder that LLM generates from context', () => {
+    // Simulates: request has /Users/kkito (no slash), LLM infers /Users/kktestuser,
+    // and returns it in reasoning_content
+    const reqBody = { messages: [{ role: 'system', content: 'Base dir: /Users/kkito' }] };
+    sanitizePaths(reqBody, 'kktestuser', 'req-llm');
+
+    const resBody = {
+      choices: [{ message: {
+        reasoning_content: '用户主目录在 macOS 上通常是 /Users/kktestuser。',
+        tool_calls: [{ id: 'call_1', type: 'function', function: {
+          name: 'write_file',
+          arguments: '{"file_path": "/Users/kktestuser/hello2.txt", "content": "world"}'
+        }}]
+      }}]
+    };
+    restorePaths(resBody, 'req-llm');
+    expect(resBody.choices[0].message.reasoning_content).toBe('用户主目录在 macOS 上通常是 /Users/kkito。');
+    expect(resBody.choices[0].message.tool_calls[0].function.arguments).toBe('{"file_path": "/Users/kkito/hello2.txt", "content": "world"}');
+  });
+
+  it('should handle Linux home directory without trailing slash', () => {
+    const reqBody = { messages: [{ role: 'system', content: 'Home: /home/zhangsan' }] };
+    sanitizePaths(reqBody, '__USER__', 'req-linux');
+
+    const resBody = { choices: [{ message: { reasoning_content: '目录是 /home/__USER__' } }] };
+    restorePaths(resBody, 'req-linux');
+    expect(resBody.choices[0].message.reasoning_content).toBe('目录是 /home/zhangsan');
+  });
+});
