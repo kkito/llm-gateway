@@ -249,7 +249,8 @@ export function loadFullConfig(configPath: string): ProxyConfig {
       modelGroups: config.modelGroups,
       adminPassword: config.adminPassword,
       apiKeys: config.apiKeys || [],
-      userApiKeys: config.userApiKeys
+      userApiKeys: config.userApiKeys,
+      privacySettings: config.privacySettings
     };
   }
 
