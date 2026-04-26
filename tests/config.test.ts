@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { loadConfig, findProvider, getProxyDir, ProviderConfig, hashPassword, verifyPassword, ApiKey, addApiKey, getApiKey, updateApiKey, deleteApiKey, getApiKeyOptions, UserApiKey, ProxyConfig } from '../src/config.js';
+import { loadConfig, findProvider, getProxyDir, ProviderConfig, hashPassword, verifyPassword, ApiKey, addApiKey, getApiKey, updateApiKey, deleteApiKey, getApiKeyOptions, UserApiKey, ProxyConfig, PrivacySettings } from '../src/config.js';
 import { writeFileSync, unlinkSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -282,6 +282,32 @@ describe('config', () => {
         models: []
       };
       expect(config.userApiKeys).toBeUndefined();
+    });
+  });
+
+  describe('PrivacySettings', () => {
+    it('should accept privacySettings in ProxyConfig', () => {
+      const config: ProxyConfig = {
+        models: [
+          { customModel: 'test', realModel: 'test-model', apiKey: 'key', baseUrl: 'https://api.test.com', provider: 'openai' }
+        ],
+        privacySettings: {
+          enabled: true,
+          stripUserField: true,
+          sanitizeFilePaths: true,
+          pathPlaceholder: '__USER__',
+          whitelistFilter: true
+        }
+      };
+      expect(config.privacySettings?.enabled).toBe(true);
+      expect(config.privacySettings?.pathPlaceholder).toBe('__USER__');
+    });
+
+    it('should accept ProxyConfig without privacySettings', () => {
+      const config: ProxyConfig = {
+        models: []
+      };
+      expect(config.privacySettings).toBeUndefined();
     });
   });
 });

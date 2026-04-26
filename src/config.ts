@@ -57,12 +57,24 @@ export interface ModelGroup {
   desc?: string;
 }
 
+/**
+ * Privacy protection settings
+ */
+export interface PrivacySettings {
+  enabled: boolean;
+  stripUserField: boolean;
+  sanitizeFilePaths: boolean;
+  pathPlaceholder: string;
+  whitelistFilter: boolean;
+}
+
 export interface ProxyConfig {
   models: ProviderConfig[];
   modelGroups?: ModelGroup[];
   adminPassword?: string; // SHA256 哈希值
   apiKeys?: ApiKey[];
   userApiKeys?: UserApiKey[];
+  privacySettings?: PrivacySettings;
 }
 
 const REQUIRED_FIELDS = ['customModel', 'realModel', 'apiKey', 'baseUrl', 'provider'] as const;
