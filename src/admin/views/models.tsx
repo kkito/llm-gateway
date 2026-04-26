@@ -414,9 +414,9 @@ export const ModelsPage: FC<Props> = (props) => {
                             type="button"
                             class={`order-btn ${model.hidden ? 'is-hidden' : ''}`}
                             data-toggle-url={`/admin/models/toggle-hidden/${encodeURIComponent(model.customModel)}`}
-                            title={model.hidden ? '取消隐藏' : '隐藏'}
+                            title={model.hidden ? '显示' : '隐藏'}
                           >
-                            {model.hidden ? '显' : '隐'}
+                            {model.hidden ? '显示' : '隐藏'}
                           </button>
                           {/* 复制按钮 */}
                           <button
@@ -496,7 +496,7 @@ export const ModelsPage: FC<Props> = (props) => {
                   btn.addEventListener('click', function() {
                     var url = this.getAttribute('data-copy-url');
                     var modelName = url.split('/').pop();
-                    if (confirm('确定要复制模型 "' + modelName + '" 吗？\n复制后名称将添加时间戳后缀。')) {
+                    if (confirm('确定要复制模型 "' + modelName + '" 吗？\\n复制后名称将添加时间戳后缀。')) {
                       var form = document.createElement('form');
                       form.method = 'POST';
                       form.action = url;

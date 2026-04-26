@@ -77,4 +77,87 @@ describe('Admin Model Management E2E', () => {
       expect(firstModel.hidden).toBe(false);
     });
   });
+
+  describe('Model List Page', () => {
+    it('should render hide/show button with full text for visible model', async () => {
+      const response = await app.request('/admin/models');
+      expect(response.status).toBe(200);
+
+      const html = await response.text();
+      // 可见模型的隐藏按钮应该显示完整文字「隐藏」
+      expect(html).toContain('title="隐藏"');
+      // 按钮文字也应该是完整的「隐藏」
+      expect(html).toMatch(/>隐藏<\/button>/);
+    });
+
+    it('should render hide/show button with full text for hidden model', async () => {
+      // 先隐藏一个模型
+      await app.request('/admin/models/toggle-hidden/gpt-4', { method: 'POST' });
+
+      const response = await app.request('/admin/models');
+      expect(response.status).toBe(200);
+
+      const html = await response.text();
+      // 隐藏模型的显示按钮应该显示完整文字「显示」
+      expect(html).toContain('title="显示"');
+      // 按钮文字也应该是完整的「显示」
+      expect(html).toMatch(/>显示<\/button>/);
+    });
+
+    it('should render move up/down buttons with correct titles', async () => {
+      const response = await app.request('/admin/models');
+      expect(response.status).toBe(200);
+
+      const html = await response.text();
+      expect(html).toContain('title="上移"');
+      expect(html).toContain('title="下移"');
+    });
+
+    it('should render copy button with correct title', async () => {
+      const response = await app.request('/admin/models');
+      expect(response.status).toBe(200);
+
+      const html = await response.text();
+      expect(html).toContain('title="复制"');
+    });
+
+    it('should render edit link for each model', async () => {
+      const response = await app.request('/admin/models');
+      expect(response.status).toBe(200);
+
+      const html = await response.text();
+      expect(html).toContain('/admin/models/edit/gpt-4');
+      expect(html).toContain('/admin/models/edit/claude');
+    });
+
+    it('should render delete button with correct title', async () => {
+      const response = await app.request('/admin/models');
+      expect(response.status).toBe(200);
+
+      const html = await response.text();
+      expect(html).toContain('title="删除"');
+    });
+
+    it('should have correct data attributes on all action buttons', async () => {
+      const response = await app.request('/admin/models');
+      expect(response.status).toBe(200);
+
+      const html = await response.text();
+
+      // 验证上移按钮
+      expect(html).toMatch(/data-move-url="\/admin\/models\/move\/[^"]+" data-direction="up"/);
+      // 验证下移按钮
+      expect(html).toMatch(/data-move-url="\/admin\/models\/move\/[^"]+" data-direction="down"/);
+      // 验证隐藏/显示按钮
+      expect(html).toMatch(/data-toggle-url="\/admin\/models\/toggle-hidden\/[^"]+"/);
+      // 验证复制按钮
+      expect(html).toMatch(/data-copy-url="\/admin\/models\/copy\/[^"]+"/);
+      // 验证删除按钮
+      expect(html).toMatch(/data-delete-url="\/admin\/models\/delete\/[^"]+"/);
+      // 验证编辑链接
+      expect(html).toMatch(/href="\/admin\/models\/edit\/[^"]+"/);
+      // 验证限制链接
+      expect(html).toMatch(/href="\/admin\/models\/[^"]+\/limits"/);
+    });
+  });
 });
