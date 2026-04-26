@@ -54,6 +54,25 @@ export function handleStream(options: StreamHandlerOptions): Response {
         let buffer = '';
         let finalUsage: any = null;
 
+        const tryExtractUsage = (sseLine: string) => {
+          try {
+            const chunkJson = JSON.parse(sseLine.slice(5).trim());
+            if (chunkJson.usage?.prompt_tokens_details?.cached_tokens) {
+              logEntry.cachedTokens = chunkJson.usage.prompt_tokens_details.cached_tokens;
+              finalUsage = chunkJson.usage;
+            }
+            if (chunkJson.usage?.cache_read_input_tokens) {
+              logEntry.cachedTokens = chunkJson.usage.cache_read_input_tokens;
+              finalUsage = chunkJson.usage;
+            }
+            if (chunkJson.usage && !finalUsage) {
+              finalUsage = chunkJson.usage;
+            }
+          } catch {
+            // ignore parse errors
+          }
+        };
+
         while (true) {
           const { done, value } = await reader.read();
           if (done) {
@@ -67,6 +86,7 @@ export function handleStream(options: StreamHandlerOptions): Response {
                 sseLine += '\n\n';
               }
               if (privacyOn) {
+                tryExtractUsage(sseLine);
                 privacyBuffer.push(sseLine);
               } else {
                 chunks.push(sseLine);
@@ -79,29 +99,6 @@ export function handleStream(options: StreamHandlerOptions): Response {
             }
 
             detailLogger.logStreamResponse(requestId + '_raw', rawChunks);
-
-            // Extract usage from chunks
-            const usageSource = privacyOn ? privacyBuffer : chunks;
-            for (let i = usageSource.length - 1; i >= 0; i--) {
-              try {
-                const chunkJson = JSON.parse(usageSource[i].slice(5).trim());
-                if (chunkJson.usage?.prompt_tokens_details?.cached_tokens) {
-                  logEntry.cachedTokens = chunkJson.usage.prompt_tokens_details.cached_tokens;
-                  finalUsage = chunkJson.usage;
-                  break;
-                }
-                if (chunkJson.usage?.cache_read_input_tokens) {
-                  logEntry.cachedTokens = chunkJson.usage.cache_read_input_tokens;
-                  finalUsage = chunkJson.usage;
-                  break;
-                }
-                if (chunkJson.usage && !finalUsage) {
-                  finalUsage = chunkJson.usage;
-                }
-              } catch {
-                // ignore parse errors
-              }
-            }
 
             if (finalUsage) {
               logEntry.promptTokens = finalUsage.prompt_tokens || finalUsage.input_tokens;
@@ -182,6 +179,7 @@ export function handleStream(options: StreamHandlerOptions): Response {
             if (providerFormat === 'anthropic') {
               const openAIChunks = parseAndConvertAnthropicSSE(part, requestId, model, streamState!);
               for (const openAIChunk of openAIChunks) {
+                tryExtractUsage(openAIChunk);
                 if (!privacyOn) {
                   chunks.push(openAIChunk);
                   try {
@@ -191,7 +189,7 @@ export function handleStream(options: StreamHandlerOptions): Response {
                   }
                 } else {
                   privacyBuffer.push(openAIChunk);
-                  if (privacyBuffer.length >= 3) {
+                  while (privacyBuffer.length >= 3) {
                     flushPrivacyWindow(privacyBuffer, requestId, controller, chunks);
                   }
                 }
@@ -204,6 +202,7 @@ export function handleStream(options: StreamHandlerOptions): Response {
               if (!sseLine.endsWith('\n\n')) {
                 sseLine += '\n\n';
               }
+              tryExtractUsage(sseLine);
               if (!privacyOn) {
                 chunks.push(sseLine);
                 try {
@@ -214,7 +213,7 @@ export function handleStream(options: StreamHandlerOptions): Response {
                 }
               } else {
                 privacyBuffer.push(sseLine);
-                if (privacyBuffer.length >= 3) {
+                while (privacyBuffer.length >= 3) {
                   flushPrivacyWindow(privacyBuffer, requestId, controller, chunks);
                 }
               }
