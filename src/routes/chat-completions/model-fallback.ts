@@ -1,9 +1,10 @@
-import type { ProviderConfig } from '../../config.js';
+import type { ProviderConfig, PrivacySettings } from '../../config.js';
 import type { Logger } from '../../logger.js';
 import type { DetailLogger } from '../../detail-logger.js';
 import type { RateLimiter } from '../../lib/rate-limiter.js';
 import { buildUpstreamRequest, sendUpstreamRequest } from './upstream-request.js';
 import { processSuccessfulResponse } from './response-processor.js';
+import { restorePaths } from '../../privacy/sanitizer.js';
 
 export interface FallbackResult {
   actualModel: string | undefined;
@@ -26,10 +27,11 @@ export interface FallbackContext {
   modelGroupName: string;
   timeoutMs: number;
   logDir: string;
+  privacySettings?: PrivacySettings;
 }
 
 export async function tryModelGroupWithFallback(ctx: FallbackContext): Promise<FallbackResult> {
-  const { c, modelNames, allProviders, body, stream, rateLimiter, logger, detailLogger, requestId, startTime, currentUser, modelGroupName, timeoutMs, logDir } = ctx;
+  const { c, modelNames, allProviders, body, stream, rateLimiter, logger, detailLogger, requestId, startTime, currentUser, modelGroupName, timeoutMs, logDir, privacySettings } = ctx;
   const triedModels: Array<{ model: string; exceeded: boolean; message?: string }> = [];
   let lastErrorBody: any = null;
   let lastErrorStatus = 500;
@@ -71,7 +73,8 @@ export async function tryModelGroupWithFallback(ctx: FallbackContext): Promise<F
     const processedResponse = await processSuccessfulResponse(
       c, response, provider, modelName, stream, body,
       rateLimiter, logger, detailLogger, requestId,
-      startTime, currentUser, modelGroupName, triedModels
+      startTime, currentUser, modelGroupName, triedModels,
+      privacySettings
     );
 
     return {

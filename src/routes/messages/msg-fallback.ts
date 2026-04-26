@@ -1,4 +1,4 @@
-import type { ProviderConfig } from '../../config.js';
+import type { ProviderConfig, PrivacySettings } from '../../config.js';
 import type { Logger } from '../../logger.js';
 import type { DetailLogger } from '../../detail-logger.js';
 import type { RateLimiter } from '../../lib/rate-limiter.js';
@@ -26,10 +26,11 @@ export interface MsgFallbackContext {
   modelGroupName: string;
   timeoutMs: number;
   logDir: string;
+  privacySettings?: PrivacySettings;
 }
 
 export async function tryMessagesFallback(ctx: MsgFallbackContext): Promise<MsgFallbackResult> {
-  const { c, modelNames, allProviders, body, stream, rateLimiter, logger, detailLogger, requestId, startTime, currentUser, modelGroupName, timeoutMs, logDir } = ctx;
+  const { c, modelNames, allProviders, body, stream, rateLimiter, logger, detailLogger, requestId, startTime, currentUser, modelGroupName, timeoutMs, logDir, privacySettings } = ctx;
   const triedModels: Array<{ model: string; exceeded: boolean; message?: string }> = [];
   let lastErrorBody: any = null;
   let lastErrorStatus = 500;
@@ -83,7 +84,8 @@ export async function tryMessagesFallback(ctx: MsgFallbackContext): Promise<MsgF
       startTime,
       currentUser,
       modelGroup: modelGroupName,
-      triedModels
+      triedModels,
+      privacySettings
     });
 
     return {

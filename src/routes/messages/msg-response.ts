@@ -1,9 +1,10 @@
-import type { ProviderConfig } from '../../config.js';
+import type { ProviderConfig, PrivacySettings } from '../../config.js';
 import type { Logger } from '../../logger.js';
 import type { DetailLogger } from '../../detail-logger.js';
 import type { RateLimiter } from '../../lib/rate-limiter.js';
 import { handleMessagesNonStream } from './non-stream-handler.js';
 import { handleStream as handleMessagesStream } from './stream-handler.js';
+import { restorePaths } from '../../privacy/sanitizer.js';
 
 export interface ProcessMsgResponseOptions {
   c: any;
@@ -21,6 +22,7 @@ export interface ProcessMsgResponseOptions {
   currentUser: any;
   modelGroup: string | undefined;
   triedModels: Array<{ model: string; exceeded: boolean; message?: string }>;
+  privacySettings?: PrivacySettings;
 }
 
 export async function processMessagesSuccess(options: ProcessMsgResponseOptions): Promise<Response> {
@@ -37,7 +39,8 @@ export async function processMessagesSuccess(options: ProcessMsgResponseOptions)
     startTime,
     currentUser,
     modelGroup,
-    triedModels
+    triedModels,
+    privacySettings
   } = options;
 
   const logEntry: any = {
@@ -71,6 +74,10 @@ export async function processMessagesSuccess(options: ProcessMsgResponseOptions)
   if (!stream) {
     const result = await handleMessagesNonStream(response, provider, modelName, logEntry, logger);
     if (result) {
+      // Restore paths in response before returning
+      if (privacySettings?.enabled && privacySettings.sanitizeFilePaths) {
+        restorePaths(result.responseData, requestId);
+      }
       logger.log(result.logEntry);
       const pricing =
         provider.inputPricePer1M !== undefined &&
@@ -103,7 +110,8 @@ export async function processMessagesSuccess(options: ProcessMsgResponseOptions)
       rateLimiter,
       logger,
       detailLogger,
-      c
+      c,
+      privacySettings
     });
   }
 

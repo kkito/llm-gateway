@@ -76,7 +76,8 @@ export function createMessagesHandler(
         const fallbackResult = await tryMessagesFallback({
           c, modelNames, allProviders: currentConfig.models, body, stream,
           rateLimiter, logger, detailLogger, requestId, startTime,
-          currentUser, modelGroupName: model_group, timeoutMs, logDir
+          currentUser, modelGroupName: model_group, timeoutMs, logDir,
+          privacySettings: currentConfig.privacySettings
         });
         actualModel = fallbackResult.actualModel;
         triedModels = fallbackResult.triedModels;
@@ -104,7 +105,8 @@ export function createMessagesHandler(
             const fallbackResult = await tryMessagesFallback({
               c, modelNames, allProviders: currentConfig.models, body, stream,
               rateLimiter, logger, detailLogger, requestId, startTime,
-              currentUser, modelGroupName: model, timeoutMs, logDir
+              currentUser, modelGroupName: model, timeoutMs, logDir,
+              privacySettings: currentConfig.privacySettings
             });
             actualModel = fallbackResult.actualModel;
             triedModels = fallbackResult.triedModels;

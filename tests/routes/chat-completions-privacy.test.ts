@@ -164,4 +164,38 @@ describe('privacy protection — chat-completions route', () => {
     expect(upstreamBody.messages[0].content).toContain('/home/__USER__/');
     expect(upstreamBody.messages[0].content).not.toContain('/home/zhangsan/');
   });
+
+  it('should restore paths in response when using model_group', async () => {
+    // Create a config with a model group
+    const config: ProxyConfig = {
+      models: [
+        { customModel: 'gpt-4', realModel: 'gpt-4o', apiKey: 'key', baseUrl: 'https://api.openai.com', provider: 'openai' },
+        { customModel: 'gpt-3.5', realModel: 'gpt-3.5-turbo', apiKey: 'key2', baseUrl: 'https://api.openai.com', provider: 'openai' }
+      ],
+      modelGroups: [{ name: 'test-group', models: ['gpt-4', 'gpt-3.5'] }],
+      privacySettings: { enabled: true, stripUserField: false, sanitizeFilePaths: true, pathPlaceholder: '__USER__', whitelistFilter: false }
+    };
+
+    setup(config);
+
+    // Mock response that echoes the sanitized path back
+    const mockResponse = {
+      ok: true, status: 200, body: null,
+      json: async () => ({ id: 'resp-1', choices: [{ message: { content: 'Fixed /home/__USER__/app/main.py', role: 'assistant' } }], usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 } }),
+      clone: function() { return this; }
+    };
+    (global.fetch as any).mockResolvedValue(mockResponse);
+
+    const resp = await app.request('/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model_group: 'test-group', messages: [{ role: 'user', content: 'Fix /home/zhangsan/app/main.py' }] })
+    });
+
+    expect(resp.status).toBe(200);
+    const json = await (resp as any).json();
+    // Response should have restored the username
+    expect(json.choices[0].message.content).toContain('/home/zhangsan/');
+    expect(json.choices[0].message.content).not.toContain('/home/__USER__/');
+  });
 });

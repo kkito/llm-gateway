@@ -1,9 +1,10 @@
-import type { ProviderConfig } from '../../config.js';
+import type { ProviderConfig, PrivacySettings } from '../../config.js';
 import type { Logger } from '../../logger.js';
 import type { DetailLogger } from '../../detail-logger.js';
 import type { RateLimiter } from '../../lib/rate-limiter.js';
 import { handleNonStream } from './non-stream-handler.js';
 import { handleStream } from './stream-handler.js';
+import { restorePaths } from '../../privacy/sanitizer.js';
 
 export async function processSuccessfulResponse(
   c: any,
@@ -19,7 +20,8 @@ export async function processSuccessfulResponse(
   startTime: number,
   currentUser: any,
   modelGroup: string | undefined,
-  triedModels: Array<{ model: string; exceeded: boolean; message?: string }>
+  triedModels: Array<{ model: string; exceeded: boolean; message?: string }>,
+  privacySettings?: PrivacySettings
 ): Promise<Response> {
   const logEntry: any = {
     timestamp: new Date().toISOString(),
@@ -52,6 +54,10 @@ export async function processSuccessfulResponse(
   if (!stream) {
     const result = await handleNonStream(response, provider, modelName, logEntry, logger);
     if (result) {
+      // Restore paths in response before returning
+      if (privacySettings?.enabled && privacySettings.sanitizeFilePaths) {
+        restorePaths(result.responseData, requestId);
+      }
       logger.log(result.logEntry);
       const pricing =
         provider.inputPricePer1M !== undefined &&
@@ -84,7 +90,8 @@ export async function processSuccessfulResponse(
       rateLimiter,
       logger,
       detailLogger,
-      c
+      c,
+      privacySettings
     });
   }
 

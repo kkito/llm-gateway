@@ -79,7 +79,8 @@ export function createChatCompletionsHandler(
         const ctx: any = {
           c, modelNames, allProviders: currentConfig.models, body, stream,
           rateLimiter, logger, detailLogger, requestId, startTime,
-          currentUser, modelGroupName: model_group, timeoutMs, logDir
+          currentUser, modelGroupName: model_group, timeoutMs, logDir,
+          privacySettings: currentConfig.privacySettings
         };
         const fallbackResult = await tryModelGroupWithFallback(ctx);
         actualModel = fallbackResult.actualModel;
@@ -108,7 +109,8 @@ export function createChatCompletionsHandler(
             const ctx: any = {
               c, modelNames, allProviders: currentConfig.models, body, stream,
               rateLimiter, logger, detailLogger, requestId, startTime,
-              currentUser, modelGroupName: model, timeoutMs, logDir
+              currentUser, modelGroupName: model, timeoutMs, logDir,
+              privacySettings: currentConfig.privacySettings
             };
             const fallbackResult = await tryModelGroupWithFallback(ctx);
             actualModel = fallbackResult.actualModel;
