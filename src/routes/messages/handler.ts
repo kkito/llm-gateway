@@ -5,6 +5,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { ModelGroupResolver } from '../../lib/model-group-resolver.js';
 import { getCurrentUser } from '../../user/middleware/auth.js';
 import { RateLimiter } from '../../lib/rate-limiter.js';
+import { applyPrivacyProtection } from '../../privacy/apply.js';
+import { restorePaths } from '../../privacy/sanitizer.js';
 import { buildMessagesUpstreamRequest, sendMessagesUpstreamRequest } from './upstream-request.js';
 import { handleMessagesNonStream } from './non-stream-handler.js';
 import { handleStream as handleMessagesStream } from './stream-handler.js';
@@ -139,6 +141,11 @@ export function createMessagesHandler(
         return c.json({ error: { message: error.message } }, 500);
       }
 
+      // Apply privacy protections
+      if (currentConfig.privacySettings?.enabled) {
+        body = applyPrivacyProtection(body, currentConfig.privacySettings, requestId);
+      }
+
       // Build and send upstream request
       const upstream = await buildMessagesUpstreamRequest(provider, body, stream);
       const response = await sendMessagesUpstreamRequest(upstream, detailLogger, requestId, timeoutMs);
@@ -183,6 +190,10 @@ export function createMessagesHandler(
       if (response.ok && !stream) {
         const result = await handleMessagesNonStream(response, provider, model, logEntry, logger);
         if (result) {
+          // Restore paths in response
+          if (currentConfig.privacySettings?.enabled && currentConfig.privacySettings.sanitizeFilePaths) {
+            restorePaths(result.responseData, requestId);
+          }
           logger.log(result.logEntry);
           const pricing = provider.inputPricePer1M !== undefined && provider.outputPricePer1M !== undefined && provider.cachedPricePer1M !== undefined
             ? { inputPricePer1M: provider.inputPricePer1M, outputPricePer1M: provider.outputPricePer1M, cachedPricePer1M: provider.cachedPricePer1M }
@@ -204,7 +215,8 @@ export function createMessagesHandler(
       if (stream && response.ok) {
         return handleMessagesStream({
           response, provider, model, actualModel: actualModel || model,
-          requestId, startTime, logEntry, rateLimiter, logger, detailLogger, c
+          requestId, startTime, logEntry, rateLimiter, logger, detailLogger, c,
+          privacySettings: currentConfig.privacySettings
         });
       }
 

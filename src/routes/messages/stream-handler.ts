@@ -4,6 +4,7 @@ import type { RateLimiter } from '../../lib/rate-limiter.js';
 import type { Logger } from '../../logger.js';
 import { createOpenAIToAnthropicStreamState, type OpenAIToAnthropicStreamState } from '../../converters/openai-to-anthropic.js';
 import { parseAndConvertOpenAISSE } from '../utils/sse-handlers-messages.js';
+import { sanitizeSSEChunk } from '../../privacy/sanitizer.js';
 
 export interface StreamHandlerOptions {
   response: Response;
@@ -17,6 +18,7 @@ export interface StreamHandlerOptions {
   logger: Logger;
   detailLogger: DetailLogger;
   c: any;
+  privacySettings?: any;
 }
 
 function isSilentError(err: any): boolean {
@@ -148,15 +150,23 @@ export function handleStream(options: StreamHandlerOptions): Response {
               const anthropicChunks = parseAndConvertOpenAISSE(part, streamState!);
               for (const anthropicChunk of anthropicChunks) {
                 chunks.push(anthropicChunk);
-                controller.enqueue(new TextEncoder().encode(anthropicChunk));
+                let chunk = anthropicChunk;
+                if (options.privacySettings?.enabled && options.privacySettings.sanitizeFilePaths) {
+                  chunk = sanitizeSSEChunk(chunk, options.requestId);
+                }
+                controller.enqueue(new TextEncoder().encode(chunk));
                 convertedEventCounter++;
               }
             } else {
               // Anthropic provider: 直接透传
               const sseLine = part + '\n\n';
               chunks.push(sseLine);
+              let chunk = sseLine;
+              if (options.privacySettings?.enabled && options.privacySettings.sanitizeFilePaths) {
+                chunk = sanitizeSSEChunk(chunk, options.requestId);
+              }
               try {
-                controller.enqueue(new TextEncoder().encode(sseLine));
+                controller.enqueue(new TextEncoder().encode(chunk));
               } catch (err) {
                 if (isSilentError(err)) return;
                 throw err;
