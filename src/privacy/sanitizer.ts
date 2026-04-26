@@ -49,19 +49,21 @@ function replaceUsernames(
 ): string {
   let result = jsonStr;
 
+  // Match /home/<username>/ or /home/<username> at end of string/value
   result = result.replace(
-    /(\/home\/)([^/"]+)(\/)/g,
+    /(\/home\/)([^/"]+)(\/|(?=["\\]}]|$))/g,
     replacerFn(mapping, placeholder)
   );
 
+  // Match /Users/<username>/ or /Users/<username> at end of string/value
   result = result.replace(
-    /(\/Users\/)([^/"]+)(\/)/g,
+    /(\/Users\/)([^/"]+)(\/|(?=["\\]}]|$))/g,
     replacerFn(mapping, placeholder)
   );
 
   // In JSON strings, backslashes are escaped as \\, so we match double backslashes
   result = result.replace(
-    /([A-Za-z]:\\\\Users\\\\)([^\\\\"]+)(\\\\)/g,
+    /([A-Za-z]:\\\\Users\\\\)([^\\\\"]+)(\\\\|(?=["\\]}]|$))/g,
     replacerFn(mapping, placeholder)
   );
 
