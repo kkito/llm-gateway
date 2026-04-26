@@ -6,6 +6,7 @@ export type ProviderType = 'openai' | 'anthropic';
 
 export * from './lib/password.js';
 export * from './lib/paths.js';
+export * from './privacy/types.js';
 
 /**
  * 模型使用限制配置
