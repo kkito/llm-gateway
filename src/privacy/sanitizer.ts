@@ -144,6 +144,25 @@ export function sanitizeSSEChunk(
 }
 
 /**
+ * Apply path mappings to a plain text string.
+ * Does NOT clear the mapping (unlike restorePaths).
+ * Used for SSE chunk concatenation in sliding window.
+ */
+export function applyPathMappings(
+  text: string,
+  requestId: string
+): string {
+  const mapping = pathMappings.get(requestId);
+  if (!mapping) return text;
+
+  let result = text;
+  for (const [placeholderPath, realPath] of mapping) {
+    result = result.split(placeholderPath).join(realPath);
+  }
+  return result;
+}
+
+/**
  * Get the path mappings for a request (placeholder -> original).
  * Useful for restoring paths in SSE chunks after stream ends.
  */
