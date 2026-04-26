@@ -53,6 +53,10 @@ export function createChatCompletionsHandler(
         }, 400);
       }
 
+      // Log raw request (before privacy protection, for audit)
+      // Deep copy to preserve original content since privacy protection mutates in place
+      detailLogger.logRequest(requestId, JSON.parse(JSON.stringify(body)));
+
       // Get latest config
       const currentConfig = typeof config === 'function' ? config() : config;
       let provider: ProviderConfig | undefined;
@@ -148,8 +152,8 @@ export function createChatCompletionsHandler(
         body = applyPrivacyProtection(body, currentConfig.privacySettings, requestId);
       }
 
-      // Log request after privacy protection (so logs show sanitized content)
-      detailLogger.logRequest(requestId, body);
+      // Log upstream request (after privacy protection — this is what LLM receives)
+      // Note: logUpstreamRequest is called inside sendUpstreamRequest
 
       // Build and send upstream request
       const upstream = await buildUpstreamRequest(provider, body, stream);

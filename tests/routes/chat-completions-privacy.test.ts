@@ -153,15 +153,15 @@ describe('privacy protection — chat-completions route', () => {
       body: JSON.stringify({ model: 'gpt-4', messages: [{ role: 'user', content: 'Fix /home/zhangsan/app/main.py' }] })
     });
 
-    // logRequest should be called with sanitized paths
+    // logRequest should have RAW content (before privacy protection, for audit)
     expect(logRequestSpy).toHaveBeenCalledTimes(1);
     const loggedBody = logRequestSpy.mock.calls[0][1];
-    expect(loggedBody.messages[0].content).toContain('/home/__USER__/');
-    expect(loggedBody.messages[0].content).not.toContain('/home/zhangsan/');
+    expect(loggedBody.messages[0].content).toContain('/home/zhangsan/');
 
-    // logUpstreamRequest should also have sanitized paths
+    // logUpstreamRequest should have sanitized paths (what LLM receives)
     expect(logUpstreamSpy).toHaveBeenCalledTimes(1);
     const upstreamBody = logUpstreamSpy.mock.calls[0][1];
     expect(upstreamBody.messages[0].content).toContain('/home/__USER__/');
+    expect(upstreamBody.messages[0].content).not.toContain('/home/zhangsan/');
   });
 });
