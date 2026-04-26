@@ -252,9 +252,9 @@ export const ModelsPage: FC<Props> = (props) => {
           }
 
           .order-btn {
-            width: 26px;
+            min-width: 26px;
             height: 26px;
-            padding: 0;
+            padding: 0 4px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
