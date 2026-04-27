@@ -5,6 +5,7 @@ import type { Logger } from '../../logger.js';
 import { createStreamConverterState, type StreamConverterState } from '../../converters/anthropic-to-openai.js';
 import { buildFullOpenAIResponse, parseAndConvertAnthropicSSE } from '../utils/sse-handlers.js';
 import { sanitizeSSEChunk } from '../../privacy/sanitizer.js';
+import { findFinalUsageFromChunks } from '../../lib/stream-usage.js';
 
 export interface StreamHandlerOptions {
   response: Response;
@@ -12,7 +13,6 @@ export interface StreamHandlerOptions {
   model: string;
   actualModel: string;
   requestId: string;
-  startTime: number;
   logEntry: any;
   rateLimiter: RateLimiter;
   logger: Logger;
@@ -30,7 +30,7 @@ function isSilentError(err: any): boolean {
 }
 
 export function handleStream(options: StreamHandlerOptions): Response {
-  const { response, provider, model, actualModel, requestId, startTime, logEntry, rateLimiter, logger, detailLogger, c } = options;
+  const { response, provider, model, actualModel, requestId, logEntry, rateLimiter, logger, detailLogger, c } = options;
 
   if (!response.body) {
     return c.json({ error: { message: 'No response body' } }, 500);
@@ -73,32 +73,20 @@ export function handleStream(options: StreamHandlerOptions): Response {
 
             detailLogger.logStreamResponse(requestId + '_raw', rawChunks);
 
-            // Extract usage from chunks (reverse order to find the last valid usage)
-            for (let i = chunks.length - 1; i >= 0; i--) {
-              try {
-                const chunkJson = JSON.parse(chunks[i].slice(5).trim());
-                if (chunkJson.usage?.prompt_tokens_details?.cached_tokens) {
-                  logEntry.cachedTokens = chunkJson.usage.prompt_tokens_details.cached_tokens;
-                  finalUsage = chunkJson.usage;
-                  break;
-                }
-                if (chunkJson.usage?.cache_read_input_tokens) {
-                  logEntry.cachedTokens = chunkJson.usage.cache_read_input_tokens;
-                  finalUsage = chunkJson.usage;
-                  break;
-                }
-                if (chunkJson.usage && !finalUsage) {
-                  finalUsage = chunkJson.usage;
-                }
-              } catch {
-                // ignore parse errors
+            // Extract usage using unified function (output is always OpenAI format)
+            const streamUsage = findFinalUsageFromChunks(chunks, 'openai');
+            if (streamUsage) {
+              logEntry.promptTokens = streamUsage.promptTokens;
+              logEntry.completionTokens = streamUsage.completionTokens;
+              logEntry.totalTokens = streamUsage.totalTokens;
+              if (streamUsage.cachedTokens) {
+                logEntry.cachedTokens = streamUsage.cachedTokens;
               }
-            }
-
-            if (finalUsage) {
-              logEntry.promptTokens = finalUsage.prompt_tokens || finalUsage.input_tokens;
-              logEntry.completionTokens = finalUsage.completion_tokens || finalUsage.output_tokens;
-              logEntry.totalTokens = finalUsage.total_tokens || (logEntry.promptTokens + logEntry.completionTokens);
+              finalUsage = {
+                prompt_tokens: streamUsage.promptTokens,
+                completion_tokens: streamUsage.completionTokens,
+                total_tokens: streamUsage.totalTokens,
+              };
             }
 
             if (finalUsage) {

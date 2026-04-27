@@ -59,6 +59,7 @@ export function extractUsageFromAnthropicChunk(chunk: any): StreamUsage | null {
   const cachedTokens =
     usage.cache_read_input_tokens ??
     usage.cache_creation_input_tokens ??
+    usage.input_tokens_details?.cached_tokens ??
     usage.prompt_tokens_details?.cached_tokens;
 
   if (cachedTokens) {

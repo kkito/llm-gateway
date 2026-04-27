@@ -100,7 +100,6 @@ describe('handleStream (messages endpoint)', () => {
         model: 'gpt-4',
         actualModel: 'gpt-4',
         requestId: 'req-123',
-        startTime: Date.now(),
         logEntry: {},
         rateLimiter: createMockRateLimiter(),
         logger: createMockLogger(),
@@ -121,7 +120,6 @@ describe('handleStream (messages endpoint)', () => {
         model: 'gpt-4',
         actualModel: 'gpt-4',
         requestId: 'req-123',
-        startTime: Date.now(),
         logEntry: {},
         rateLimiter: createMockRateLimiter(),
         logger: createMockLogger(),
@@ -145,7 +143,6 @@ describe('handleStream (messages endpoint)', () => {
         model: 'gpt-4',
         actualModel: 'gpt-4',
         requestId: 'req-123',
-        startTime: Date.now(),
         logEntry: {},
         rateLimiter: createMockRateLimiter(),
         logger: createMockLogger(),
@@ -189,7 +186,6 @@ describe('handleStream (messages endpoint)', () => {
         model: 'claude',
         actualModel: 'claude',
         requestId: 'req-123',
-        startTime: Date.now(),
         logEntry: {},
         rateLimiter: createMockRateLimiter(),
         logger: createMockLogger(),
@@ -235,7 +231,6 @@ describe('handleStream (messages endpoint)', () => {
         model: 'gpt-4',
         actualModel: 'gpt-4',
         requestId: 'req-123',
-        startTime: Date.now(),
         logEntry,
         rateLimiter,
         logger: createMockLogger(),
@@ -265,7 +260,6 @@ describe('handleStream (messages endpoint)', () => {
         model: 'claude',
         actualModel: 'claude',
         requestId: 'req-123',
-        startTime: Date.now(),
         logEntry,
         rateLimiter: createMockRateLimiter(),
         logger: createMockLogger(),
@@ -300,7 +294,6 @@ describe('handleStream (messages endpoint)', () => {
         model: 'gpt-4',
         actualModel: 'gpt-4',
         requestId: 'req-123',
-        startTime: Date.now(),
         logEntry,
         rateLimiter: createMockRateLimiter(),
         logger: createMockLogger(),
@@ -334,7 +327,6 @@ describe('handleStream (messages endpoint)', () => {
         model: 'claude',
         actualModel: 'claude',
         requestId: 'req-123',
-        startTime: Date.now(),
         logEntry,
         rateLimiter: createMockRateLimiter(),
         logger: createMockLogger(),
@@ -365,7 +357,6 @@ describe('handleStream (messages endpoint)', () => {
         model: 'gpt-4',
         actualModel: 'gpt-4',
         requestId: 'req-123',
-        startTime: Date.now(),
         logEntry: {},
         rateLimiter,
         logger,
@@ -404,7 +395,6 @@ describe('handleStream (messages endpoint)', () => {
         model: 'gpt-4',
         actualModel: 'gpt-4',
         requestId: 'req-123',
-        startTime: Date.now(),
         logEntry: {},
         rateLimiter,
         logger,
@@ -422,7 +412,7 @@ describe('handleStream (messages endpoint)', () => {
       );
     });
 
-    it('calls detailLogger.logStreamResponse twice (raw and processed)', async () => {
+    it('calls detailLogger.logStreamResponse three times (raw, processed, stats)', async () => {
       const c = createMockHonoContext();
       const detailLogger = createMockDetailLogger();
       const logger = createMockLogger();
@@ -434,7 +424,6 @@ describe('handleStream (messages endpoint)', () => {
         model: 'claude',
         actualModel: 'claude',
         requestId: 'req-123',
-        startTime: Date.now(),
         logEntry: {},
         rateLimiter,
         logger,
@@ -445,7 +434,7 @@ describe('handleStream (messages endpoint)', () => {
       handleStream(options);
       await waitForStreamProcessing();
 
-      expect(detailLogger.logStreamResponse).toHaveBeenCalledTimes(2);
+      expect(detailLogger.logStreamResponse).toHaveBeenCalledTimes(3);
     });
   });
 
@@ -472,7 +461,6 @@ describe('handleStream (messages endpoint)', () => {
         model: 'claude',
         actualModel: 'claude',
         requestId: 'req-multiple',
-        startTime: Date.now(),
         logEntry,
         rateLimiter: createMockRateLimiter(),
         logger: createMockLogger(),
@@ -508,7 +496,6 @@ describe('handleStream (messages endpoint)', () => {
         model: 'original-model',
         actualModel: 'actual-model',
         requestId: 'req-actual',
-        startTime: Date.now(),
         logEntry: {},
         rateLimiter,
         logger,
@@ -539,7 +526,6 @@ describe('handleStream (messages endpoint)', () => {
         model: 'claude',
         actualModel: 'claude',
         requestId: 'req-empty',
-        startTime: Date.now(),
         logEntry,
         rateLimiter: createMockRateLimiter(),
         logger: createMockLogger(),

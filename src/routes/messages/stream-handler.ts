@@ -5,6 +5,7 @@ import type { Logger } from '../../logger.js';
 import { createOpenAIToAnthropicStreamState, type OpenAIToAnthropicStreamState } from '../../converters/openai-to-anthropic.js';
 import { parseAndConvertOpenAISSE } from '../utils/sse-handlers-messages.js';
 import { sanitizeSSEChunk } from '../../privacy/sanitizer.js';
+import { findFinalUsageFromChunks } from '../../lib/stream-usage.js';
 
 export interface StreamHandlerOptions {
   response: Response;
@@ -12,7 +13,6 @@ export interface StreamHandlerOptions {
   model: string;
   actualModel: string;
   requestId: string;
-  startTime: number;
   logEntry: any;
   rateLimiter: RateLimiter;
   logger: Logger;
@@ -30,7 +30,7 @@ function isSilentError(err: any): boolean {
 }
 
 export function handleStream(options: StreamHandlerOptions): Response {
-  const { response, provider, model, actualModel, requestId, startTime, logEntry, rateLimiter, logger, detailLogger, c } = options;
+  const { response, provider, model, actualModel, requestId, logEntry, rateLimiter, logger, detailLogger, c } = options;
 
   if (!response.body) {
     return c.json({ error: { message: 'No response body' } }, 500);
@@ -75,44 +75,15 @@ export function handleStream(options: StreamHandlerOptions): Response {
 
             detailLogger.logStreamResponse(requestId + '_raw', rawChunks);
 
-            // Extract usage from chunks (reverse order to find the last valid usage)
-            for (let i = chunks.length - 1; i >= 0; i--) {
-              try {
-                const chunkText = chunks[i];
-                const lines = chunkText.split('\n');
-                for (const line of lines) {
-                  if (line.startsWith('data:')) {
-                    const chunkJson = JSON.parse(line.slice(5).trim());
-                    if (chunkJson.usage?.prompt_tokens_details?.cached_tokens) {
-                      logEntry.cachedTokens = chunkJson.usage.prompt_tokens_details.cached_tokens;
-                      finalUsage = chunkJson.usage;
-                      break;
-                    }
-                    if (chunkJson.usage?.input_tokens_details?.cached_tokens) {
-                      logEntry.cachedTokens = chunkJson.usage.input_tokens_details.cached_tokens;
-                      finalUsage = chunkJson.usage;
-                      break;
-                    }
-                    // Handle cache_creation_input_tokens (produced by OpenAI->Anthropic conversion)
-                    if (chunkJson.usage?.cache_creation_input_tokens) {
-                      logEntry.cachedTokens = chunkJson.usage.cache_creation_input_tokens;
-                      finalUsage = chunkJson.usage;
-                      break;
-                    }
-                    if (chunkJson.usage && !finalUsage) {
-                      finalUsage = chunkJson.usage;
-                    }
-                  }
-                }
-              } catch {
-                // ignore parse errors
+            // Extract usage using unified function (output is always Anthropic format)
+            const streamUsage = findFinalUsageFromChunks(chunks, 'anthropic');
+            if (streamUsage) {
+              logEntry.promptTokens = streamUsage.promptTokens;
+              logEntry.completionTokens = streamUsage.completionTokens;
+              logEntry.totalTokens = streamUsage.totalTokens;
+              if (streamUsage.cachedTokens) {
+                logEntry.cachedTokens = streamUsage.cachedTokens;
               }
-            }
-
-            if (finalUsage) {
-              logEntry.promptTokens = finalUsage.prompt_tokens || finalUsage.input_tokens;
-              logEntry.completionTokens = finalUsage.completion_tokens || finalUsage.output_tokens;
-              logEntry.totalTokens = finalUsage.total_tokens || (logEntry.promptTokens + logEntry.completionTokens);
             }
 
             detailLogger.logStreamResponse(requestId, chunks);
@@ -175,7 +146,7 @@ export function handleStream(options: StreamHandlerOptions): Response {
           }
         }
 
-        console.log(`   📊 [SSE 统计] 请求 ${requestId} - 原始 SSE 事件：${eventCounter}, 转换后事件：${convertedEventCounter}`);
+        detailLogger.logStreamResponse(requestId + '_stats', [{ event: 'sse_stats', rawEvents: eventCounter, convertedEvents: convertedEventCounter }]);
       } catch (error) {
         try {
           controller.error(error);
