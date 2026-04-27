@@ -547,5 +547,121 @@ describe('anthropic-to-openai converter - request conversion', () => {
       // budget_tokens is Anthropic-specific, not passed to OpenAI
       expect((result as any).thinking).toBeUndefined();
     });
+
+    it('should extract thinking blocks from assistant messages into reasoning field', () => {
+      const anthropicRequest = {
+        model: 'claude-3-7-sonnet-20250219',
+        messages: [
+          {
+            role: 'user' as const,
+            content: 'What is 2+2?'
+          },
+          {
+            role: 'assistant' as const,
+            content: [
+              {
+                type: 'thinking' as const,
+                text: 'Let me calculate...',
+                thinking: 'Let me calculate 2+2. That equals 4.',
+                signature: 'abc123'
+              },
+              {
+                type: 'text' as const,
+                text: 'The answer is 4.'
+              }
+            ]
+          }
+        ],
+        max_tokens: 1024,
+        stream: true,
+        thinking: {
+          type: 'enabled' as const
+        }
+      };
+
+      const result = convertAnthropicRequestToOpenAI(anthropicRequest);
+
+      expect(result.messages).toHaveLength(2);
+      expect(result.messages[1].content).toBe('The answer is 4.');
+      expect((result.messages[1] as any).reasoning).toBe('Let me calculate 2+2. That equals 4.');
+    });
+
+    it('should handle assistant message with thinking and tool_calls', () => {
+      const anthropicRequest = {
+        model: 'claude-3-7-sonnet-20250219',
+        messages: [
+          {
+            role: 'user' as const,
+            content: 'Check the weather'
+          },
+          {
+            role: 'assistant' as const,
+            content: [
+              {
+                type: 'thinking' as const,
+                text: '',
+                thinking: 'I should use the weather tool.',
+                signature: ''
+              },
+              {
+                type: 'tool_use' as const,
+                id: 'toolu_1',
+                name: 'get_weather',
+                input: { city: 'Beijing' }
+              }
+            ]
+          }
+        ],
+        max_tokens: 1024,
+        stream: true,
+        thinking: {
+          type: 'enabled' as const
+        }
+      };
+
+      const result = convertAnthropicRequestToOpenAI(anthropicRequest);
+
+      expect(result.messages[1].content).toBe(null);
+      expect(result.messages[1].tool_calls).toHaveLength(1);
+      expect((result.messages[1] as any).reasoning).toBe('I should use the weather tool.');
+    });
+
+    it('should handle multiple thinking blocks in assistant message', () => {
+      const anthropicRequest = {
+        model: 'claude-3-7-sonnet-20250219',
+        messages: [
+          {
+            role: 'user' as const,
+            content: 'Hello'
+          },
+          {
+            role: 'assistant' as const,
+            content: [
+              {
+                type: 'thinking' as const,
+                text: '',
+                thinking: 'First thought. ',
+                signature: ''
+              },
+              {
+                type: 'text' as const,
+                text: 'Hi!'
+              },
+              {
+                type: 'thinking' as const,
+                text: '',
+                thinking: 'Second thought.',
+                signature: ''
+              }
+            ]
+          }
+        ],
+        max_tokens: 1024
+      };
+
+      const result = convertAnthropicRequestToOpenAI(anthropicRequest);
+
+      expect((result.messages[1] as any).reasoning).toBe('First thought. Second thought.');
+    });
   });
 });

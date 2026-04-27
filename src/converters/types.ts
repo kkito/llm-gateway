@@ -7,7 +7,7 @@
 // ==================== Anthropic 类型 ====================
 
 export interface AnthropicContentBlock {
-  type: 'text' | 'image' | 'tool_use' | 'tool_result';
+  type: 'text' | 'image' | 'tool_use' | 'tool_result' | 'thinking';
   text?: string;
   source?: {
     type: 'base64' | 'url';
@@ -19,6 +19,8 @@ export interface AnthropicContentBlock {
   input?: any;
   tool_use_id?: string;
   content?: any;
+  thinking?: string;
+  signature?: string;
 }
 
 export interface AnthropicMessage {
@@ -107,6 +109,7 @@ export interface OpenAIMessage {
     };
   }>;
   tool_call_id?: string;
+  reasoning?: string;
 }
 
 export interface OpenAITool {

@@ -143,6 +143,15 @@ export function convertAnthropicRequestToOpenAI(
             openaiMessage.content = null;
           }
         }
+
+        // 提取 thinking 内容（Anthropic thinking block -> reasoning）
+        const thinkingParts = msg.content
+          .filter(block => block.type === 'thinking')
+          .map(block => (block as any).thinking || '')
+          .join('');
+        if (thinkingParts) {
+          (openaiMessage as any).reasoning = thinkingParts;
+        }
       }
 
       messages.push(openaiMessage);
