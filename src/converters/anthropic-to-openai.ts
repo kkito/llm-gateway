@@ -243,13 +243,19 @@ export function convertAnthropicRequestToOpenAI(
     }
   }
 
+  // 转换 thinking 参数：Anthropic thinking -> OpenAI stream_options
+  const streamOptions = anthropicRequest.thinking?.type === 'enabled'
+    ? { include_reasoning: true }
+    : undefined;
+
   return {
     model: anthropicRequest.model,
     messages,
     tools: convertAnthropicToolsToOpenAI(anthropicRequest.tools),
     max_tokens: anthropicRequest.max_tokens,
     stream: anthropicRequest.stream,
-    temperature: anthropicRequest.temperature
+    temperature: anthropicRequest.temperature,
+    ...(streamOptions && { stream_options: streamOptions })
   };
 }
 

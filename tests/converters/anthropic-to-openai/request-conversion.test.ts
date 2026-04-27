@@ -469,4 +469,83 @@ describe('anthropic-to-openai converter - request conversion', () => {
       tool_call_id: 'toolu_123'
     });
   });
+
+  describe('thinking parameter conversion', () => {
+    it('should convert thinking enabled to stream_options', () => {
+      const anthropicRequest = {
+        model: 'claude-3-7-sonnet-20250219',
+        messages: [{
+          role: 'user' as const,
+          content: 'Think about this carefully'
+        }],
+        max_tokens: 4096,
+        stream: true,
+        thinking: {
+          type: 'enabled' as const,
+          budget_tokens: 1024
+        }
+      };
+
+      const result = convertAnthropicRequestToOpenAI(anthropicRequest);
+
+      expect(result.stream_options).toEqual({ include_reasoning: true });
+    });
+
+    it('should not add stream_options when thinking is disabled', () => {
+      const anthropicRequest = {
+        model: 'claude-3-7-sonnet-20250219',
+        messages: [{
+          role: 'user' as const,
+          content: 'No thinking needed'
+        }],
+        max_tokens: 1024,
+        stream: true,
+        thinking: {
+          type: 'disabled' as const
+        }
+      };
+
+      const result = convertAnthropicRequestToOpenAI(anthropicRequest);
+
+      expect(result.stream_options).toBeUndefined();
+    });
+
+    it('should not add stream_options when thinking is not provided', () => {
+      const anthropicRequest = {
+        model: 'claude-3-5-sonnet-20241022',
+        messages: [{
+          role: 'user' as const,
+          content: 'Hello'
+        }],
+        max_tokens: 1024,
+        stream: true
+      };
+
+      const result = convertAnthropicRequestToOpenAI(anthropicRequest);
+
+      expect(result.stream_options).toBeUndefined();
+    });
+
+    it('should handle thinking with budget_tokens', () => {
+      const anthropicRequest = {
+        model: 'claude-3-7-sonnet-20250219',
+        messages: [{
+          role: 'user' as const,
+          content: 'Think deeply'
+        }],
+        max_tokens: 8192,
+        stream: true,
+        thinking: {
+          type: 'enabled' as const,
+          budget_tokens: 4096
+        }
+      };
+
+      const result = convertAnthropicRequestToOpenAI(anthropicRequest);
+
+      expect(result.stream_options).toEqual({ include_reasoning: true });
+      // budget_tokens is Anthropic-specific, not passed to OpenAI
+      expect((result as any).thinking).toBeUndefined();
+    });
+  });
 });

@@ -40,6 +40,10 @@ export interface AnthropicRequest {
   max_tokens: number;
   stream?: boolean;
   temperature?: number;
+  thinking?: {
+    type: 'enabled' | 'disabled';
+    budget_tokens?: number;
+  };
 }
 
 export interface AnthropicResponse {
@@ -121,6 +125,9 @@ export interface OpenAIRequest {
   max_tokens?: number;
   stream?: boolean;
   temperature?: number;
+  stream_options?: {
+    include_reasoning: boolean;
+  };
 }
 
 export interface OpenAIResponse {
