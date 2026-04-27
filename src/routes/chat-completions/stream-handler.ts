@@ -48,6 +48,8 @@ export function handleStream(options: StreamHandlerOptions): Response {
   const privacyOn = privacySettings?.enabled && privacySettings.sanitizeFilePaths;
   const privacyBuffer: string[] = [];
 
+  console.log(`   🔒 [隐私模式] privacyOn=${privacyOn}, privacySettings=${JSON.stringify(privacySettings || {})}`);
+
   const transformedStream = new ReadableStream({
     async start(controller) {
       try {
