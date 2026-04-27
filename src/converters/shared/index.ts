@@ -5,6 +5,7 @@ export {
 
 export {
   createStreamConverterState,
+  createOpenAIToAnthropicStreamState,
 } from './types.js';
 
 export type {

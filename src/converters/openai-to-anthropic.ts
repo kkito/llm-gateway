@@ -16,6 +16,10 @@ import {
   type OpenAIResponse
 } from './types.js';
 
+import type { OpenAIStreamChunk, AnthropicStreamEvent, OpenAIToAnthropicStreamState } from './shared/types.js';
+import { mapOpenAIToAnthropicFinishReason } from './shared/finish-reason.js';
+export { createOpenAIToAnthropicStreamState } from './shared/types.js';
+
 // ==================== 请求转换：OpenAI → Anthropic ====================
 
 /**
@@ -302,138 +306,6 @@ export function convertAnthropicResponseToOpenAI(
 // ==================== 流式响应转换：OpenAI SSE → Anthropic SSE ====================
 
 /**
- * OpenAI 流式 chunk 类型
- */
-interface OpenAIStreamChunk {
-  id: string;
-  object: 'chat.completion.chunk';
-  created: number;
-  model: string;
-  choices: Array<{
-    index: number;
-    delta: {
-      role?: string;
-      content?: string | null;
-      tool_calls?: Array<{
-        index: number;
-        id?: string;
-        type: 'function';
-        function: {
-          name?: string;
-          arguments?: string;
-        };
-      }>;
-      reasoning_content?: string | null;
-      reasoning?: string | null;
-      reasoning_details?: Array<{ text: string }>;
-    };
-    finish_reason: string | null;
-  }>;
-  usage?: {
-    prompt_tokens?: number;
-    completion_tokens?: number;
-    total_tokens?: number;
-    prompt_tokens_details?: {
-      cached_tokens?: number;
-    };
-  };
-}
-
-/**
- * Anthropic 流式事件类型
- */
-interface AnthropicStreamEvent {
-  type: 'message_start' | 'message_stop' | 'content_block_start' | 'content_block_stop' | 'content_block_delta' | 'message_delta';
-  message?: {
-    id: string;
-    type: string;
-    role: string;
-    model: string;
-    content: any[];
-    stop_reason: string | null;
-    stop_sequence: string | null;
-    usage?: {
-      input_tokens: number;
-      output_tokens: number;
-    };
-  };
-  index?: number;
-  content_block?: {
-    type: 'text' | 'tool_use' | 'thinking';
-    text?: string;
-    id?: string;
-    name?: string;
-    input?: any;
-  };
-  delta?: {
-    type?: 'text_delta' | 'input_json_delta' | 'thinking_delta' | 'signature_delta';
-    text?: string;
-    partial_json?: string;
-    thinking?: string;
-    signature?: string;
-    stop_reason?: string | null;
-    stop_sequence?: string | null;
-  };
-  usage?: {
-    input_tokens?: number;
-    output_tokens?: number;
-    cache_creation_input_tokens?: number;
-    cache_read_input_tokens?: number;
-  };
-}
-
-/**
- * 流式转换器状态管理（OpenAI → Anthropic）
- * 参考 LiteLLM: AnthropicStreamWrapper
- */
-export interface OpenAIToAnthropicStreamState {
-  sentMessageStart: boolean;
-  sentContentBlockStart: boolean;
-  sentContentBlockFinish: boolean;
-  currentContentBlockType: 'text' | 'tool_use' | 'thinking';
-  currentContentBlockIndex: number;
-  currentToolId: string | null;
-  currentToolName: string | null;
-  messageId: string;
-}
-
-/**
- * 创建新的流式转换器状态（OpenAI → Anthropic）
- */
-export function createOpenAIToAnthropicStreamState(): OpenAIToAnthropicStreamState {
-  return {
-    sentMessageStart: false,
-    sentContentBlockStart: false,
-    sentContentBlockFinish: false,
-    currentContentBlockType: 'text',
-    currentContentBlockIndex: 0,
-    currentToolId: null,
-    currentToolName: null,
-    messageId: `msg_${Date.now()}`
-  };
-}
-
-/**
- * 将 OpenAI finish_reason 映射为 Anthropic stop_reason
- */
-function mapOpenAIFinishReasonToAnthropic(finishReason: string | null): string | null {
-  if (!finishReason) return null;
-  
-  switch (finishReason) {
-    case 'stop':
-      return 'end_turn';
-    case 'length':
-      return 'max_tokens';
-    case 'tool_calls':
-      return 'tool_use';
-    case 'content_filter':
-      return 'stop_sequence';
-    default:
-      return 'end_turn';
-  }
-}
-
-/**
  * 判断是否应该开始新的 content block
  *
  * 参考 LiteLLM 实现：litellm/llms/anthropic/experimental_pass_through/adapters/streaming_iterator.py
@@ -616,48 +488,57 @@ export function convertOpenAIStreamChunkToAnthropic(
     state.sentContentBlockStart = false;
   }
 
-  // 3. 处理 tool_calls
+  // 3. 处理 tool_calls（支持 parallel tool calls）
   if (delta?.tool_calls && delta.tool_calls.length > 0) {
-    const toolCall = delta.tool_calls[0];
-    const toolIndex = toolCall.index ?? 0;
+    for (const toolCall of delta.tool_calls) {
+      const toolIndex = toolCall.index ?? 0;
 
-    // 检查是否需要开始新的 content block（tool_use）
-    if (state.currentContentBlockType !== 'tool_use' || !state.sentContentBlockStart) {
-      // 开始新的 tool_use block
-      state.currentContentBlockType = 'tool_use';
-      state.sentContentBlockStart = false;
-      state.sentContentBlockFinish = false;
+      // 检查是否是新的 tool call（parallel calls）
+      const isNewToolCall = toolCall.id && state.currentToolId && toolCall.id !== state.currentToolId;
+      const needsNewBlock = state.currentContentBlockType !== 'tool_use' || !state.sentContentBlockStart || isNewToolCall;
 
-      // 记录 tool 信息
-      if (toolCall.id) state.currentToolId = toolCall.id;
-      if (toolCall.function?.name) state.currentToolName = toolCall.function.name;
-    }
-
-    // 发送 content_block_start（如果是第一次）
-    if (!state.sentContentBlockStart) {
-      state.sentContentBlockStart = true;
-      events.push({
-        type: 'content_block_start',
-        index: state.currentContentBlockIndex,
-        content_block: {
-          type: 'tool_use',
-          id: state.currentToolId || `toolu_${Date.now()}_${toolIndex}`,
-          name: state.currentToolName || '',
-          input: {}
+      if (needsNewBlock) {
+        // 结束当前的 block
+        if (state.sentContentBlockStart && !state.sentContentBlockFinish) {
+          events.push({ type: 'content_block_stop', index: state.currentContentBlockIndex });
+          state.sentContentBlockFinish = true;
+          state.currentContentBlockIndex++;
         }
-      });
-    }
 
-    // 发送 input_json_delta
-    if (toolCall.function?.arguments) {
-      events.push({
-        type: 'content_block_delta',
-        index: state.currentContentBlockIndex,
-        delta: {
-          type: 'input_json_delta',
-          partial_json: toolCall.function.arguments
-        }
-      });
+        state.currentContentBlockType = 'tool_use';
+        state.sentContentBlockStart = false;
+        state.sentContentBlockFinish = false;
+
+        if (toolCall.id) state.currentToolId = toolCall.id;
+        if (toolCall.function?.name) state.currentToolName = toolCall.function.name;
+      }
+
+      // 发送 content_block_start（如果是第一次）
+      if (!state.sentContentBlockStart) {
+        state.sentContentBlockStart = true;
+        events.push({
+          type: 'content_block_start',
+          index: state.currentContentBlockIndex,
+          content_block: {
+            type: 'tool_use',
+            id: state.currentToolId || `toolu_${Date.now()}_${toolIndex}`,
+            name: state.currentToolName || '',
+            input: {}
+          }
+        });
+      }
+
+      // 发送 input_json_delta
+      if (toolCall.function?.arguments) {
+        events.push({
+          type: 'content_block_delta',
+          index: state.currentContentBlockIndex,
+          delta: {
+            type: 'input_json_delta',
+            partial_json: toolCall.function.arguments
+          }
+        });
+      }
     }
   }
   // 4. 处理文本内容
@@ -717,12 +598,41 @@ export function convertOpenAIStreamChunkToAnthropic(
   }
   // 7. 处理 reasoning_details 字段（thinking）- OpenAI o1 格式
   else if (delta?.reasoning_details && delta.reasoning_details.length > 0) {
-    const reasoningText = delta.reasoning_details[0]?.text || '';
-    if (reasoningText) {
-      handleThinkingDelta(events, state, reasoningText);
+    for (const detail of delta.reasoning_details) {
+      const reasoningText = detail?.text || '';
+      if (reasoningText) {
+        handleThinkingDelta(events, state, reasoningText);
+      }
     }
   }
-  
+
+  // 5b. 处理 refusal 字段（OpenAI 安全过滤）
+  if (delta?.refusal !== undefined && delta.refusal !== null && delta.refusal !== '') {
+    if (state.currentContentBlockType !== 'text' || !state.sentContentBlockStart) {
+      if (state.sentContentBlockStart && !state.sentContentBlockFinish) {
+        events.push({ type: 'content_block_stop', index: state.currentContentBlockIndex });
+        state.sentContentBlockFinish = true;
+        state.currentContentBlockIndex++;
+      }
+      state.currentContentBlockType = 'text';
+      state.sentContentBlockStart = false;
+      state.sentContentBlockFinish = false;
+    }
+    if (!state.sentContentBlockStart) {
+      state.sentContentBlockStart = true;
+      events.push({
+        type: 'content_block_start',
+        index: state.currentContentBlockIndex,
+        content_block: { type: 'text', text: '' }
+      });
+    }
+    events.push({
+      type: 'content_block_delta',
+      index: state.currentContentBlockIndex,
+      delta: { type: 'text_delta', text: delta.refusal }
+    });
+  }
+
   // 8. 处理 finish_reason（结束消息）
   if (finishReason) {
     // 结束当前 content block
@@ -735,7 +645,7 @@ export function convertOpenAIStreamChunkToAnthropic(
     }
     
     // 发送 message_delta（包含 stop_reason 和 usage）
-    const anthropicStopReason = mapOpenAIFinishReasonToAnthropic(finishReason);
+    const anthropicStopReason = mapOpenAIToAnthropicFinishReason(finishReason);
 
     const messageDeltaEvent: AnthropicStreamEvent = {
       type: 'message_delta',

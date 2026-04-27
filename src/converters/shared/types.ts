@@ -134,3 +134,19 @@ export function createStreamConverterState(): StreamConverterState {
     hasSentToolCallStart: new Map(),
   };
 }
+
+/**
+ * 创建 OpenAI → Anthropic 流式转换器状态
+ */
+export function createOpenAIToAnthropicStreamState(): OpenAIToAnthropicStreamState {
+  return {
+    sentMessageStart: false,
+    sentContentBlockStart: false,
+    sentContentBlockFinish: false,
+    currentContentBlockType: 'text',
+    currentContentBlockIndex: 0,
+    currentToolId: null,
+    currentToolName: null,
+    messageId: `msg_${Date.now()}`,
+  };
+}
