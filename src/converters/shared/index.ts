@@ -3,6 +3,10 @@ export {
   mapOpenAIToAnthropicFinishReason,
 } from './finish-reason.js';
 
+export {
+  createStreamConverterState,
+} from './types.js';
+
 export type {
   AnthropicStreamEvent,
   OpenAIStreamChunk,

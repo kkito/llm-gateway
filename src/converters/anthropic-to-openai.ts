@@ -17,6 +17,10 @@ import {
   type OpenAIResponse
 } from './types.js';
 
+import type { OpenAIStreamChunk, AnthropicStreamEvent } from './shared/types.js';
+import { mapAnthropicToOpenAIFinishReason, createStreamConverterState } from './shared/index.js';
+export { createStreamConverterState } from './shared/types.js';
+
 // ==================== 请求转换：Anthropic → OpenAI ====================
 
 /**
@@ -321,132 +325,6 @@ export function convertOpenAIResponseToAnthropic(
 // ==================== 流式响应转换：Anthropic SSE → OpenAI SSE ====================
 
 /**
- * Anthropic 流式事件类型（完整定义）
- */
-interface AnthropicStreamEvent {
-  type: 'message_start' | 'message_stop' | 'content_block_start' | 'content_block_stop' | 'content_block_delta' | 'message_delta';
-  message?: {
-    id: string;
-    type: string;
-    role: string;
-    model: string;
-    content: any[];
-    stop_reason: string | null;
-    stop_sequence: string | null;
-    usage?: {
-      input_tokens: number;
-      output_tokens: number;
-    };
-  };
-  index?: number;
-  content_block?: {
-    type: 'text' | 'tool_use' | 'thinking';
-    text?: string;
-    id?: string;
-    name?: string;
-    input?: any;
-  };
-  delta?: {
-    type?: 'text_delta' | 'input_json_delta' | 'thinking_delta' | 'signature_delta';
-    text?: string;
-    partial_json?: string;
-    thinking?: string;
-    signature?: string;
-    stop_reason?: string | null;
-    stop_sequence?: string | null;
-  };
-  usage?: {
-    input_tokens?: number;
-    output_tokens?: number;
-    cache_creation_input_tokens?: number;
-    cache_read_input_tokens?: number;
-  };
-}
-
-/**
- * OpenAI 流式 chunk 类型
- */
-interface OpenAIStreamChunk {
-  id: string;
-  object: 'chat.completion.chunk';
-  created: number;
-  model: string;
-  choices: Array<{
-    index: number;
-    delta: {
-      role?: string;
-      content?: string | null;
-      tool_calls?: Array<{
-        index: number;
-        id: string;
-        type: 'function';
-        function: {
-          name: string;
-          arguments: string;
-        };
-      }>;
-      reasoning_content?: string | null;
-    };
-    finish_reason: string | null;
-  }>;
-  usage?: {
-    prompt_tokens: number;
-    completion_tokens: number;
-    total_tokens: number;
-    prompt_tokens_details?: {
-      cached_tokens: number;
-    };
-  };
-}
-
-/**
- * 流式转换器状态管理
- * 用于跟踪 tool_use 的累积 JSON 参数
- */
-export interface StreamConverterState {
-  currentToolIndex: number;
-  toolInputBuffers: Map<number, string>; // index -> accumulated JSON string
-  toolIdMap: Map<number, string>; // index -> tool id
-  toolNameMap: Map<number, string>; // index -> tool name
-  hasSentToolCallStart: Map<number, boolean>; // index -> whether sent tool_call start
-}
-
-/**
- * 创建新的流式转换器状态
- */
-export function createStreamConverterState(): StreamConverterState {
-  return {
-    currentToolIndex: 0,
-    toolInputBuffers: new Map(),
-    toolIdMap: new Map(),
-    toolNameMap: new Map(),
-    hasSentToolCallStart: new Map()
-  };
-}
-
-/**
- * 将 finish_reason 映射为 stop_reason（流式版本）
- */
-function mapFinishReasonForStream(
-  stopReason: string | null | undefined
-): string | null {
-  if (!stopReason) return null;
-  
-  switch (stopReason) {
-    case 'end_turn':
-      return 'stop';
-    case 'tool_use':
-      return 'tool_calls';
-    case 'max_tokens':
-      return 'length';
-    case 'stop_sequence':
-      return 'stop';
-    default:
-      return 'stop';
-  }
-}
-
-/**
  * 转换单个 Anthropic 流式事件为 OpenAI 流式 chunk（带状态管理）
  * 
  * 参考 LiteLLM 实现：
@@ -697,7 +575,7 @@ export function convertAnthropicStreamEventToOpenAI(
 
     case 'message_delta': {
       // message_delta -> finish_reason 和最终 usage
-      const stopReason = mapFinishReasonForStream(event.delta?.stop_reason);
+      const stopReason = mapAnthropicToOpenAIFinishReason(event.delta?.stop_reason);
       
       // 计算 usage，包含缓存 token
       let usage: OpenAIStreamChunk['usage'] = undefined;
@@ -740,39 +618,26 @@ export function convertAnthropicStreamEventToOpenAI(
       return null;
     }
 
+    case 'ping':
+      // Ignore ping events, do not forward downstream
+      return null;
+
+    case 'error':
+      // Return error chunk so downstream client is notified
+      return {
+        id: requestId,
+        object: 'chat.completion.chunk' as const,
+        created,
+        model,
+        choices: [{
+          index: 0,
+          delta: {},
+          finish_reason: 'error' as any,
+        }],
+      };
+
     default:
       return null;
-  }
-}
-
-/**
- * 解析 SSE 数据行（支持 event 和 data 前缀）
- */
-export function parseSSEData(line: string): { event?: string; data: any } | null {
-  const trimmedLine = line.trim();
-  
-  // 处理 event 行
-  if (trimmedLine.startsWith('event:')) {
-    const eventType = trimmedLine.slice(6).trim();
-    return { event: eventType, data: null };
-  }
-  
-  // 处理 data 行
-  if (!trimmedLine.startsWith('data:')) {
-    return null;
-  }
-
-  const data = trimmedLine.slice(5).trim();
-  if (!data || data === '[DONE]') {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(data);
-    // 如果之前有 event 类型，添加到结果中
-    return { data: parsed };
-  } catch {
-    return null;
   }
 }
 

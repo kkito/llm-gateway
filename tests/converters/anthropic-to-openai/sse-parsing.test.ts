@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { parseSSEData } from '../../../src/converters/anthropic-to-openai.js';
+import { parseSSEData } from '../../../src/converters/shared/sse-parser.js';
+import { parseSSEBlock } from '../../../src/converters/anthropic-to-openai.js';
 
 describe('anthropic-to-openai converter - SSE parsing', () => {
   it('should parse valid SSE data line', () => {
@@ -75,5 +76,25 @@ describe('anthropic-to-openai converter - SSE parsing', () => {
     expect(results[4]?.data.type).toBe('content_block_stop');
     expect(results[5]?.data.type).toBe('message_delta');
     expect(results[6]?.data.type).toBe('message_stop');
+  });
+
+  it('skips SSE comment lines', () => {
+    const block = ': OPENROUTER PROCESSING\n\ndata: {"type":"text"}\n\n';
+    const results = parseSSEBlock(block);
+    expect(results).toHaveLength(1);
+    expect(results[0].data).toEqual({ type: 'text' });
+  });
+
+  it('handles event: prefix lines', () => {
+    const block = 'event: message_start\ndata: {"type":"message_start"}\n\n';
+    const results = parseSSEBlock(block);
+    expect(results).toHaveLength(1);
+    expect(results[0].event).toBe('message_start');
+  });
+
+  it('handles empty data lines', () => {
+    const block = 'data: \n\n';
+    const results = parseSSEBlock(block);
+    expect(results).toEqual([]);
   });
 });

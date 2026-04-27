@@ -121,3 +121,16 @@ export interface SSEParseResult {
   event?: string;
   data: any;
 }
+
+/**
+ * 创建 Anthropic → OpenAI 流式转换器状态
+ */
+export function createStreamConverterState(): StreamConverterState {
+  return {
+    currentToolIndex: 0,
+    toolInputBuffers: new Map(),
+    toolIdMap: new Map(),
+    toolNameMap: new Map(),
+    hasSentToolCallStart: new Map(),
+  };
+}

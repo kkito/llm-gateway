@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { convertAnthropicStreamEventToOpenAI } from '../../../src/converters/anthropic-to-openai.js';
+import { convertAnthropicStreamEventToOpenAI, createStreamConverterState } from '../../../src/converters/anthropic-to-openai.js';
+import type { AnthropicStreamEvent } from '../../../src/converters/shared/types.js';
 
 describe('anthropic-to-openai converter - stream event conversion', () => {
   const requestId = 'test-request-123';
@@ -231,5 +232,62 @@ describe('anthropic-to-openai converter - stream event conversion', () => {
     const result = convertAnthropicStreamEventToOpenAI(event, requestId, model);
 
     expect(result?.usage).toBeUndefined();
+  });
+
+  it('ignores ping events', () => {
+    const event: AnthropicStreamEvent = { type: 'ping' as any };
+    const result = convertAnthropicStreamEventToOpenAI(event, requestId, model);
+    expect(result).toBeNull();
+  });
+
+  it('returns error chunk for error events', () => {
+    const event: AnthropicStreamEvent = {
+      type: 'error' as any,
+      error: { type: 'overloaded_error', message: 'Overloaded' }
+    };
+    const result = convertAnthropicStreamEventToOpenAI(event, requestId, model);
+    expect(result).not.toBeNull();
+    expect(result!.choices[0].finish_reason).toBe('error');
+  });
+
+  it('handles content_block_start with tool_use type', () => {
+    const event: AnthropicStreamEvent = {
+      type: 'content_block_start',
+      index: 0,
+      content_block: { type: 'tool_use', id: 'toolu_123', name: 'search', input: {} }
+    };
+    const state = createStreamConverterState();
+    const result = convertAnthropicStreamEventToOpenAI(event, requestId, model, state);
+    expect(result).not.toBeNull();
+    expect(result!.choices[0].delta.tool_calls).toBeDefined();
+    expect(result!.choices[0].delta.tool_calls![0].id).toBe('toolu_123');
+    expect(result!.choices[0].delta.tool_calls![0].function.name).toBe('search');
+  });
+
+  it('handles input_json_delta for tool_use', () => {
+    const event: AnthropicStreamEvent = {
+      type: 'content_block_delta',
+      index: 0,
+      delta: { type: 'input_json_delta', partial_json: '{"action": "se' }
+    };
+    const state = createStreamConverterState();
+    state.toolIdMap.set(0, 'toolu_123');
+    state.toolNameMap.set(0, 'search');
+    state.toolInputBuffers.set(0, '');
+
+    const result = convertAnthropicStreamEventToOpenAI(event, requestId, model, state);
+    expect(result).not.toBeNull();
+    expect(result!.choices[0].delta.tool_calls![0].function.arguments).toBe('{"action": "se');
+    expect(state.toolInputBuffers.get(0)).toBe('{"action": "se');
+  });
+
+  it('includes cache_creation_input_tokens in message_delta usage', () => {
+    const event: AnthropicStreamEvent = {
+      type: 'message_delta',
+      delta: { stop_reason: 'end_turn' },
+      usage: { input_tokens: 10, output_tokens: 20, cache_creation_input_tokens: 5 }
+    };
+    const result = convertAnthropicStreamEventToOpenAI(event, requestId, model);
+    expect(result!.usage!.prompt_tokens_details!.cached_tokens).toBe(5);
   });
 });
