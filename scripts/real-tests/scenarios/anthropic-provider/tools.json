@@ -1,0 +1,34 @@
+[
+  {
+    "name": "write_file",
+    "description": "Create or write content to a file at a specified path",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "file_path": {
+          "type": "string",
+          "description": "The absolute path of the file to create or overwrite"
+        },
+        "content": {
+          "type": "string",
+          "description": "The content to write to the file"
+        }
+      },
+      "required": ["file_path", "content"]
+    }
+  },
+  {
+    "name": "list_directory",
+    "description": "List the contents of a directory",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "The absolute path to the directory to list"
+        }
+      },
+      "required": ["path"]
+    }
+  }
+]

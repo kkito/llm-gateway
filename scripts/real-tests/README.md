@@ -11,8 +11,12 @@ scripts/real-tests/
 ├── utils/
 │   └── validate.sh            # 通用响应验证工具
 └── scenarios/
-    └── openai-provider/       # OpenAI endpoint + OpenAI provider 场景
+    ├── openai-provider/       # OpenAI endpoint + OpenAI provider 场景
+    │   ├── test.sh            # 测试执行脚本
+    │   └── DESCRIPTION        # 场景描述
+    └── anthropic-provider/    # Anthropic endpoint + OpenAI provider 场景
         ├── test.sh            # 测试执行脚本
+        ├── tools.json         # Anthropic 格式工具定义
         └── DESCRIPTION        # 场景描述
 ```
 
@@ -78,6 +82,19 @@ bash scripts/real-tests/scenarios/openai-provider/test.sh http://localhost:4000 
   - 验证消息中包含 `tool_calls` 和 `tool` 角色
   - 验证响应中包含 `tool_calls`（id, type, function.name, function.arguments）
   - 验证最后一个 chunk 包含 `usage` 信息
+
+### Anthropic Provider (格式转换模式)
+
+**场景描述**: 客户端发送 Anthropic 格式请求（`/v1/messages`），网关将其转换为 OpenAI 格式后转发给 OpenAI 上游。
+
+**测试内容**:
+- ✅ 流式对话 + 工具调用（主要测试场景）
+  - 验证响应是 Anthropic SSE 格式 (`event:` + `data:` 前缀)
+  - 验证 `content_block_*` 事件序列正确
+  - 验证累积 text content 不为空
+  - 验证包含 `tool_use` 类型的 content block
+  - 验证 tool_use 包含 id, name, input 字段
+  - 验证包含 usage 信息（input_tokens, output_tokens）
 
 ## 如何添加新的测试场景
 
