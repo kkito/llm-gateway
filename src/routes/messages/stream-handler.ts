@@ -13,6 +13,7 @@ export interface StreamHandlerOptions {
   model: string;
   actualModel: string;
   requestId: string;
+  startTime: number;
   logEntry: any;
   rateLimiter: RateLimiter;
   logger: Logger;
@@ -146,7 +147,7 @@ export function handleStream(options: StreamHandlerOptions): Response {
           }
         }
 
-        detailLogger.logStreamResponse(requestId + '_stats', [{ event: 'sse_stats', rawEvents: eventCounter, convertedEvents: convertedEventCounter }]);
+        detailLogger.logStreamResponse(requestId + '_stats', [JSON.stringify({ event: 'sse_stats', rawEvents: eventCounter, convertedEvents: convertedEventCounter })]);
       } catch (error) {
         try {
           controller.error(error);

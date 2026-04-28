@@ -13,6 +13,7 @@ export interface StreamHandlerOptions {
   model: string;
   actualModel: string;
   requestId: string;
+  startTime: number;
   logEntry: any;
   rateLimiter: RateLimiter;
   logger: Logger;

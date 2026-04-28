@@ -17,9 +17,9 @@ import {
   type OpenAIResponse
 } from './types.js';
 
-import type { OpenAIStreamChunk, AnthropicStreamEvent } from './shared/types.js';
+import type { OpenAIStreamChunk, AnthropicStreamEvent, StreamConverterState } from './shared/types.js';
 import { mapAnthropicToOpenAIFinishReason, createStreamConverterState } from './shared/index.js';
-export { createStreamConverterState } from './shared/types.js';
+export { createStreamConverterState, type StreamConverterState } from './shared/types.js';
 
 // ==================== 请求转换：Anthropic → OpenAI ====================
 

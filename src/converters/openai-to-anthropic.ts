@@ -18,7 +18,8 @@ import {
 
 import type { OpenAIStreamChunk, AnthropicStreamEvent, OpenAIToAnthropicStreamState } from './shared/types.js';
 import { mapOpenAIToAnthropicFinishReason } from './shared/finish-reason.js';
-export { createOpenAIToAnthropicStreamState } from './shared/types.js';
+import { createOpenAIToAnthropicStreamState } from './shared/types.js';
+export { createOpenAIToAnthropicStreamState, type OpenAIToAnthropicStreamState } from './shared/types.js';
 
 // ==================== 请求转换：OpenAI → Anthropic ====================
 
@@ -445,21 +446,19 @@ export function convertOpenAIStreamChunkToAnthropic(
   const events: AnthropicStreamEvent[] = [];
 
   // 初始化状态（如果未提供）
-  if (!state) {
-    state = createOpenAIToAnthropicStreamState();
-  }
+  const s: OpenAIToAnthropicStreamState = state ?? createOpenAIToAnthropicStreamState();
 
   const choice = chunk.choices?.[0];
   const delta = choice?.delta;
   const finishReason = choice?.finish_reason;
 
   // 1. 第一次 chunk：发送 message_start
-  if (!state.sentMessageStart) {
-    state.sentMessageStart = true;
+  if (!s.sentMessageStart) {
+    s.sentMessageStart = true;
     events.push({
       type: 'message_start',
       message: {
-        id: state.messageId,
+        id: s.messageId,
         type: 'message',
         role: 'assistant',
         content: [],
@@ -475,17 +474,17 @@ export function convertOpenAIStreamChunkToAnthropic(
   }
 
   // 2. 检查是否需要开始新的 content block（参考 LiteLLM 的 _should_start_new_content_block）
-  const shouldStartNewBlock = shouldStartNewContentBlock(chunk, state);
-  
-  if (shouldStartNewBlock && state.sentContentBlockStart && !state.sentContentBlockFinish) {
+  const shouldStartNewBlock = shouldStartNewContentBlock(chunk, s);
+
+  if (shouldStartNewBlock && s.sentContentBlockStart && !s.sentContentBlockFinish) {
     // 结束当前的 content block
     events.push({
       type: 'content_block_stop',
-      index: state.currentContentBlockIndex
+      index: s.currentContentBlockIndex
     });
-    state.sentContentBlockFinish = true;
-    state.currentContentBlockIndex++;
-    state.sentContentBlockStart = false;
+    s.sentContentBlockFinish = true;
+    s.currentContentBlockIndex++;
+    s.sentContentBlockStart = false;
   }
 
   // 3. 处理 tool_calls（支持 parallel tool calls）
@@ -494,35 +493,35 @@ export function convertOpenAIStreamChunkToAnthropic(
       const toolIndex = toolCall.index ?? 0;
 
       // 检查是否是新的 tool call（parallel calls）
-      const isNewToolCall = toolCall.id && state.currentToolId && toolCall.id !== state.currentToolId;
-      const needsNewBlock = state.currentContentBlockType !== 'tool_use' || !state.sentContentBlockStart || isNewToolCall;
+      const isNewToolCall = toolCall.id && s.currentToolId && toolCall.id !== s.currentToolId;
+      const needsNewBlock = s.currentContentBlockType !== 'tool_use' || !s.sentContentBlockStart || isNewToolCall;
 
       if (needsNewBlock) {
         // 结束当前的 block
-        if (state.sentContentBlockStart && !state.sentContentBlockFinish) {
-          events.push({ type: 'content_block_stop', index: state.currentContentBlockIndex });
-          state.sentContentBlockFinish = true;
-          state.currentContentBlockIndex++;
+        if (s.sentContentBlockStart && !s.sentContentBlockFinish) {
+          events.push({ type: 'content_block_stop', index: s.currentContentBlockIndex });
+          s.sentContentBlockFinish = true;
+          s.currentContentBlockIndex++;
         }
 
-        state.currentContentBlockType = 'tool_use';
-        state.sentContentBlockStart = false;
-        state.sentContentBlockFinish = false;
+        s.currentContentBlockType = 'tool_use';
+        s.sentContentBlockStart = false;
+        s.sentContentBlockFinish = false;
 
-        if (toolCall.id) state.currentToolId = toolCall.id;
-        if (toolCall.function?.name) state.currentToolName = toolCall.function.name;
+        if (toolCall.id) s.currentToolId = toolCall.id;
+        if (toolCall.function?.name) s.currentToolName = toolCall.function.name;
       }
 
       // 发送 content_block_start（如果是第一次）
-      if (!state.sentContentBlockStart) {
-        state.sentContentBlockStart = true;
+      if (!s.sentContentBlockStart) {
+        s.sentContentBlockStart = true;
         events.push({
           type: 'content_block_start',
-          index: state.currentContentBlockIndex,
+          index: s.currentContentBlockIndex,
           content_block: {
             type: 'tool_use',
-            id: state.currentToolId || `toolu_${Date.now()}_${toolIndex}`,
-            name: state.currentToolName || '',
+            id: s.currentToolId || `toolu_${Date.now()}_${toolIndex}`,
+            name: s.currentToolName || '',
             input: {}
           }
         });
@@ -532,7 +531,7 @@ export function convertOpenAIStreamChunkToAnthropic(
       if (toolCall.function?.arguments) {
         events.push({
           type: 'content_block_delta',
-          index: state.currentContentBlockIndex,
+          index: s.currentContentBlockIndex,
           delta: {
             type: 'input_json_delta',
             partial_json: toolCall.function.arguments
@@ -544,29 +543,29 @@ export function convertOpenAIStreamChunkToAnthropic(
   // 4. 处理文本内容
   if (delta?.content !== undefined && delta.content !== null) {
     // 检查是否需要开始新的 content block（text）
-    if (state.currentContentBlockType !== 'text' || !state.sentContentBlockStart) {
+    if (s.currentContentBlockType !== 'text' || !s.sentContentBlockStart) {
       // 结束之前的 thinking block（如果有）
-      if ((state.currentContentBlockType === 'thinking' || state.currentContentBlockType === 'tool_use') && state.sentContentBlockStart && !state.sentContentBlockFinish) {
+      if ((s.currentContentBlockType === 'thinking' || s.currentContentBlockType === 'tool_use') && s.sentContentBlockStart && !s.sentContentBlockFinish) {
         events.push({
           type: 'content_block_stop',
-          index: state.currentContentBlockIndex
+          index: s.currentContentBlockIndex
         });
-        state.sentContentBlockFinish = true;
-        state.currentContentBlockIndex++;
+        s.sentContentBlockFinish = true;
+        s.currentContentBlockIndex++;
       }
 
       // 开始新的 text block
-      state.currentContentBlockType = 'text';
-      state.sentContentBlockStart = false;
-      state.sentContentBlockFinish = false;
+      s.currentContentBlockType = 'text';
+      s.sentContentBlockStart = false;
+      s.sentContentBlockFinish = false;
     }
 
     // 发送 content_block_start（如果是第一次）
-    if (!state.sentContentBlockStart) {
-      state.sentContentBlockStart = true;
+    if (!s.sentContentBlockStart) {
+      s.sentContentBlockStart = true;
       events.push({
         type: 'content_block_start',
-        index: state.currentContentBlockIndex,
+        index: s.currentContentBlockIndex,
         content_block: {
           type: 'text',
           text: ''
@@ -578,7 +577,7 @@ export function convertOpenAIStreamChunkToAnthropic(
     if (delta.content) {
       events.push({
         type: 'content_block_delta',
-        index: state.currentContentBlockIndex,
+        index: s.currentContentBlockIndex,
         delta: {
           type: 'text_delta',
           text: delta.content
@@ -586,49 +585,49 @@ export function convertOpenAIStreamChunkToAnthropic(
       });
     }
   }
-  
+
   // 5. 处理 reasoning_content（thinking）- Qwen 格式
   // 注意：使用独立 if 而非 else if，因为某些模型（如 MiniMax）同时返回 content 和 reasoning_content
   if (delta?.reasoning_content !== undefined && delta.reasoning_content !== null && delta.reasoning_content !== '') {
-    handleThinkingDelta(events, state, delta.reasoning_content);
+    handleThinkingDelta(events, s, delta.reasoning_content);
   }
   // 6. 处理 reasoning 字段（thinking）- OpenRouter 格式
   else if (delta?.reasoning !== undefined && delta.reasoning !== null && delta.reasoning !== '') {
-    handleThinkingDelta(events, state, delta.reasoning);
+    handleThinkingDelta(events, s, delta.reasoning);
   }
   // 7. 处理 reasoning_details 字段（thinking）- OpenAI o1 格式
   else if (delta?.reasoning_details && delta.reasoning_details.length > 0) {
     for (const detail of delta.reasoning_details) {
       const reasoningText = detail?.text || '';
       if (reasoningText) {
-        handleThinkingDelta(events, state, reasoningText);
+        handleThinkingDelta(events, s, reasoningText);
       }
     }
   }
 
   // 5b. 处理 refusal 字段（OpenAI 安全过滤）
   if (delta?.refusal !== undefined && delta.refusal !== null && delta.refusal !== '') {
-    if (state.currentContentBlockType !== 'text' || !state.sentContentBlockStart) {
-      if (state.sentContentBlockStart && !state.sentContentBlockFinish) {
-        events.push({ type: 'content_block_stop', index: state.currentContentBlockIndex });
-        state.sentContentBlockFinish = true;
-        state.currentContentBlockIndex++;
+    if (s.currentContentBlockType !== 'text' || !s.sentContentBlockStart) {
+      if (s.sentContentBlockStart && !s.sentContentBlockFinish) {
+        events.push({ type: 'content_block_stop', index: s.currentContentBlockIndex });
+        s.sentContentBlockFinish = true;
+        s.currentContentBlockIndex++;
       }
-      state.currentContentBlockType = 'text';
-      state.sentContentBlockStart = false;
-      state.sentContentBlockFinish = false;
+      s.currentContentBlockType = 'text';
+      s.sentContentBlockStart = false;
+      s.sentContentBlockFinish = false;
     }
-    if (!state.sentContentBlockStart) {
-      state.sentContentBlockStart = true;
+    if (!s.sentContentBlockStart) {
+      s.sentContentBlockStart = true;
       events.push({
         type: 'content_block_start',
-        index: state.currentContentBlockIndex,
+        index: s.currentContentBlockIndex,
         content_block: { type: 'text', text: '' }
       });
     }
     events.push({
       type: 'content_block_delta',
-      index: state.currentContentBlockIndex,
+      index: s.currentContentBlockIndex,
       delta: { type: 'text_delta', text: delta.refusal }
     });
   }
@@ -636,12 +635,12 @@ export function convertOpenAIStreamChunkToAnthropic(
   // 8. 处理 finish_reason（结束消息）
   if (finishReason) {
     // 结束当前 content block
-    if (state.sentContentBlockStart && !state.sentContentBlockFinish) {
+    if (s.sentContentBlockStart && !s.sentContentBlockFinish) {
       events.push({
         type: 'content_block_stop',
-        index: state.currentContentBlockIndex
+        index: s.currentContentBlockIndex
       });
-      state.sentContentBlockFinish = true;
+      s.sentContentBlockFinish = true;
     }
     
     // 发送 message_delta（包含 stop_reason 和 usage）
