@@ -1,7 +1,14 @@
 import { Hono } from 'hono';
-import type { ProxyConfig } from '../../config.js';
+import type { ProxyConfig, ProviderConfig } from '../../config.js';
 import { loadFullConfig, saveConfig } from '../../config.js';
 import { ModelGroupFormPage } from '../views/model-group-form.js';
+
+/**
+ * 过滤出可见的模型（hidden !== true）
+ */
+export function getVisibleModels(config: ProxyConfig): ProviderConfig[] {
+  return config.models.filter(m => m.hidden !== true);
+}
 
 interface RouteDeps {
   configPath: string;
@@ -16,7 +23,7 @@ export function createModelGroupFormRoute(deps: RouteDeps) {
   app.get('/admin/model-groups/new', (c) => {
     try {
       const proxyConfig = loadFullConfig(configPath);
-      return c.html(<ModelGroupFormPage models={proxyConfig.models} />);
+      return c.html(<ModelGroupFormPage models={getVisibleModels(proxyConfig)} />);
     } catch (error: any) {
       return c.html(<ModelGroupFormPage models={[]} error={`加载配置失败：${error.message}`} />);
     }
@@ -32,7 +39,7 @@ export function createModelGroupFormRoute(deps: RouteDeps) {
     // 验证组名格式
     if (!name || !/^[-a-zA-Z0-9_.]+$/.test(name)) {
       const proxyConfig = loadFullConfig(configPath);
-      return c.html(<ModelGroupFormPage models={proxyConfig.models} error="组名只能包含字母、数字、下划线、中划线、点" />);
+      return c.html(<ModelGroupFormPage models={getVisibleModels(proxyConfig)} error="组名只能包含字母、数字、下划线、中划线、点" />);
     }
 
     // 解析 JSON 格式的模型数组
@@ -42,7 +49,7 @@ export function createModelGroupFormRoute(deps: RouteDeps) {
         models = JSON.parse(modelsParam);
       } catch (e: any) {
         const proxyConfig = loadFullConfig(configPath);
-        return c.html(<ModelGroupFormPage models={proxyConfig.models} error="模型数据格式错误" />);
+        return c.html(<ModelGroupFormPage models={getVisibleModels(proxyConfig)} error="模型数据格式错误" />);
       }
     }
 
@@ -51,12 +58,12 @@ export function createModelGroupFormRoute(deps: RouteDeps) {
 
       // 检查组名是否已存在
       if (proxyConfig.modelGroups?.some(g => g.name === name)) {
-        return c.html(<ModelGroupFormPage models={proxyConfig.models} error={`组名 "${name}" 已存在`} />);
+        return c.html(<ModelGroupFormPage models={getVisibleModels(proxyConfig)} error={`组名 "${name}" 已存在`} />);
       }
 
       // 检查是否至少选择一个模型
       if (models.length === 0) {
-        return c.html(<ModelGroupFormPage models={proxyConfig.models} error="请至少选择一个模型" />);
+        return c.html(<ModelGroupFormPage models={getVisibleModels(proxyConfig)} error="请至少选择一个模型" />);
       }
 
       // 创建新配置
@@ -68,7 +75,7 @@ export function createModelGroupFormRoute(deps: RouteDeps) {
       return c.redirect('/admin/model-groups');
     } catch (error: any) {
       const proxyConfig = loadFullConfig(configPath);
-      return c.html(<ModelGroupFormPage models={proxyConfig.models} error={`保存失败：${error.message}`} />);
+      return c.html(<ModelGroupFormPage models={getVisibleModels(proxyConfig)} error={`保存失败：${error.message}`} />);
     }
   });
 
@@ -80,10 +87,10 @@ export function createModelGroupFormRoute(deps: RouteDeps) {
       const group = proxyConfig.modelGroups?.find(g => g.name === name);
 
       if (!group) {
-        return c.html(<ModelGroupFormPage models={proxyConfig.models} error={`未找到 Model Group：${name}`} isEdit />);
+        return c.html(<ModelGroupFormPage models={getVisibleModels(proxyConfig)} error={`未找到 Model Group：${name}`} isEdit />);
       }
 
-      return c.html(<ModelGroupFormPage models={proxyConfig.models} group={group} isEdit />);
+      return c.html(<ModelGroupFormPage models={getVisibleModels(proxyConfig)} group={group} isEdit />);
     } catch (error: any) {
       return c.html(<ModelGroupFormPage models={[]} error={`加载配置失败：${error.message}`} isEdit />);
     }
@@ -100,7 +107,7 @@ export function createModelGroupFormRoute(deps: RouteDeps) {
     if (!name || !/^[-a-zA-Z0-9_.]+$/.test(name)) {
       const proxyConfig = loadFullConfig(configPath);
       const group = proxyConfig.modelGroups?.find(g => g.name === oldName);
-      return c.html(<ModelGroupFormPage models={proxyConfig.models} group={group} error="组名只能包含字母、数字、下划线、中划线、点" isEdit />);
+      return c.html(<ModelGroupFormPage models={getVisibleModels(proxyConfig)} group={group} error="组名只能包含字母、数字、下划线、中划线、点" isEdit />);
     }
 
     try {
@@ -109,7 +116,7 @@ export function createModelGroupFormRoute(deps: RouteDeps) {
       // 检查组名是否与其他组冲突（排除当前组）
       if (proxyConfig.modelGroups?.some(g => g.name === name && g.name !== oldName)) {
         const group = proxyConfig.modelGroups?.find(g => g.name === oldName);
-        return c.html(<ModelGroupFormPage models={proxyConfig.models} group={group} error={`组名 "${name}" 已存在`} isEdit />);
+        return c.html(<ModelGroupFormPage models={getVisibleModels(proxyConfig)} group={group} error={`组名 "${name}" 已存在`} isEdit />);
       }
 
       // 更新配置（只更新名称和描述，models 通过 add-model/remove-model/move-model 单独处理）
@@ -125,7 +132,7 @@ export function createModelGroupFormRoute(deps: RouteDeps) {
     } catch (error: any) {
       const proxyConfig = loadFullConfig(configPath);
       const group = proxyConfig.modelGroups?.find(g => g.name === oldName);
-      return c.html(<ModelGroupFormPage models={proxyConfig.models} group={group} error={`保存失败：${error.message}`} isEdit />);
+      return c.html(<ModelGroupFormPage models={getVisibleModels(proxyConfig)} group={group} error={`保存失败：${error.message}`} isEdit />);
     }
   });
 
