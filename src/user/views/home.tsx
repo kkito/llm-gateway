@@ -442,12 +442,6 @@ export const HomePage: FC<Props> = (props) => {
         }}
       />
 
-      {/* 公告区域 - Hero 上方 */}
-      {props.uiSettings?.enabled && props.uiSettings.announcementMarkdown ? (
-        <div class="announcement-banner">
-          <div dangerouslySetInnerHTML={{ __html: marked.parse(props.uiSettings.announcementMarkdown) as string }} />
-        </div>
-      ) : null}
 
       {/* Hero 区域 */}
       <div class="hero">
@@ -459,6 +453,7 @@ export const HomePage: FC<Props> = (props) => {
                 公司内部免费大模型 API —— 支持 OpenAI / Anthropic 格式
               </p>
             </div>
+
             <div style={{textAlign: 'right'}}>
               <p style={{margin: '0', fontSize: '0.85rem', color: 'var(--text-secondary)'}}>
                 欢迎，<strong style={{color: 'var(--primary)'}}>{userName}</strong>
@@ -478,6 +473,13 @@ export const HomePage: FC<Props> = (props) => {
           </>
         )}
       </div>
+
+      {/* 公告区域 */}
+      {props.uiSettings?.enabled && props.uiSettings.announcementMarkdown ? (
+        <div class="announcement-banner">
+          <div dangerouslySetInnerHTML={{ __html: marked.parse(props.uiSettings.announcementMarkdown) as string }} />
+        </div>
+      ) : null}
 
       {/* JSON 配置卡片 */}
       <div class="card">
