@@ -1,7 +1,8 @@
-import { FC, PropsWithChildren } from 'hono/jsx';
+import { FC, PropsWithChildren, JSX } from 'hono/jsx';
 
 interface Props extends PropsWithChildren {
   title: string;
+  head?: any;
 }
 
 export const Layout: FC<Props> = (props) => {
@@ -15,6 +16,7 @@ export const Layout: FC<Props> = (props) => {
           rel="stylesheet"
           href="/assets/pico.min.css"
         />
+        {props.head}
       </head>
       <body>
         <nav class="container-fluid">
