@@ -21,6 +21,7 @@ export const TopbarNav: FC<Props> = (props) => {
       { href: '/admin/api-keys', label: 'API Keys' },
       { href: '/admin/model-groups', label: '模型组' },
       { href: '/admin/stats', label: '统计' },
+      { href: '/admin/announcement', label: '公告管理' },
       { href: '/admin/password', label: '密码设置' },
       { href: '/admin/privacy', label: '隐私保护' },
     ],
