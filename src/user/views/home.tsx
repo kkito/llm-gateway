@@ -55,15 +55,30 @@ export const HomePage: FC<Props> = (props) => {
             }
 
             .announcement-banner {
-              background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
-              border: 1px solid #6366f1;
-              border-radius: var(--radius);
-              padding: 0.6rem 0.85rem;
               margin-bottom: 0.75rem;
               font-size: 0.8rem;
             }
             .announcement-banner h1, .announcement-banner h2, .announcement-banner h3 {
               margin-top: 0;
+            }
+            .announcement-banner p {
+              margin-bottom: 0.5rem;
+            }
+            .announcement-banner code {
+              background: rgba(99, 102, 241, 0.08);
+              padding: 0.1rem 0.3rem;
+              border-radius: 4px;
+              font-size: 0.75rem;
+            }
+            .announcement-banner pre {
+              background: rgba(99, 102, 241, 0.05);
+              padding: 0.5rem 0.75rem;
+              border-radius: var(--radius-sm);
+              overflow-x: auto;
+            }
+            .announcement-banner pre code {
+              background: none;
+              padding: 0;
             }
 
             /* Hero 区域 */
@@ -436,14 +451,14 @@ export const HomePage: FC<Props> = (props) => {
 
       {/* Hero 区域 */}
       <div class="hero">
-        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem'}}>
-          <div>
-            <h1>🚀 LLM Gateway</h1>
-            <p class="hero-subtitle">
-              公司内部免费大模型 API · 支持 OpenAI / Anthropic 格式
-            </p>
-          </div>
-          {userName && (
+        {userName ? (
+          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem'}}>
+            <div style={{textAlign: 'left'}}>
+              <h1>🚀 LLM Gateway</h1>
+              <p class="hero-subtitle">
+                公司内部免费大模型 API —— 支持 OpenAI / Anthropic 格式
+              </p>
+            </div>
             <div style={{textAlign: 'right'}}>
               <p style={{margin: '0', fontSize: '0.85rem', color: 'var(--text-secondary)'}}>
                 欢迎，<strong style={{color: 'var(--primary)'}}>{userName}</strong>
@@ -453,11 +468,15 @@ export const HomePage: FC<Props> = (props) => {
                 <a href="/user/logout" style={{color: 'var(--primary)', textDecoration: 'none', fontSize: '0.8rem'}}>登出</a>
               </div>
             </div>
-          )}
-        </div>
-        <div class="hero-notice">
-          欢迎贡献 · <strong>账号被封概不负责</strong>
-        </div>
+          </div>
+        ) : (
+          <>
+            <h1>🚀 LLM Gateway</h1>
+            <p class="hero-subtitle">
+              公司内部免费大模型 API —— 支持 OpenAI / Anthropic 格式
+            </p>
+          </>
+        )}
       </div>
 
       {/* JSON 配置卡片 */}
@@ -619,35 +638,6 @@ export const HomePage: FC<Props> = (props) => {
                 ))}
             </tbody>
           </table>
-        </div>
-      </div>
-
-      {/* 参考信息区域 */}
-      <div class="reference-section">
-        <h3 class="reference-title">
-          💡 常用 Coding Agent 配置
-        </h3>
-        <div class="reference-card">
-          <p class="reference-item">
-            <strong>Claude Code / Cursor / OpenCode / Qwen Code 等配置参考：</strong>
-            <a href="https://cloud.baidu.com/doc/qianfan/s/0mn2mnemj" target="_blank" rel="noopener" class="reference-link">
-              百度千帆文档
-            </a>
-            {' '}或{' '}
-            <a href="https://help.aliyun.com/zh/model-studio/qwen-code-coding-plan" target="_blank" rel="noopener" class="reference-link">
-              阿里云百炼文档
-            </a>
-          </p>
-          <p class="reference-item">
-            <strong>🔌 格式兼容：</strong>
-            本站兼容 OpenAI / Anthropic 两种格式，其他未支持的格式可通过这两种格式兼容使用。
-          </p>
-          <p class="reference-item">
-            <strong>⚡ Cache Token 加速：</strong>
-            支持 Cache Token 加速 Coding Agent 实现。Qwen Code 可直接使用以下地址访问实现 Cache Token，加快速度：
-            <br />
-            <code id="cache-token-url">http://dashscope.aliyuncs.com.llm.macmini.kkito.cn/</code>
-          </p>
         </div>
       </div>
 
