@@ -25,6 +25,7 @@ import { createPasswordRoute } from './admin/routes/password.js';
 import { createPrivacyRoute } from './admin/routes/privacy.js';
 import { createApiKeysRoute } from './admin/routes/api-keys.js';
 import { createUsersRoute } from './admin/routes/users.js';
+import { createAnnouncementRoute } from './admin/routes/announcement.js';
 import { authMiddleware, isPasswordConfigured, sessions } from './admin/middleware/auth.js';
 import { createUserAuthMiddleware } from './user/middleware/auth.js';
 import { loadFullConfig } from './config.js';
@@ -251,6 +252,14 @@ export function createServer(
   // 隐私保护路由
   if (configPath) {
     app.route('', createPrivacyRoute({ configPath, onConfigChange }));
+  }
+
+  // 公告管理路由
+  if (configPath) {
+    app.route('', createAnnouncementRoute({
+      configPath,
+      onConfigChange
+    }));
   }
 
   // API Keys 管理路由
