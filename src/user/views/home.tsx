@@ -487,7 +487,7 @@ export const HomePage: FC<Props> = (props) => {
           <span class="card-icon">📋</span>
           <h2>JSON 配置</h2>
         </div>
-        <div class="input-wrapper" style={{flexWrap: 'nowrap'}}>
+        <div class="input-wrapper">
           <pre id="json-display" style={{
             flex: 1,
             margin: 0,
