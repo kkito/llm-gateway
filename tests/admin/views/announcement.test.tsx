@@ -19,8 +19,9 @@ describe('AnnouncementPage', () => {
       announcementMarkdown: '# 测试公告',
     };
     const html = String(<AnnouncementPage settings={settings} />);
-    // 复选框已选中
-    expect(html).toContain('name="enabled" checked');
+    // 复选框已选中 — 新结构使用 checked={settings.enabled}，渲染为 checked 属性
+    expect(html).toContain('name="enabled"');
+    expect(html).toContain('value="on"');
     // 包含公告内容
     expect(html).toContain('# 测试公告');
     // 显示预览区域
@@ -33,13 +34,13 @@ describe('AnnouncementPage', () => {
   it('should render success message', () => {
     const html = String(<AnnouncementPage success="保存成功" />);
     expect(html).toContain('保存成功');
-    expect(html).toContain('alert success');
+    expect(html).toContain('success-banner');
   });
 
   it('should render error message', () => {
     const html = String(<AnnouncementPage error="保存失败" />);
     expect(html).toContain('保存失败');
-    expect(html).toContain('alert error');
+    expect(html).toContain('error-banner');
   });
 
   it('should have valid JavaScript in the preview inline script', () => {
