@@ -34,6 +34,7 @@
     "@picocss/pico": "^2.1.1",
     "commander": "^14.0.3",
     "hono": "^4.12.8",
+    "marked": "^18.0.2",
     "uuid": "^13.0.0"
   },
   "devDependencies": {
