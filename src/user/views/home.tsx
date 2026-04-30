@@ -1,11 +1,13 @@
 import { FC } from 'hono/jsx';
 import { Layout } from '../components/Layout.js';
-import type { ProviderConfig, ModelGroup } from '../../config.js';
+import type { ProviderConfig, ModelGroup, UiSettings } from '../../config.js';
+import { marked } from 'marked';
 
 interface Props {
   models: ProviderConfig[];
   modelGroups?: ModelGroup[];
   userName?: string;
+  uiSettings?: UiSettings;
 }
 
 export const HomePage: FC<Props> = (props) => {
@@ -50,6 +52,18 @@ export const HomePage: FC<Props> = (props) => {
               max-width: 650px;
               margin: 0 auto;
               padding: 0.75rem;
+            }
+
+            .announcement-banner {
+              background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+              border: 1px solid #6366f1;
+              border-radius: var(--radius);
+              padding: 0.6rem 0.85rem;
+              margin-bottom: 0.75rem;
+              font-size: 0.8rem;
+            }
+            .announcement-banner h1, .announcement-banner h2, .announcement-banner h3 {
+              margin-top: 0;
             }
 
             /* Hero 区域 */
@@ -412,6 +426,13 @@ export const HomePage: FC<Props> = (props) => {
           `
         }}
       />
+
+      {/* 公告区域 - Hero 上方 */}
+      {props.uiSettings?.enabled && props.uiSettings.announcementMarkdown ? (
+        <div class="announcement-banner">
+          <div dangerouslySetInnerHTML={{ __html: marked.parse(props.uiSettings.announcementMarkdown) as string }} />
+        </div>
+      ) : null}
 
       {/* Hero 区域 */}
       <div class="hero">

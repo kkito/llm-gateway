@@ -24,8 +24,8 @@ export function createHomeRoute(config: ProxyConfig | (() => ProxyConfig), confi
     // 未启用认证时，直接显示页面（无需登录）
     if (!isAuthEnabled) {
       const currentConfig = typeof config === 'function' ? config() : config;
-      // 未启用认证时，不显示用户名（无 Guest 概念）
-      return c.html(<HomePage models={currentConfig.models} modelGroups={currentConfig.modelGroups} userName={undefined} />);
+      const fullConfig = configPath ? loadFullConfig(configPath) : undefined;
+      return c.html(<HomePage models={currentConfig.models} modelGroups={currentConfig.modelGroups} userName={undefined} uiSettings={fullConfig?.uiSettings} />);
     }
 
     // 已启用认证，需要登录
@@ -35,7 +35,8 @@ export function createHomeRoute(config: ProxyConfig | (() => ProxyConfig), confi
     }
 
     const currentConfig = typeof config === 'function' ? config() : config;
-    return c.html(<HomePage models={currentConfig.models} modelGroups={currentConfig.modelGroups} userName={currentUser.name} />);
+    const fullConfig = configPath ? loadFullConfig(configPath) : undefined;
+    return c.html(<HomePage models={currentConfig.models} modelGroups={currentConfig.modelGroups} userName={currentUser.name} uiSettings={fullConfig?.uiSettings} />);
   });
 
   return app;
