@@ -12,3 +12,4 @@ AGENTS.md
 skills-lock.json
 .worktrees
 *.tsbuildinfo
+.superpowers
