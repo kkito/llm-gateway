@@ -69,6 +69,14 @@ export interface PrivacySettings {
   whitelistFilter: boolean;
 }
 
+/**
+ * UI 配置设置
+ */
+export interface UiSettings {
+  enabled?: boolean;           // 是否启用公告，默认 false
+  announcementMarkdown?: string; // Markdown 原始内容，可选
+}
+
 export interface ProxyConfig {
   models: ProviderConfig[];
   modelGroups?: ModelGroup[];
@@ -76,6 +84,7 @@ export interface ProxyConfig {
   apiKeys?: ApiKey[];
   userApiKeys?: UserApiKey[];
   privacySettings?: PrivacySettings;
+  uiSettings?: UiSettings;  // 新增 UI 设置
 }
 
 const REQUIRED_FIELDS = ['customModel', 'realModel', 'apiKey', 'baseUrl', 'provider'] as const;
@@ -250,7 +259,8 @@ export function loadFullConfig(configPath: string): ProxyConfig {
       adminPassword: config.adminPassword,
       apiKeys: config.apiKeys || [],
       userApiKeys: config.userApiKeys,
-      privacySettings: config.privacySettings
+      privacySettings: config.privacySettings,
+      uiSettings: config.uiSettings
     };
   }
 
