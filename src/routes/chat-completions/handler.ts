@@ -1,6 +1,7 @@
 import type { ProviderConfig, ProxyConfig } from '../../config.js';
 import type { Logger } from '../../logger.js';
 import type { DetailLogger } from '../../detail-logger.js';
+import type { RequestLogger } from '../../lib/request-logger.js';
 import { v4 as uuidv4 } from 'uuid';
 import { ModelGroupResolver } from '../../lib/model-group-resolver.js';
 import { getCurrentUser } from '../../user/middleware/auth.js';
@@ -17,7 +18,8 @@ export function createChatCompletionsHandler(
   logger: Logger,
   detailLogger: DetailLogger,
   timeoutMs: number,
-  logDir: string
+  logDir: string,
+  requestLogger: RequestLogger
 ): (c: any, endpoint: string) => Promise<Response> {
   const rateLimiter = new RateLimiter(logDir);
 
@@ -136,6 +138,18 @@ export function createChatCompletionsHandler(
             userName: currentUser?.name,
             error: { message: 'Model not found' }
           });
+          requestLogger.log({
+            timestamp: new Date().toISOString(),
+            requestId,
+            customModel: model,
+            endpoint,
+            method: 'POST',
+            statusCode: 404,
+            durationMs: Date.now() - startTime,
+            isStreaming: !!stream,
+            userName: currentUser?.name,
+            error: { message: 'Model not found' }
+          });
           return c.json({ error: { message: 'Model not found' } }, 404);
         }
       }
@@ -192,6 +206,19 @@ export function createChatCompletionsHandler(
           userName: currentUser?.name,
           error: { message: 'Authentication required' }
         });
+        requestLogger.log({
+          timestamp: new Date().toISOString(),
+          requestId,
+          customModel: model_group ? actualModel! : model,
+          modelGroup: model_group,
+          endpoint,
+          method: 'POST',
+          statusCode: 401,
+          durationMs: Date.now() - startTime,
+          isStreaming: !!stream,
+          userName: currentUser?.name,
+          error: { message: 'Authentication required' }
+        });
         return c.json({ error: { message: 'Authentication required' } }, 401);
       }
 
@@ -204,6 +231,7 @@ export function createChatCompletionsHandler(
             restorePaths(result.responseData, requestId);
           }
           logger.log(result.logEntry);
+          requestLogger.log(result.logEntry);
           const pricing = provider.inputPricePer1M !== undefined && provider.outputPricePer1M !== undefined && provider.cachedPricePer1M !== undefined
             ? { inputPricePer1M: provider.inputPricePer1M, outputPricePer1M: provider.outputPricePer1M, cachedPricePer1M: provider.cachedPricePer1M }
             : undefined;
@@ -213,6 +241,7 @@ export function createChatCompletionsHandler(
       }
 
       logger.log(logEntry);
+      requestLogger.log(logEntry);
 
       // Fallback for non-OK or empty body
       if (!response.body) {
@@ -238,6 +267,19 @@ export function createChatCompletionsHandler(
       console.log(`   耗时：${Date.now() - startTime}ms\n`);
 
       logger.log({
+        timestamp: new Date().toISOString(),
+        requestId,
+        customModel: modelGroup ? actualModel! : (body.model as string),
+        modelGroup: modelGroup,
+        endpoint,
+        method: 'POST',
+        statusCode: 500,
+        durationMs: Date.now() - startTime,
+        isStreaming: false,
+        userName: currentUser?.name,
+        error: { message: error.message || 'Internal error', type: error.name }
+      });
+      requestLogger.log({
         timestamp: new Date().toISOString(),
         requestId,
         customModel: modelGroup ? actualModel! : (body.model as string),

@@ -6,6 +6,7 @@ import { Hono } from 'hono';
 import type { ProxyConfig } from '../../config.js';
 import type { Logger } from '../../logger.js';
 import type { DetailLogger } from '../../detail-logger.js';
+import type { RequestLogger } from '../../lib/request-logger.js';
 import { createChatCompletionsHandler } from './handler.js';
 
 export function createChatCompletionsRoute(
@@ -13,10 +14,11 @@ export function createChatCompletionsRoute(
   logger: Logger,
   detailLogger: DetailLogger,
   timeoutMs: number,
-  logDir: string
+  logDir: string,
+  requestLogger: RequestLogger
 ) {
   const router = new Hono();
-  const handler = createChatCompletionsHandler(config, logger, detailLogger, timeoutMs, logDir);
+  const handler = createChatCompletionsHandler(config, logger, detailLogger, timeoutMs, logDir, requestLogger);
 
   router.post('/v1/chat/completions', (c) => handler(c, '/v1/chat/completions'));
   router.post('/chat/completions', (c) => handler(c, '/chat/completions'));
