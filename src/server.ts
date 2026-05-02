@@ -32,6 +32,8 @@ import { loadFullConfig } from './config.js';
 import { join as pathJoin } from 'path';
 import { UsageTracker } from './lib/usage-tracker.js';
 import { StatsProvider } from './lib/stats-provider.js';
+import { DatabaseManager } from './lib/db.js';
+import { RequestLogger } from './lib/request-logger.js';
 
 // 获取当前模块目录 (用于静态文件服务)
 const __filename = fileURLToPath(import.meta.url);
@@ -53,6 +55,15 @@ export function createServer(
   // 从 logger 获取 logDir
   const logDir = pathJoin(logger.getFilePath(), '..');
 
+  // Initialize SQLite database
+  const configDir = pathJoin(logDir, '..'); // ~/.llm-gateway/
+  const dbManager = DatabaseManager.getInstance(configDir);
+  dbManager.initialize();
+
+  // Initialize async request logger
+  const requestLogger = RequestLogger.getInstance(dbManager);
+  requestLogger.start();
+
   // 创建用量追踪器（单例）
   const usageTracker = UsageTracker.getInstance(logDir);
 
@@ -71,16 +82,20 @@ export function createServer(
     }, 60 * 60 * 1000); // 1 小时
   }
 
-  // 确保进程退出时清理定时器（只注册一次）
+  // Ensure process exits cleanly (only register once)
   if (!hasSetupSignalHandlers) {
     hasSetupSignalHandlers = true;
     process.on('SIGINT', () => {
       if (cleanupInterval) clearInterval(cleanupInterval);
+      requestLogger.stop();
+      dbManager.close();
       process.exit(0);
     });
 
     process.on('SIGTERM', () => {
       if (cleanupInterval) clearInterval(cleanupInterval);
+      requestLogger.stop();
+      dbManager.close();
       process.exit(0);
     });
   }
@@ -170,7 +185,8 @@ export function createServer(
     logger,
     detailLogger,
     timeoutMs,
-    logDir
+    logDir,
+    requestLogger
   ));
 
   // 消息路由
@@ -179,7 +195,8 @@ export function createServer(
     logger,
     detailLogger,
     timeoutMs,
-    logDir
+    logDir,
+    requestLogger
   ));
 
   // 认证中间件 - 必须在这里注册（在所有 admin 路由之前），这样才能拦截所有 /admin/* 路由
