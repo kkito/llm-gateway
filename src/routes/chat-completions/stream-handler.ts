@@ -4,7 +4,7 @@ import type { RateLimiter } from '../../lib/rate-limiter.js';
 import type { Logger } from '../../logger.js';
 import { createStreamConverterState, type StreamConverterState } from '../../converters/anthropic-to-openai.js';
 import { buildFullOpenAIResponse, parseAndConvertAnthropicSSE } from '../utils/sse-handlers.js';
-import { sanitizeSSEChunk } from '../../privacy/sanitizer.js';
+import { sanitizeSSEChunk, clearStreamBufferState } from '../../privacy/sanitizer.js';
 import { findFinalUsageFromChunks } from '../../lib/stream-usage.js';
 
 export interface StreamHandlerOptions {
@@ -106,6 +106,8 @@ export function handleStream(options: StreamHandlerOptions): Response {
             detailLogger.logConvertedResponse(requestId, buildFullOpenAIResponse(chunks));
             logger.log(logEntry);
 
+            clearStreamBufferState(requestId);
+
             const pricing =
               provider.inputPricePer1M !== undefined &&
               provider.outputPricePer1M !== undefined &&
@@ -142,7 +144,12 @@ export function handleStream(options: StreamHandlerOptions): Response {
                 chunks.push(openAIChunk);
                 let sanitizedChunk = openAIChunk;
                 if (options.privacySettings?.enabled && options.privacySettings.sanitizeFilePaths) {
-                  sanitizedChunk = sanitizeSSEChunk(sanitizedChunk, options.requestId);
+                  const result = sanitizeSSEChunk(sanitizedChunk, options.requestId);
+                  if (!result.buffered) {
+                    sanitizedChunk = result.output;
+                  } else {
+                    continue; // buffered, wait for next chunk
+                  }
                 }
                 controller.enqueue(new TextEncoder().encode(sanitizedChunk));
               }
@@ -156,7 +163,11 @@ export function handleStream(options: StreamHandlerOptions): Response {
               }
               chunks.push(sseLine);
               if (options.privacySettings?.enabled && options.privacySettings.sanitizeFilePaths) {
-                sseLine = sanitizeSSEChunk(sseLine, options.requestId);
+                const result = sanitizeSSEChunk(sseLine, options.requestId);
+                if (result.buffered) {
+                  continue; // buffered, wait for next chunk
+                }
+                sseLine = result.output;
               }
               try {
                 controller.enqueue(new TextEncoder().encode(sseLine));

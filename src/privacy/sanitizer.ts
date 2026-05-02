@@ -13,11 +13,24 @@
 // Global mapping storage: requestId → Map<placeholder_path, real_path>
 const pathMappings = new Map<string, Map<string, string>>();
 
+// Buffer state for streaming: tracks partial placeholder content across chunks
+interface SSEBufferState {
+  buffer: string;
+}
+const streamBufferStates = new Map<string, SSEBufferState>();
+
 /**
  * Clear all path mappings (for testing).
  */
 export function clearPathMappings(): void {
   pathMappings.clear();
+}
+
+/**
+ * Clear all streaming buffer states (for testing).
+ */
+export function clearAllStreamBufferStates(): void {
+  streamBufferStates.clear();
 }
 
 /**
@@ -128,17 +141,104 @@ export function restorePaths(
 /**
  * Sanitize a single SSE chunk string by reverse-replacing placeholders.
  * Used in streaming responses. Does NOT clear the mapping (stream has multiple chunks).
+ *
+ * Handles cross-chunk truncation: if a placeholder is split across two chunks,
+ * buffers the partial content and completes the replacement when the next chunk arrives.
  */
 export function sanitizeSSEChunk(
   sseLine: string,
   requestId: string
-): string {
+): { output: string; buffered: boolean } {
   const mapping = pathMappings.get(requestId);
-  if (!mapping) return sseLine;
+  if (!mapping) return { output: sseLine, buffered: false };
 
-  let result = sseLine;
-  for (const [placeholderPath, realPath] of mapping) {
-    result = result.split(placeholderPath).join(realPath);
+  // Get or create buffer state for this request
+  let state = streamBufferStates.get(requestId);
+  if (!state) {
+    state = { buffer: '' };
+    streamBufferStates.set(requestId, state);
   }
-  return result;
+
+  const combined = state.buffer + sseLine;
+
+  // Step 1: Try complete replacement
+  const { result: replaced, anyReplaced } = tryReplaceAll(combined, mapping);
+  if (anyReplaced) {
+    state.buffer = '';
+    return { output: replaced, buffered: false };
+  }
+
+  // Step 2: Prefix compatibility check
+  const maxLen = getMaxPlaceholderLength(mapping);
+  if (combined.length >= maxLen) {
+    const tail = combined.slice(-maxLen);
+    if (isPrefixOfAnyPlaceholder(tail, mapping)) {
+      // Save combined content to buffer, wait for next chunk
+      state.buffer = combined;
+      return { output: '', buffered: true };
+    }
+  }
+
+  // Not compatible, flush buffer (send as-is), clear state
+  const flushResult = state.buffer + sseLine;
+  state.buffer = '';
+  return { output: flushResult, buffered: false };
+}
+
+/**
+ * Try to replace all placeholders in the text.
+ * Returns the replaced text and whether any replacement occurred.
+ */
+function tryReplaceAll(
+  text: string,
+  mapping: Map<string, string>
+): { result: string; anyReplaced: boolean } {
+  let result = text;
+  let anyReplaced = false;
+  for (const [placeholderPath, realPath] of mapping) {
+    if (result.includes(placeholderPath)) {
+      result = result.split(placeholderPath).join(realPath);
+      anyReplaced = true;
+    }
+  }
+  return { result, anyReplaced };
+}
+
+/**
+ * Get the maximum placeholder length from the mapping.
+ */
+function getMaxPlaceholderLength(mapping: Map<string, string>): number {
+  let max = 0;
+  for (const p of mapping.keys()) {
+    if (p.length > max) max = p.length;
+  }
+  return max;
+}
+
+/**
+ * Check if any suffix of the text is a prefix of any placeholder in the mapping.
+ * This detects when a placeholder might be truncated across chunk boundaries.
+ * Only checks suffixes up to the maximum placeholder length.
+ */
+function isPrefixOfAnyPlaceholder(
+  text: string,
+  mapping: Map<string, string>
+): boolean {
+  const maxLen = getMaxPlaceholderLength(mapping);
+  // Check all suffixes from length 1 to maxLen
+  for (let len = 1; len <= Math.min(text.length, maxLen); len++) {
+    const suffix = text.slice(-len);
+    for (const placeholder of mapping.keys()) {
+      if (placeholder.startsWith(suffix)) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Clear the streaming buffer state for a request.
+ * Should be called when the stream ends to clean up.
+ */
+export function clearStreamBufferState(requestId: string): void {
+  streamBufferStates.delete(requestId);
 }
