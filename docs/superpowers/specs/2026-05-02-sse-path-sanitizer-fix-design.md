@@ -11,21 +11,79 @@
 - 保持现有非流式替换逻辑不变
 - 兼容现有测试，新增测试覆盖截断场景
 
-## 架构
+## 核心流程
 
 ```
 chunk 进来
   ↓
-有 buffer？
-  ├─ 有 → 加入 buffer，合并尝试替换
-  │        ├─ 成功 → 发送替换内容，清空 buffer
-  │        └─ 失败 → 检查 buffer + chunk 是否还兼容占位符前缀
-  │                   ├─ 兼容 → 继续等待下一个 chunk
-  │                   └─ 不兼容 → flush buffer（原样发送），清空，回到前序匹配
-  │
-  └─ 无 → 前序匹配？
-           ├─ 匹配 → 加入 buffer，等待
-           └─ 不匹配 → 直接发送
+步骤1：完整替换检查
+  buffer + chunk 合并后，是否包含完整占位符？
+  ├─ 是 → 替换，发送替换后的内容，清空 buffer
+  └─ 否 → 继续
+       ↓
+步骤2：前序兼容性检查
+  取 buffer + chunk 的最后 N 个字符
+  检查是否是 mapping 中任意占位符的前缀？
+  ├─ 是 → 保存 buffer，等待下一个 chunk
+  └─ 否 → flush buffer（原样发送），清空状态
+```
+
+## 详细设计
+
+### sanitizeSSEChunk 核心逻辑
+
+```
+输入：sseLine (chunk), requestId
+输出：{ output: string, buffered: boolean }
+
+1. 获取 mapping，无 mapping → 直接返回 { output: sseLine, buffered: false }
+2. 获取或创建 buffer state
+3. 合并 buffer + sseLine → combined
+4. 尝试完整替换：tryReplaceAll(combined, mapping)
+   - 成功 → 返回 { output: replaced, buffered: false }，清空 buffer
+5. 前序兼容性检查：
+   - 取 combined 最后 N 个字符（N=20）
+   - 检查是否是 mapping 中任意占位符的前缀：
+     placeholder.startsWith(tail) || placeholder.startsWith(placeholder.slice(0, tail.length))
+   - 兼容 → 保存 combined 到 buffer，返回 { output: '', buffered: true }
+   - 不兼容 → flush buffer + sseLine（原样），返回 { output: combined, buffered: false }
+```
+
+### 前序匹配函数
+
+```typescript
+function isPrefixCompatible(text: string, mapping: Map<string, string>): boolean {
+  // 取最后 N 个字符
+  const N = 20;
+  const tail = text.slice(-N);
+  
+  for (const placeholder of mapping.keys()) {
+    // 情况1：tail 是占位符的前缀
+    if (placeholder.startsWith(tail)) return true;
+    // 情况2：tail 比占位符长，但前缀匹配
+    if (placeholder.startsWith(placeholder.slice(0, tail.length))) {
+      // 实际就是 placeholder 本身，检查 tail 是否包含它
+      if (tail.startsWith(placeholder.slice(0, N))) return true;
+    }
+  }
+  return false;
+}
+```
+
+### 架构
+
+```
+无 buffer 状态：
+  chunk 进来 → 步骤1（完整替换）→ 步骤2（前序检查）
+    ├─ 完整匹配 → 替换发送
+    ├─ 前序兼容 → 进入 buffer
+    └─ 都不匹配 → 直接发送
+
+有 buffer 状态：
+  chunk 进来 → 合并 buffer → 步骤1 → 步骤2
+    ├─ 完整匹配 → 替换发送，清空 buffer
+    ├─ 前序兼容 → 更新 buffer，继续等待
+    └─ 都不兼容 → flush buffer（原样发送），清空
 ```
 
 ## 核心组件
