@@ -71,7 +71,7 @@ export function createServer(
   initUsageApiTracker(usageTracker);
 
   // 创建统计提供者（共享 usageTracker 实例）
-  const statsProvider = new StatsProvider(usageTracker, logDir);
+  const statsProvider = new StatsProvider(dbManager, usageTracker);
   initStatsProvider(statsProvider);
 
   // 定期清理过期的滑动窗口数据（每小时清理一次）

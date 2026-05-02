@@ -2,8 +2,9 @@ import { Hono } from 'hono';
 import { StatsView } from '../views/stats.js';
 import { getCurrentUser } from '../middleware/auth.js';
 import { loadStats } from '../../lib/stats-core.js';
-import { loadFullConfig, getProxyDir } from '../../config.js';
+import { DatabaseManager } from '../../lib/db.js';
 import { join } from 'path';
+import { getProxyDir } from '../../config.js';
 
 export function createStatsRoute(configPath?: string) {
   const app = new Hono();
@@ -13,26 +14,32 @@ export function createStatsRoute(configPath?: string) {
       // 检查是否启用了认证
       let isAuthEnabled = false;
       if (configPath) {
+        const { loadFullConfig } = await import('../../config.js');
         const fullConfig = loadFullConfig(configPath);
         isAuthEnabled = !!(fullConfig.userApiKeys && fullConfig.userApiKeys.length > 0);
       }
 
-      // 获取正确的日志目录
-      const logDir = join(getProxyDir(), 'logs/proxy');
+      // 初始化数据库
+      const configDir = join(getProxyDir(), 'logs', '..');
+      const dbManager = DatabaseManager.getInstance(configDir);
+      dbManager.initialize();
 
       // 未启用认证时，直接显示统计页面
       if (!isAuthEnabled) {
-        const stats = loadStats(logDir, {});
+        const stats = await loadStats(dbManager.getDb(), {});
+        dbManager.close();
         return c.html(<StatsView stats={stats} userName="Guest" />);
       }
 
       // 已启用认证，需要登录
       const currentUser = getCurrentUser(c, configPath);
       if (!currentUser) {
+        dbManager.close();
         return c.redirect('/user/login');
       }
 
-      const stats = loadStats(logDir, { userName: currentUser.name });
+      const stats = await loadStats(dbManager.getDb(), { userName: currentUser.name });
+      dbManager.close();
 
       return c.html(<StatsView stats={stats} userName={currentUser.name} />);
     } catch (error) {

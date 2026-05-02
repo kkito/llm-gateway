@@ -1,6 +1,5 @@
 import { Hono } from 'hono';
 import { StatsProvider } from '../../lib/stats-provider.js';
-import { getLogDir } from '../../config.js';
 
 // 全局 StatsProvider 实例（延迟初始化）
 let statsProvider: StatsProvider | null = null;
@@ -27,20 +26,7 @@ export function createStatsApiRoute() {
       const week = c.req.query('week');
       const month = c.req.query('month');
       const byHour = c.req.query('byHour') === 'true';
-      const logDir = c.req.query('logDir');
       const forceReload = c.req.query('forceReload') === 'true';
-
-      // 使用统一的日志目录
-      // 优先通过 query 参数指定的 logDir，否则从全局 StatsProvider 获取
-      // 这样即使服务器启动时使用了 --log-dir 参数，API 也能找到正确的日志目录
-      let actualLogDir: string;
-      if (logDir) {
-        actualLogDir = logDir;
-      } else if (statsProvider) {
-        actualLogDir = statsProvider.getLogDir();
-      } else {
-        actualLogDir = getLogDir();
-      }
 
       // 构建查询选项
       const options: { date?: string; week?: string; month?: string; byHour?: boolean; forceReload?: boolean } = {};
@@ -50,15 +36,15 @@ export function createStatsApiRoute() {
       if (byHour) options.byHour = true;
       if (forceReload) options.forceReload = true;
 
-      // 优先使用 StatsProvider（内存缓存），如果未初始化则回退到直接加载
-      let stats;
-      if (statsProvider && !forceReload) {
-        stats = await statsProvider.getStats(options);
-      } else {
-        // 回退到旧的 loadStats 方法
-        const { loadStats } = await import('../../lib/stats-core.js');
-        stats = loadStats(actualLogDir, options);
+      // 使用 StatsProvider 获取统计
+      if (!statsProvider) {
+        return c.json({
+          success: false,
+          error: 'StatsProvider 未初始化'
+        }, 500);
       }
+
+      const stats = await statsProvider.getStats(options);
 
       return c.json({
         success: true,
