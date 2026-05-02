@@ -2,6 +2,7 @@ import type { ProviderConfig } from '../../config.js';
 import type { DetailLogger } from '../../detail-logger.js';
 import type { RateLimiter } from '../../lib/rate-limiter.js';
 import type { Logger } from '../../logger.js';
+import type { RequestLogger } from '../../lib/request-logger.js';
 import { createOpenAIToAnthropicStreamState, type OpenAIToAnthropicStreamState } from '../../converters/openai-to-anthropic.js';
 import { parseAndConvertOpenAISSE } from '../utils/sse-handlers-messages.js';
 import { sanitizeSSEChunk } from '../../privacy/sanitizer.js';
@@ -20,6 +21,7 @@ export interface StreamHandlerOptions {
   detailLogger: DetailLogger;
   c: any;
   privacySettings?: any;
+  requestLogger: RequestLogger;
 }
 
 function isSilentError(err: any): boolean {
@@ -31,7 +33,7 @@ function isSilentError(err: any): boolean {
 }
 
 export function handleStream(options: StreamHandlerOptions): Response {
-  const { response, provider, model, actualModel, requestId, logEntry, rateLimiter, logger, detailLogger, c } = options;
+  const { response, provider, model, actualModel, requestId, logEntry, rateLimiter, logger, detailLogger, c, requestLogger } = options;
 
   if (!response.body) {
     return c.json({ error: { message: 'No response body' } }, 500);
@@ -89,6 +91,7 @@ export function handleStream(options: StreamHandlerOptions): Response {
 
             detailLogger.logStreamResponse(requestId, chunks);
             logger.log(logEntry);
+            requestLogger.log(logEntry);
 
             const pricing =
               provider.inputPricePer1M !== undefined &&

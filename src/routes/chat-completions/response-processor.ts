@@ -2,6 +2,7 @@ import type { ProviderConfig, PrivacySettings } from '../../config.js';
 import type { Logger } from '../../logger.js';
 import type { DetailLogger } from '../../detail-logger.js';
 import type { RateLimiter } from '../../lib/rate-limiter.js';
+import type { RequestLogger } from '../../lib/request-logger.js';
 import { handleNonStream } from './non-stream-handler.js';
 import { handleStream } from './stream-handler.js';
 import { restorePaths } from '../../privacy/sanitizer.js';
@@ -21,7 +22,8 @@ export async function processSuccessfulResponse(
   currentUser: any,
   modelGroup: string | undefined,
   triedModels: Array<{ model: string; exceeded: boolean; message?: string }>,
-  privacySettings?: PrivacySettings
+  privacySettings: PrivacySettings | undefined,
+  requestLogger: RequestLogger
 ): Promise<Response> {
   const logEntry: any = {
     timestamp: new Date().toISOString(),
@@ -91,7 +93,8 @@ export async function processSuccessfulResponse(
       logger,
       detailLogger,
       c,
-      privacySettings
+      privacySettings,
+      requestLogger
     });
   }
 

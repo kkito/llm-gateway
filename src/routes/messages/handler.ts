@@ -79,7 +79,8 @@ export function createMessagesHandler(
           c, modelNames, allProviders: currentConfig.models, body, stream,
           rateLimiter, logger, detailLogger, requestId, startTime,
           currentUser, modelGroupName: model_group, timeoutMs, logDir,
-          privacySettings: currentConfig.privacySettings
+          privacySettings: currentConfig.privacySettings,
+          requestLogger
         });
         actualModel = fallbackResult.actualModel;
         triedModels = fallbackResult.triedModels;
@@ -108,7 +109,8 @@ export function createMessagesHandler(
               c, modelNames, allProviders: currentConfig.models, body, stream,
               rateLimiter, logger, detailLogger, requestId, startTime,
               currentUser, modelGroupName: model, timeoutMs, logDir,
-              privacySettings: currentConfig.privacySettings
+              privacySettings: currentConfig.privacySettings,
+              requestLogger
             });
             actualModel = fallbackResult.actualModel;
             triedModels = fallbackResult.triedModels;
@@ -249,7 +251,8 @@ export function createMessagesHandler(
         return handleMessagesStream({
           response, provider, model, actualModel: actualModel || model,
           requestId, startTime, logEntry, rateLimiter, logger, detailLogger, c,
-          privacySettings: currentConfig.privacySettings
+          privacySettings: currentConfig.privacySettings,
+          requestLogger
         });
       }
 

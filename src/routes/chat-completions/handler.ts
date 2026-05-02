@@ -82,7 +82,8 @@ export function createChatCompletionsHandler(
           c, modelNames, allProviders: currentConfig.models, body, stream,
           rateLimiter, logger, detailLogger, requestId, startTime,
           currentUser, modelGroupName: model_group, timeoutMs, logDir,
-          privacySettings: currentConfig.privacySettings
+          privacySettings: currentConfig.privacySettings,
+          requestLogger
         };
         const fallbackResult = await tryModelGroupWithFallback(ctx);
         actualModel = fallbackResult.actualModel;
@@ -112,7 +113,8 @@ export function createChatCompletionsHandler(
               c, modelNames, allProviders: currentConfig.models, body, stream,
               rateLimiter, logger, detailLogger, requestId, startTime,
               currentUser, modelGroupName: model, timeoutMs, logDir,
-              privacySettings: currentConfig.privacySettings
+              privacySettings: currentConfig.privacySettings,
+              requestLogger
             };
             const fallbackResult = await tryModelGroupWithFallback(ctx);
             actualModel = fallbackResult.actualModel;
@@ -254,7 +256,8 @@ export function createChatCompletionsHandler(
         return handleStream({
           response, provider, model, actualModel: actualModel || model,
           requestId, startTime, logEntry, rateLimiter, logger, detailLogger, c,
-          privacySettings: currentConfig.privacySettings
+          privacySettings: currentConfig.privacySettings,
+          requestLogger
         });
       }
 
