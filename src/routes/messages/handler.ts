@@ -2,6 +2,7 @@ import type { ProviderConfig, ProxyConfig } from '../../config.js';
 import type { Logger } from '../../logger.js';
 import type { DetailLogger } from '../../detail-logger.js';
 import type { RequestLogger } from '../../lib/request-logger.js';
+import type { DatabaseManager } from '../../lib/db.js';
 import { v4 as uuidv4 } from 'uuid';
 import { ModelGroupResolver } from '../../lib/model-group-resolver.js';
 import { getCurrentUser } from '../../user/middleware/auth.js';
@@ -18,10 +19,10 @@ export function createMessagesHandler(
   logger: Logger,
   detailLogger: DetailLogger,
   timeoutMs: number,
-  logDir: string,
+  dbManager: DatabaseManager,
   requestLogger: RequestLogger
 ): (c: any, endpoint: string) => Promise<Response> {
-  const rateLimiter = new RateLimiter(logDir);
+  const rateLimiter = new RateLimiter(dbManager);
 
   return async (c: any, endpoint: string) => {
     const startTime = Date.now();
@@ -78,7 +79,7 @@ export function createMessagesHandler(
         const fallbackResult = await tryMessagesFallback({
           c, modelNames, allProviders: currentConfig.models, body, stream,
           rateLimiter, logger, detailLogger, requestId, startTime,
-          currentUser, modelGroupName: model_group, timeoutMs, logDir,
+          currentUser, modelGroupName: model_group, timeoutMs, dbManager,
           privacySettings: currentConfig.privacySettings,
           requestLogger
         });
@@ -108,7 +109,7 @@ export function createMessagesHandler(
             const fallbackResult = await tryMessagesFallback({
               c, modelNames, allProviders: currentConfig.models, body, stream,
               rateLimiter, logger, detailLogger, requestId, startTime,
-              currentUser, modelGroupName: model, timeoutMs, logDir,
+              currentUser, modelGroupName: model, timeoutMs, dbManager,
               privacySettings: currentConfig.privacySettings,
               requestLogger
             });
@@ -155,7 +156,7 @@ export function createMessagesHandler(
 
       // Rate limit check
       try {
-        const limitResult = await rateLimiter.checkLimits(provider, logDir);
+        const limitResult = await rateLimiter.checkLimits(provider);
         if (limitResult.exceeded) {
           console.log(`   ⚠️  [限制触发] ${limitResult.message}`);
           const errorResponse = rateLimiter.createErrorResponse(limitResult.message!);

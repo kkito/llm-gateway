@@ -1,4 +1,5 @@
 import type { ProviderConfig, ModelGroup } from '../config.js';
+import type { DatabaseManager } from './db.js';
 import { RateLimiter } from './rate-limiter.js';
 import { ModelGroupExhaustedError, type TriedModel } from './model-group-error.js';
 
@@ -48,10 +49,10 @@ export class ModelGroupResolver {
   async findAvailableModel(
     modelNames: string[],
     config: ProviderConfig[],
-    logDir: string
+    dbManager: DatabaseManager
   ): Promise<AvailableModelResult> {
     const triedModels: TriedModel[] = [];
-    const rateLimiter = new RateLimiter(logDir);
+    const rateLimiter = new RateLimiter(dbManager);
 
     for (const modelName of modelNames) {
       const provider = config.find(p => p.customModel === modelName);
@@ -66,7 +67,7 @@ export class ModelGroupResolver {
       }
 
       try {
-        const result = await rateLimiter.checkLimits(provider, logDir);
+        const result = await rateLimiter.checkLimits(provider);
 
         if (result.exceeded) {
           triedModels.push({

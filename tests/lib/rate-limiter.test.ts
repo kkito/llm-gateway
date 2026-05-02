@@ -1,25 +1,32 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { RateLimiter } from '../../src/lib/rate-limiter.js';
+import { DatabaseManager } from '../../src/lib/db.js';
 import type { ModelLimit } from '../../src/config.js';
 import { mkdirSync, rmSync, existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
 describe('rate-limiter', () => {
-  const testLogDir = join(tmpdir(), 'test-rate-limiter-' + Date.now());
+  const testDbDir = join(tmpdir(), 'test-rate-limiter-' + Date.now());
   let rateLimiter: RateLimiter;
+  let dbManager: DatabaseManager;
 
   beforeEach(() => {
-    if (!existsSync(testLogDir)) {
-      mkdirSync(testLogDir, { recursive: true });
+    if (!existsSync(testDbDir)) {
+      mkdirSync(testDbDir, { recursive: true });
     }
-    rateLimiter = new RateLimiter(testLogDir);
+    DatabaseManager.resetInstance();
+    dbManager = DatabaseManager.getInstance(testDbDir);
+    dbManager.initialize();
+    rateLimiter = new RateLimiter(dbManager);
   });
 
   afterEach(() => {
+    try { dbManager.close(); } catch {}
+    DatabaseManager.resetInstance();
     try {
-      if (existsSync(testLogDir)) {
-        rmSync(testLogDir, { recursive: true, force: true });
+      if (existsSync(testDbDir)) {
+        rmSync(testDbDir, { recursive: true, force: true });
       }
     } catch {}
   });

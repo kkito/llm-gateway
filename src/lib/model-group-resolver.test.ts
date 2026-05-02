@@ -2,20 +2,27 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { ModelGroupResolver } from './model-group-resolver.js';
 import { ModelGroupExhaustedError } from './model-group-error.js';
 import type { ModelGroup, ProviderConfig } from '../config.js';
+import { DatabaseManager } from './db.js';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { existsSync, mkdirSync, rmSync } from 'fs';
 
 describe('ModelGroupResolver', () => {
   const resolver = new ModelGroupResolver();
-  const tempLogDir = join(tmpdir(), 'llm-gateway-test-logs');
+  const tempDbDir = join(tmpdir(), 'llm-gateway-test-logs');
+  let dbManager: DatabaseManager;
 
   beforeEach(() => {
-    if (!existsSync(tempLogDir)) mkdirSync(tempLogDir, { recursive: true });
+    if (!existsSync(tempDbDir)) mkdirSync(tempDbDir, { recursive: true });
+    DatabaseManager.resetInstance();
+    dbManager = DatabaseManager.getInstance(tempDbDir);
+    dbManager.initialize();
   });
 
   afterEach(() => {
-    if (existsSync(tempLogDir)) rmSync(tempLogDir, { recursive: true, force: true });
+    try { dbManager.close(); } catch {}
+    DatabaseManager.resetInstance();
+    if (existsSync(tempDbDir)) rmSync(tempDbDir, { recursive: true, force: true });
   });
 
   describe('resolveModelGroup', () => {
@@ -80,14 +87,14 @@ describe('ModelGroupResolver', () => {
     ];
 
     it('should return first available model', async () => {
-      const result = await resolver.findAvailableModel(['model-a'], config, tempLogDir);
+      const result = await resolver.findAvailableModel(['model-a'], config, dbManager);
       expect(result.model).toBe('model-a');
       expect(result.provider.customModel).toBe('model-a');
     });
 
     it('should handle missing model config', async () => {
       await expect(
-        resolver.findAvailableModel(['nonexistent'], config, tempLogDir)
+        resolver.findAvailableModel(['nonexistent'], config, dbManager)
       ).rejects.toThrow(ModelGroupExhaustedError);
     });
   });

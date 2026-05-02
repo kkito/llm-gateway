@@ -6,6 +6,7 @@ import { Hono } from 'hono';
 import type { ProxyConfig } from '../../config.js';
 import type { Logger } from '../../logger.js';
 import type { DetailLogger } from '../../detail-logger.js';
+import type { DatabaseManager } from '../../lib/db.js';
 import type { RequestLogger } from '../../lib/request-logger.js';
 import { createMessagesHandler } from './handler.js';
 
@@ -14,11 +15,11 @@ export function createMessagesRoute(
   logger: Logger,
   detailLogger: DetailLogger,
   timeoutMs: number,
-  logDir: string,
+  dbManager: DatabaseManager,
   requestLogger: RequestLogger
 ) {
   const router = new Hono();
-  const handler = createMessagesHandler(config, logger, detailLogger, timeoutMs, logDir, requestLogger);
+  const handler = createMessagesHandler(config, logger, detailLogger, timeoutMs, dbManager, requestLogger);
 
   router.post('/v1/messages', (c) => handler(c, '/v1/messages'));
   router.post('/messages', (c) => handler(c, '/messages'));

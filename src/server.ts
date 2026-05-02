@@ -185,7 +185,7 @@ export function createServer(
     logger,
     detailLogger,
     timeoutMs,
-    logDir,
+    dbManager,
     requestLogger
   ));
 
@@ -195,7 +195,7 @@ export function createServer(
     logger,
     detailLogger,
     timeoutMs,
-    logDir,
+    dbManager,
     requestLogger
   ));
 

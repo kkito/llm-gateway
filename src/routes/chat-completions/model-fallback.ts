@@ -3,6 +3,7 @@ import type { Logger } from '../../logger.js';
 import type { DetailLogger } from '../../detail-logger.js';
 import type { RateLimiter } from '../../lib/rate-limiter.js';
 import type { RequestLogger } from '../../lib/request-logger.js';
+import type { DatabaseManager } from '../../lib/db.js';
 import { buildUpstreamRequest, sendUpstreamRequest } from './upstream-request.js';
 import { processSuccessfulResponse } from './response-processor.js';
 import { restorePaths } from '../../privacy/sanitizer.js';
@@ -27,13 +28,13 @@ export interface FallbackContext {
   currentUser: any;
   modelGroupName: string;
   timeoutMs: number;
-  logDir: string;
+  dbManager: DatabaseManager;
   privacySettings?: PrivacySettings;
   requestLogger: RequestLogger;
 }
 
 export async function tryModelGroupWithFallback(ctx: FallbackContext): Promise<FallbackResult> {
-  const { c, modelNames, allProviders, body, stream, rateLimiter, logger, detailLogger, requestId, startTime, currentUser, modelGroupName, timeoutMs, logDir, privacySettings, requestLogger } = ctx;
+  const { c, modelNames, allProviders, body, stream, rateLimiter, logger, detailLogger, requestId, startTime, currentUser, modelGroupName, timeoutMs, dbManager, privacySettings, requestLogger } = ctx;
   const triedModels: Array<{ model: string; exceeded: boolean; message?: string }> = [];
   let lastErrorBody: any = null;
   let lastErrorStatus = 500;
@@ -47,7 +48,7 @@ export async function tryModelGroupWithFallback(ctx: FallbackContext): Promise<F
     }
 
     // 2. Check rate limits
-    const limitResult = await rateLimiter.checkLimits(provider, logDir);
+    const limitResult = await rateLimiter.checkLimits(provider);
     if (limitResult.exceeded) {
       triedModels.push({ model: modelName, exceeded: true, message: limitResult.message });
       continue;

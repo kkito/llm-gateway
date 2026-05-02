@@ -2,6 +2,7 @@ import type { ModelLimit, ProviderConfig } from '../config.js';
 import { UsageTracker, type ModelUsageCounter } from './usage-tracker.js';
 import { getPeriodDescription } from './period-utils.js';
 import { hasValidPricing, type Pricing } from './cost-calculator.js';
+import type { DatabaseManager } from './db.js';
 
 /**
  * 限制检查结果
@@ -29,22 +30,21 @@ export interface RateLimitError {
  * 限制检查器类
  */
 export class RateLimiter {
-  private logDir: string;
+  private dbManager: DatabaseManager;
 
-  constructor(logDir: string) {
-    this.logDir = logDir;
+  constructor(dbManager: DatabaseManager) {
+    this.dbManager = dbManager;
   }
 
   private get tracker(): UsageTracker {
-    return UsageTracker.getInstance(this.logDir);
+    return UsageTracker.getInstance(this.dbManager);
   }
 
   /**
    * 检查所有限制
    */
   async checkLimits(
-    config: ProviderConfig,
-    logDir: string
+    config: ProviderConfig
   ): Promise<LimitCheckResult> {
     if (!config.limits || config.limits.length === 0) {
       return { exceeded: false };

@@ -1,4 +1,4 @@
-import type { Database } from 'better-sqlite3';
+import Database from 'better-sqlite3';
 import type { DatabaseManager } from './db.js';
 import type { LogEntry } from '../logger.js';
 import type { ModelLimit } from '../config.js';
