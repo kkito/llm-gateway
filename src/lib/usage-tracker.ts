@@ -1,5 +1,5 @@
-import { existsSync, readFileSync, readdirSync } from 'fs';
-import { join } from 'path';
+import type { Database } from 'better-sqlite3';
+import type { DatabaseManager } from './db.js';
 import type { LogEntry } from '../logger.js';
 import type { ModelLimit } from '../config.js';
 import { getTodayDate, getWeekStart, getMonthStart, getPeriodRange } from './period-utils.js';
@@ -15,22 +15,21 @@ export type { SlidingWindowEntry, SlidingWindowCounter, ModelUsageCounter, Parse
 export class UsageTracker {
   private static instance: UsageTracker | null = null;
   private counters: Map<string, ModelUsageCounter> = new Map();
-  private logDir: string;
+  private dbManager: DatabaseManager;
 
-  private constructor(logDir: string) {
-    this.logDir = logDir;
+  private constructor(dbManager: DatabaseManager) {
+    this.dbManager = dbManager;
   }
 
   /**
    * 获取单例实例
    */
-  static getInstance(logDir: string): UsageTracker {
+  static getInstance(dbManager: DatabaseManager): UsageTracker {
     if (!UsageTracker.instance) {
-      UsageTracker.instance = new UsageTracker(logDir);
+      UsageTracker.instance = new UsageTracker(dbManager);
     }
-    // 验证 logDir 一致性
-    if (UsageTracker.instance.logDir !== logDir) {
-      throw new Error(`logDir mismatch: ${logDir} vs ${UsageTracker.instance.logDir}`);
+    if (UsageTracker.instance.dbManager !== dbManager) {
+      throw new Error('DatabaseManager mismatch');
     }
     return UsageTracker.instance;
   }
@@ -87,92 +86,69 @@ export class UsageTracker {
   }
 
   /**
-   * 获取日志文件列表
+   * 从 SQLite 数据库加载用量
    */
-  private getLogFilesForRange(start: string, end: string): string[] {
-    if (!existsSync(this.logDir)) return [];
-    
-    return readdirSync(this.logDir)
-      .filter(f => f.startsWith('proxy-') && f.endsWith('.log'))
-      .map(f => {
-        const match = f.match(/proxy-(\d{4}-\d{2}-\d{2})\.log/);
-        return match ? { file: join(this.logDir, f), date: match[1] } : null;
-      })
-      .filter((item): item is { file: string; date: string } => item !== null)
-      .filter(item => item.date >= start && item.date <= end)
-      .map(item => item.file);
-  }
-
-  /**
-   * 解析日志文件
-   */
-  private parseLogFile(filePath: string): ParsedLogEntry[] {
-    if (!existsSync(filePath)) return [];
-    const content = readFileSync(filePath, 'utf-8');
-    return content.trim().split('\n').filter(line => line.trim()).map(line => JSON.parse(line));
-  }
-
-  /**
-   * 从日志文件加载用量
-   */
-  private loadFromLogs(
+  private loadFromDb(
     counter: ModelUsageCounter,
     period: 'day' | 'hours' | 'week' | 'month',
     periodValue: number | undefined,
     pricing: Pricing | undefined
   ): void {
-    const dateRange = getPeriodRange(period, periodValue);
-    const logFiles = this.getLogFilesForRange(dateRange.start, dateRange.end);
-    
-    let requests = 0;
-    let inputTokens = 0;
-    let cost = 0;
-    const slidingEntries: SlidingWindowEntry[] = [];
-    
-    for (const file of logFiles) {
-      const entries = this.parseLogFile(file);
-      for (const entry of entries) {
-        if (entry.customModel !== counter.model) continue;
-        if (entry.statusCode < 200 || entry.statusCode >= 300) continue;
-        
-        requests++;
-        inputTokens += entry.promptTokens || 0;
-        
-        if (pricing) {
-          const entryCost = calculateCost(
-            {
-              inputTokens: entry.promptTokens || 0,
-              outputTokens: entry.completionTokens || 0,
-              cachedTokens: entry.cachedTokens || 0
-            },
-            pricing
-          );
-          cost += entryCost;
-        }
-        
-        if (period === 'hours') {
-          slidingEntries.push({
-            timestamp: new Date(entry.timestamp).getTime() / 1000,
-            requests: 1,
-            inputTokens: entry.promptTokens || 0,
-            cost: pricing ? calculateCost(
-              {
-                inputTokens: entry.promptTokens || 0,
-                outputTokens: entry.completionTokens || 0,
-                cachedTokens: entry.cachedTokens || 0
-              },
-              pricing
-            ) : 0
-          });
-        }
-      }
+    let db: Database.Database;
+    try {
+      db = this.dbManager.getDb();
+    } catch {
+      // Database not initialized; leave counters at zero
+      return;
     }
-    
-    // 更新计数器
+
+    const dateRange = getPeriodRange(period, periodValue);
+    // Convert YYYY-MM-DD dates to ISO timestamps for proper comparison with timestamp column
+    const startTs = dateRange.start + 'T00:00:00.000Z';
+    const endTs = dateRange.end + 'T23:59:59.999Z';
+
+    const rows = db.prepare(`
+      SELECT
+        COUNT(*) as requests,
+        COALESCE(SUM(prompt_tokens), 0) as inputTokens
+      FROM requests
+      WHERE timestamp >= ? AND timestamp <= ?
+        AND custom_model = ?
+        AND status_code >= 200 AND status_code < 300
+    `).get(startTs, endTs, counter.model) as { requests: number; inputTokens: number };
+
+    const requests = rows.requests;
+    const inputTokens = rows.inputTokens;
+    let cost = 0;
+
+    // Calculate cost if pricing is available
+    if (pricing) {
+      const totalTokensRow = db.prepare(`
+        SELECT
+          COALESCE(SUM(prompt_tokens), 0) as totalInput,
+          COALESCE(SUM(completion_tokens), 0) as totalOutput,
+          COALESCE(SUM(cached_tokens), 0) as totalCached
+        FROM requests
+        WHERE timestamp >= ? AND timestamp <= ?
+          AND custom_model = ?
+          AND status_code >= 200 AND status_code < 300
+      `).get(startTs, endTs, counter.model) as { totalInput: number; totalOutput: number; totalCached: number };
+
+      cost = calculateCost(
+        {
+          inputTokens: totalTokensRow.totalInput,
+          outputTokens: totalTokensRow.totalOutput,
+          cachedTokens: totalTokensRow.totalCached
+        },
+        pricing
+      );
+    }
+
+    // Update counter
     const today = getTodayDate();
     const weekStart = getWeekStart();
     const monthStart = getMonthStart();
-    
+
     if (period === 'day') {
       counter.today = {
         date: today,
@@ -182,7 +158,7 @@ export class UsageTracker {
         loaded: true
       };
     }
-    
+
     if (period === 'week') {
       counter.thisWeek = {
         weekStart,
@@ -192,7 +168,7 @@ export class UsageTracker {
         loaded: true
       };
     }
-    
+
     if (period === 'month') {
       counter.thisMonth = {
         month: monthStart,
@@ -202,15 +178,44 @@ export class UsageTracker {
         loaded: true
       };
     }
-    
+
     if (period === 'hours') {
       const windowHours = periodValue || 24;
       const cutoff = Date.now() / 1000 - (windowHours * 3600);
-      const filtered = slidingEntries.filter(e => e.timestamp > cutoff);
-      
+
+      const slidingRows = db.prepare(`
+        SELECT
+          prompt_tokens,
+          completion_tokens,
+          cached_tokens,
+          timestamp
+        FROM requests
+        WHERE timestamp >= ? AND timestamp <= ?
+          AND custom_model = ?
+          AND status_code >= 200 AND status_code < 300
+      `).all(
+        new Date(cutoff * 1000).toISOString(),
+        new Date().toISOString(),
+        counter.model
+      ) as { prompt_tokens: number; completion_tokens: number; cached_tokens: number; timestamp: string }[];
+
+      const slidingEntries: SlidingWindowEntry[] = slidingRows.map(row => ({
+        timestamp: new Date(row.timestamp).getTime() / 1000,
+        requests: 1,
+        inputTokens: row.prompt_tokens || 0,
+        cost: pricing ? calculateCost(
+          {
+            inputTokens: row.prompt_tokens || 0,
+            outputTokens: row.completion_tokens || 0,
+            cachedTokens: row.cached_tokens || 0
+          },
+          pricing
+        ) : 0
+      }));
+
       counter.slidingWindows.set(windowHours, {
         windowHours,
-        entries: filtered,
+        entries: slidingEntries,
         loaded: true
       });
     }
@@ -254,7 +259,7 @@ export class UsageTracker {
     // 只要有加载需求就执行加载，pricing 为 undefined 时 cost 会计为 0
     // 对于 requests/input_tokens 类型的限制，不需要 pricing 也能统计
     if (needReload) {
-      this.loadFromLogs(counter, period, periodValue, pricing);
+      this.loadFromDb(counter, period, periodValue, pricing);
     }
   }
 

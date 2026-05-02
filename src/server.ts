@@ -65,7 +65,7 @@ export function createServer(
   requestLogger.start();
 
   // 创建用量追踪器（单例）
-  const usageTracker = UsageTracker.getInstance(logDir);
+  const usageTracker = UsageTracker.getInstance(dbManager);
 
   // 初始化 UsageTracker API
   initUsageApiTracker(usageTracker);

@@ -1,26 +1,36 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { UsageTracker } from '../../src/lib/usage-tracker.js';
+import { DatabaseManager } from '../../src/lib/db.js';
 import type { LogEntry } from '../../src/logger.js';
 import type { ModelLimit } from '../../src/config.js';
-import { mkdirSync, writeFileSync, rmSync, existsSync } from 'fs';
+import { rmSync, existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
 describe('usage-tracker', () => {
-  const testLogDir = join(tmpdir(), 'test-usage-tracker-' + Date.now());
+  const testDbDir = join(tmpdir(), 'test-usage-tracker-' + Date.now());
+  let dbManager: DatabaseManager;
   let tracker: UsageTracker;
 
   beforeEach(() => {
-    if (!existsSync(testLogDir)) {
-      mkdirSync(testLogDir, { recursive: true });
-    }
-    tracker = new UsageTracker(testLogDir);
+    UsageTracker.resetInstance();
+    DatabaseManager.resetInstance();
+
+    dbManager = DatabaseManager.getInstance(testDbDir);
+    dbManager.initialize();
+
+    tracker = UsageTracker.getInstance(dbManager);
   });
 
   afterEach(() => {
     try {
-      if (existsSync(testLogDir)) {
-        rmSync(testLogDir, { recursive: true, force: true });
+      if (dbManager) {
+        dbManager.close();
+      }
+      DatabaseManager.resetInstance();
+      UsageTracker.resetInstance();
+      if (existsSync(testDbDir)) {
+        rmSync(testDbDir, { recursive: true, force: true });
       }
     } catch {}
   });
@@ -49,7 +59,7 @@ describe('usage-tracker', () => {
 
     it('should update today counter', () => {
       const counter = tracker.getCounter('test-model');
-      
+
       const entry: LogEntry = {
         timestamp: new Date().toISOString(),
         requestId: 'test-1',
@@ -62,9 +72,9 @@ describe('usage-tracker', () => {
         promptTokens: 1000,
         completionTokens: 500
       };
-      
+
       tracker.recordUsage('test-model', entry, pricing);
-      
+
       expect(counter.today.requests).toBe(1);
       expect(counter.today.inputTokens).toBe(1000);
       expect(counter.today.cost).toBeCloseTo(0.01 + 0.015, 4); // (1000/1M * 10) + (500/1M * 30)
@@ -72,7 +82,7 @@ describe('usage-tracker', () => {
 
     it('should update all period counters', () => {
       const counter = tracker.getCounter('test-model');
-      
+
       const entry: LogEntry = {
         timestamp: new Date().toISOString(),
         requestId: 'test-1',
@@ -84,9 +94,9 @@ describe('usage-tracker', () => {
         isStreaming: false,
         promptTokens: 1000
       };
-      
+
       tracker.recordUsage('test-model', entry, pricing);
-      
+
       expect(counter.today.requests).toBe(1);
       expect(counter.thisWeek.requests).toBe(1);
       expect(counter.thisMonth.requests).toBe(1);
@@ -100,7 +110,7 @@ describe('usage-tracker', () => {
         entries: [],
         loaded: true
       });
-      
+
       const entry: LogEntry = {
         timestamp: new Date().toISOString(),
         requestId: 'test-1',
@@ -112,9 +122,9 @@ describe('usage-tracker', () => {
         isStreaming: false,
         promptTokens: 1000
       };
-      
+
       tracker.recordUsage('test-model', entry, undefined);
-      
+
       const window = counter.slidingWindows.get(5);
       expect(window?.entries.length).toBe(1);
       expect(window?.entries[0].inputTokens).toBe(1000);
@@ -122,7 +132,7 @@ describe('usage-tracker', () => {
 
     it('should accumulate multiple requests', () => {
       const counter = tracker.getCounter('test-model');
-      
+
       const entry1: LogEntry = {
         timestamp: new Date().toISOString(),
         requestId: 'test-1',
@@ -134,7 +144,7 @@ describe('usage-tracker', () => {
         isStreaming: false,
         promptTokens: 1000
       };
-      
+
       const entry2: LogEntry = {
         timestamp: new Date().toISOString(),
         requestId: 'test-2',
@@ -146,10 +156,10 @@ describe('usage-tracker', () => {
         isStreaming: false,
         promptTokens: 2000
       };
-      
+
       tracker.recordUsage('test-model', entry1, pricing);
       tracker.recordUsage('test-model', entry2, pricing);
-      
+
       expect(counter.today.requests).toBe(2);
       expect(counter.today.inputTokens).toBe(3000);
     });
@@ -162,13 +172,13 @@ describe('usage-tracker', () => {
       counter.today.inputTokens = 10000;
       counter.today.cost = 5.5;
       counter.today.loaded = true;
-      
+
       const limit: ModelLimit = {
         type: 'requests',
         period: 'day',
         max: 100
       };
-      
+
       const usage = tracker.getCurrentUsage(counter, limit);
       expect(usage).toBe(50);
     });
@@ -177,13 +187,13 @@ describe('usage-tracker', () => {
       const counter = tracker.getCounter('test-model');
       counter.today.inputTokens = 10000;
       counter.today.loaded = true;
-      
+
       const limit: ModelLimit = {
         type: 'input_tokens',
         period: 'day',
         max: 50000
       };
-      
+
       const usage = tracker.getCurrentUsage(counter, limit);
       expect(usage).toBe(10000);
     });
@@ -192,64 +202,68 @@ describe('usage-tracker', () => {
       const counter = tracker.getCounter('test-model');
       counter.thisMonth.cost = 250.5;
       counter.thisMonth.loaded = true;
-      
+
       const limit: ModelLimit = {
         type: 'cost',
         period: 'month',
         max: 500
       };
-      
+
       const usage = tracker.getCurrentUsage(counter, limit);
       expect(usage).toBe(250.5);
     });
 
     it('should return 0 for empty sliding window', () => {
       const counter = tracker.getCounter('test-model');
-      
+
       const limit: ModelLimit = {
         type: 'requests',
         period: 'hours',
         periodValue: 5,
         max: 50
       };
-      
+
       const usage = tracker.getCurrentUsage(counter, limit);
       expect(usage).toBe(0);
     });
   });
 
   describe('ensureLoaded', () => {
-    it('should load from log files on first access', async () => {
-      // 创建测试日志文件（使用本地日期，与 getTodayDate() 一致）
+    it('should load from database on first access', async () => {
+      const db = dbManager.getDb();
+
+      const now = new Date().toISOString();
       const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD in local time
-      const logFile = join(testLogDir, `proxy-${today}.log`);
-      
-      const logEntry = {
-        timestamp: new Date().toISOString(),
-        requestId: 'test-1',
-        customModel: 'test-model',
-        realModel: 'gpt-4',
-        provider: 'openai',
-        endpoint: '/v1/chat/completions',
-        method: 'POST',
-        statusCode: 200,
-        durationMs: 100,
-        isStreaming: false,
-        promptTokens: 1000,
-        completionTokens: 500
-      };
-      
-      writeFileSync(logFile, JSON.stringify(logEntry) + '\n', 'utf-8');
-      
+
+      // Insert a test request into the database
+      db.prepare(`
+        INSERT INTO requests (request_id, timestamp, custom_model, real_model, provider, endpoint, status_code, duration_ms, is_streaming, prompt_tokens, completion_tokens, cached_tokens, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        'test-1',
+        now,
+        'test-model',
+        'gpt-4',
+        'openai',
+        '/v1/chat/completions',
+        200,
+        100,
+        0,
+        1000,
+        500,
+        0,
+        Math.floor(Date.now() / 1000)
+      );
+
       const pricing = {
         inputPricePer1M: 10.0,
         outputPricePer1M: 30.0,
         cachedPricePer1M: 0
       };
-      
+
       const counter = tracker.getCounter('test-model');
       await tracker.ensureLoaded(counter, 'day', undefined, pricing);
-      
+
       expect(counter.today.loaded).toBe(true);
       expect(counter.today.requests).toBe(1);
       expect(counter.today.inputTokens).toBe(1000);
@@ -261,14 +275,168 @@ describe('usage-tracker', () => {
         outputPricePer1M: 30.0,
         cachedPricePer1M: 0
       };
-      
+
       const counter = tracker.getCounter('test-model');
       counter.today.loaded = true;
       counter.today.requests = 50;
-      
+
       await tracker.ensureLoaded(counter, 'day', undefined, pricing);
-      
+
       expect(counter.today.requests).toBe(50); // 应该保持不变
+    });
+
+    it('should return zero counts when database is empty', async () => {
+      const pricing = {
+        inputPricePer1M: 10.0,
+        outputPricePer1M: 30.0,
+        cachedPricePer1M: 0
+      };
+
+      const counter = tracker.getCounter('empty-model');
+      await tracker.ensureLoaded(counter, 'day', undefined, pricing);
+
+      expect(counter.today.loaded).toBe(true);
+      expect(counter.today.requests).toBe(0);
+      expect(counter.today.inputTokens).toBe(0);
+    });
+
+    it('should load week period from database', async () => {
+      const db = dbManager.getDb();
+      const now = new Date().toISOString();
+      const today = new Date().toLocaleDateString('en-CA');
+
+      db.prepare(`
+        INSERT INTO requests (request_id, timestamp, custom_model, real_model, provider, endpoint, status_code, duration_ms, is_streaming, prompt_tokens, completion_tokens, cached_tokens, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        'test-week-1',
+        now,
+        'week-model',
+        'gpt-4',
+        'openai',
+        '/v1/chat/completions',
+        200,
+        100,
+        0,
+        2000,
+        1000,
+        0,
+        Math.floor(Date.now() / 1000)
+      );
+
+      const counter = tracker.getCounter('week-model');
+      await tracker.ensureLoaded(counter, 'week', undefined, undefined);
+
+      expect(counter.thisWeek.loaded).toBe(true);
+      expect(counter.thisWeek.requests).toBe(1);
+      expect(counter.thisWeek.inputTokens).toBe(2000);
+    });
+
+    it('should load month period from database', async () => {
+      const db = dbManager.getDb();
+      const now = new Date().toISOString();
+
+      db.prepare(`
+        INSERT INTO requests (request_id, timestamp, custom_model, real_model, provider, endpoint, status_code, duration_ms, is_streaming, prompt_tokens, completion_tokens, cached_tokens, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        'test-month-1',
+        now,
+        'month-model',
+        'claude-3',
+        'anthropic',
+        '/v1/messages',
+        200,
+        150,
+        0,
+        3000,
+        1500,
+        500,
+        Math.floor(Date.now() / 1000)
+      );
+
+      const pricing = {
+        inputPricePer1M: 10.0,
+        outputPricePer1M: 30.0,
+        cachedPricePer1M: 5.0
+      };
+
+      const counter = tracker.getCounter('month-model');
+      await tracker.ensureLoaded(counter, 'month', undefined, pricing);
+
+      expect(counter.thisMonth.loaded).toBe(true);
+      expect(counter.thisMonth.requests).toBe(1);
+      expect(counter.thisMonth.inputTokens).toBe(3000);
+    });
+
+    it('should load sliding window from database', async () => {
+      const db = dbManager.getDb();
+      const now = new Date();
+      const oneHourAgo = new Date(now.getTime() - 3600 * 1000);
+
+      db.prepare(`
+        INSERT INTO requests (request_id, timestamp, custom_model, real_model, provider, endpoint, status_code, duration_ms, is_streaming, prompt_tokens, completion_tokens, cached_tokens, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        'test-sliding-1',
+        oneHourAgo.toISOString(),
+        'sliding-model',
+        'gpt-4',
+        'openai',
+        '/v1/chat/completions',
+        200,
+        100,
+        0,
+        1500,
+        750,
+        0,
+        Math.floor(Date.now() / 1000)
+      );
+
+      const pricing = {
+        inputPricePer1M: 10.0,
+        outputPricePer1M: 30.0,
+        cachedPricePer1M: 0
+      };
+
+      const counter = tracker.getCounter('sliding-model');
+      await tracker.ensureLoaded(counter, 'hours', 24, pricing);
+
+      const window = counter.slidingWindows.get(24);
+      expect(window?.loaded).toBe(true);
+      expect(window?.entries.length).toBe(1);
+      expect(window?.entries[0].inputTokens).toBe(1500);
+    });
+
+    it('should exclude failed requests from counts', async () => {
+      const db = dbManager.getDb();
+      const now = new Date().toISOString();
+
+      // Insert a failed request
+      db.prepare(`
+        INSERT INTO requests (request_id, timestamp, custom_model, real_model, provider, endpoint, status_code, duration_ms, is_streaming, prompt_tokens, completion_tokens, cached_tokens, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        'test-fail-1',
+        now,
+        'error-model',
+        'gpt-4',
+        'openai',
+        '/v1/chat/completions',
+        500,
+        100,
+        0,
+        1000,
+        0,
+        0,
+        Math.floor(Date.now() / 1000)
+      );
+
+      const counter = tracker.getCounter('error-model');
+      await tracker.ensureLoaded(counter, 'day', undefined, undefined);
+
+      expect(counter.today.loaded).toBe(true);
+      expect(counter.today.requests).toBe(0);
     });
   });
 
@@ -276,7 +444,7 @@ describe('usage-tracker', () => {
     it('should remove expired entries from sliding windows', () => {
       const counter = tracker.getCounter('test-model');
       const now = Date.now() / 1000;
-      
+
       // 添加一个过期条目（10 小时前）
       counter.slidingWindows.set(5, {
         windowHours: 5,
@@ -296,9 +464,9 @@ describe('usage-tracker', () => {
         ],
         loaded: true
       });
-      
+
       tracker.cleanupSlidingWindows();
-      
+
       const window = counter.slidingWindows.get(5);
       expect(window?.entries.length).toBe(1); // 只保留 1 小时前的条目
       expect(window?.entries[0].inputTokens).toBe(2000);
@@ -312,11 +480,11 @@ describe('usage-tracker', () => {
         outputPricePer1M: 30.0,
         cachedPricePer1M: 0
       };
-      
+
       // 先获取计数器
       const counterA = tracker.getCounter('model-a');
       const counterB = tracker.getCounter('model-b');
-      
+
       const entry1: LogEntry = {
         timestamp: new Date().toISOString(),
         requestId: 'test-1',
@@ -328,7 +496,7 @@ describe('usage-tracker', () => {
         isStreaming: false,
         promptTokens: 1000
       };
-      
+
       const entry2: LogEntry = {
         timestamp: new Date().toISOString(),
         requestId: 'test-2',
@@ -340,17 +508,54 @@ describe('usage-tracker', () => {
         isStreaming: false,
         promptTokens: 2000
       };
-      
+
       // 直接更新已获取的计数器
       tracker.recordUsage('model-a', entry1, pricing);
       tracker.recordUsage('model-b', entry2, pricing);
-      
+
       // 验证计数器是独立的
       expect(counterA.today.requests).toBe(1);
       expect(counterA.today.inputTokens).toBe(1000);
-      
+
       expect(counterB.today.requests).toBe(1);
       expect(counterB.today.inputTokens).toBe(2000);
+    });
+  });
+
+  describe('singleton', () => {
+    it('should return same instance with same dbManager', () => {
+      // Verify singleton behavior with the same dbManager from beforeEach
+      const tracker2 = UsageTracker.getInstance(dbManager);
+      expect(tracker2).toBe(tracker);
+    });
+
+    it('should detect DatabaseManager mismatch after full reset', () => {
+      // Fully reset both singletons
+      UsageTracker.resetInstance();
+      DatabaseManager.resetInstance();
+
+      // Create first UsageTracker with dbManagerA
+      const dirA = join(tmpdir(), 'test-singleton-a-' + Math.random().toString(36).slice(2));
+      const dmA = DatabaseManager.getInstance(dirA);
+      dmA.initialize();
+      const trackerA = UsageTracker.getInstance(dmA);
+
+      // Now create a second DatabaseManager by directly instantiating (bypassing singleton)
+      // This simulates a separate process/server calling getInstance
+      const dirB = join(tmpdir(), 'test-singleton-b-' + Math.random().toString(36).slice(2));
+      const dmB = new (DatabaseManager as any)(dirB) as DatabaseManager;
+      (dmB as any).initialize();
+
+      // Attempting to get UsageTracker with dmB should throw
+      expect(() => UsageTracker.getInstance(dmB)).toThrow('DatabaseManager mismatch');
+
+      // Cleanup
+      dmA.close();
+      try { (dmB as any).close(); } catch {}
+      DatabaseManager.resetInstance();
+      UsageTracker.resetInstance();
+      try { rmSync(dirA, { recursive: true, force: true }); } catch {}
+      try { rmSync(dirB, { recursive: true, force: true }); } catch {}
     });
   });
 });
