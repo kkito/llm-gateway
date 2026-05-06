@@ -1,7 +1,8 @@
 const SAFE_FIELDS = [
   'messages', 'stream', 'temperature', 'max_tokens', 'top_p',
   'presence_penalty', 'frequency_penalty', 'stop', 'response_format',
-  'tools', 'tool_choice', 'seed', 'stream_options'
+  'tools', 'tool_choice', 'seed', 'stream_options', 'reasoning_effort',
+  'extra_body'
 ];
 
 /**

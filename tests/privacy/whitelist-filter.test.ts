@@ -10,16 +10,18 @@ describe('filterWhitelistedFields', () => {
     const body = {
       messages: [{ role: 'user', content: 'hi' }],
       temperature: 0.7,
+      reasoning_effort: 'high',
+      extra_body: { foo: 'bar' },
       user: 'user-123',
-      metadata: { session: 'abc' },
-      extra_body: { foo: 'bar' }
+      metadata: { session: 'abc' }
     };
     const result = filterWhitelistedFields(body, 'req-001');
     expect(result).toHaveProperty('messages');
     expect(result).toHaveProperty('temperature');
+    expect(result).toHaveProperty('reasoning_effort');
+    expect(result).toHaveProperty('extra_body');
     expect(result).not.toHaveProperty('user');
     expect(result).not.toHaveProperty('metadata');
-    expect(result).not.toHaveProperty('extra_body');
   });
 
   it('should log filtered-out fields', () => {
@@ -40,7 +42,7 @@ describe('filterWhitelistedFields', () => {
   });
 
   it('should return empty object when all fields are unknown', () => {
-    const body = { user: 'u1', metadata: { a: 1 }, extra_body: {} };
+    const body = { user: 'u1', metadata: { a: 1 } };
     const result = filterWhitelistedFields(body, 'req-001');
     expect(Object.keys(result)).toEqual([]);
   });
@@ -59,7 +61,7 @@ describe('filterWhitelistedFields', () => {
   it('should truncate log values to 500 chars', () => {
     const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const longValue = 'x'.repeat(1000);
-    const body = { messages: [], extra_body: { val: longValue } };
+    const body = { messages: [], metadata: { val: longValue } };
     filterWhitelistedFields(body, 'req-001');
     const callArgs = spy.mock.calls[0][0] as string;
     expect(callArgs.length).toBeLessThan(800);
