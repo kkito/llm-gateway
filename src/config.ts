@@ -38,6 +38,7 @@ export interface ProviderConfig {
   cachedPricePer1M?: number;   // 缓存 token 每百万价格（美元）
   limits?: ModelLimit[];       // 使用限制配置
   hidden?: boolean;            // 是否隐藏该模型（不对外展示）
+  defaultParams?: Record<string, any>; // 默认参数配置
 }
 
 /**
@@ -143,6 +144,13 @@ function validateModelsArray(models: any): ProviderConfig[] {
       item.limits.forEach((limit: any, limitIndex: number) => {
         validateModelLimit(limit, limitIndex, index);
       });
+    }
+
+    // 验证 defaultParams
+    if (item.defaultParams !== undefined) {
+      if (typeof item.defaultParams !== 'object' || Array.isArray(item.defaultParams) || item.defaultParams === null) {
+        throw new Error(`defaultParams must be an object at model ${index}`);
+      }
     }
   });
 

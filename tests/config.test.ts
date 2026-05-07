@@ -99,6 +99,46 @@ describe('config', () => {
       expect(config).toHaveLength(1);
       expect(config[0].customModel).toBe('my-gpt4');
     });
+
+    it('should accept valid defaultParams object', () => {
+      unlinkSync(testConfigPath);
+      const configWithParams = [
+        {
+          customModel: 'test-model',
+          realModel: 'gpt-4',
+          apiKey: 'sk-test',
+          baseUrl: 'https://api.openai.com',
+          provider: 'openai' as const,
+          defaultParams: { temperature: 0.7, max_tokens: 4096 }
+        }
+      ];
+      writeFileSync(testConfigPath, JSON.stringify(configWithParams, null, 2));
+      const result = loadConfig(testConfigPath);
+      expect(result[0].defaultParams).toEqual({ temperature: 0.7, max_tokens: 4096 });
+    });
+
+    it('should reject defaultParams as array', () => {
+      unlinkSync(testConfigPath);
+      const configWithArray = {
+        models: [
+          {
+            customModel: 'test-model',
+            realModel: 'gpt-4',
+            apiKey: 'sk-test',
+            baseUrl: 'https://api.openai.com',
+            provider: 'openai' as const,
+            defaultParams: ['temperature', 0.7]
+          }
+        ]
+      };
+      writeFileSync(testConfigPath, JSON.stringify(configWithArray, null, 2));
+      expect(() => loadConfig(testConfigPath)).toThrow('defaultParams must be an object');
+    });
+
+    it('should accept missing defaultParams (optional field)', () => {
+      const result = loadConfig(testConfigPath);
+      expect(result[0].defaultParams).toBeUndefined();
+    });
   });
 
   describe('findProvider', () => {
