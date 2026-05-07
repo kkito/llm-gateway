@@ -7,7 +7,9 @@ interface Props {
 
 export const JsonEditor: FC<Props> = (props) => {
   const safeValue = props.value || '';
-  const uniqueId = `je-${props.name}-${Math.random().toString(36).slice(2, 8)}`;
+  // Sanitize name to prevent XSS in inline handler strings
+  const sanitizedName = props.name.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const uniqueId = `je-${sanitizedName}-${Math.random().toString(36).slice(2, 8)}`;
 
   const jsCode = `
 (function() {
