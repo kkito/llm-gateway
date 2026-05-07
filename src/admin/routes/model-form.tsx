@@ -5,6 +5,7 @@ import { ModelFormPage } from '../views/model-form.js';
 import { ModelsPage } from '../views/models.js';
 import { OpenAIProvider } from '../../providers/openai.js';
 import { AnthropicProvider } from '../../providers/anthropic.js';
+import { mergeModelParams } from '../../lib/params-merger.js';
 
 interface RouteDeps {
   config: ProxyConfig | (() => ProxyConfig);
@@ -24,7 +25,8 @@ async function testModelConnection(
   baseUrl: string,
   apiKey: string,
   realModel: string,
-  message: string
+  message: string,
+  defaultParams?: Record<string, any>
 ): Promise<{
   success: boolean;
   model?: string;
@@ -46,6 +48,9 @@ async function testModelConnection(
     max_tokens: 4096,
   };
 
+  // Merge defaultParams (user-provided test params override defaults)
+  const mergedBody = mergeModelParams(defaultParams, testBody);
+
   try {
     const response = await fetch(url, {
       method: 'POST',
@@ -53,7 +58,7 @@ async function testModelConnection(
         ...headers,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(testBody),
+      body: JSON.stringify(mergedBody),
       signal: AbortSignal.timeout(60000),
     });
 
@@ -68,7 +73,7 @@ async function testModelConnection(
           success: true,
           model: realModel,
           content: rawBody,
-          requestBody: JSON.stringify(testBody, null, 2),
+          requestBody: JSON.stringify(mergedBody, null, 2),
           fullResponse: rawBody,
         };
       }
@@ -94,7 +99,7 @@ async function testModelConnection(
         content,
         reasoningContent,
         usage,
-        requestBody: JSON.stringify(testBody, null, 2),
+        requestBody: JSON.stringify(mergedBody, null, 2),
         fullResponse: JSON.stringify(data, null, 2),
       };
     }
@@ -103,11 +108,11 @@ async function testModelConnection(
       success: false,
       message: `HTTP ${response.status}: ${rawBody}`,
       rawResponse: rawBody,
-      requestBody: JSON.stringify(testBody, null, 2),
+      requestBody: JSON.stringify(mergedBody, null, 2),
     };
   } catch (error: any) {
     if (error.name === 'AbortError') {
-      return { success: false, message: '请求超时（60秒），请检查网络连接或 API 地址', requestBody: JSON.stringify(testBody, null, 2) };
+      return { success: false, message: '请求超时（60秒），请检查网络连接或 API 地址', requestBody: JSON.stringify(mergedBody, null, 2) };
     }
     return { success: false, message: `网络错误: ${error.message}` };
   }
@@ -120,7 +125,7 @@ export function createModelFormRoute(deps: RouteDeps) {
   // 测试模型配置
   app.post('/admin/models/test', async (c) => {
     const body = await c.req.json();
-    const { provider, baseUrl, apiKey, apiKeyId, realModel, message } = body as { provider?: 'openai' | 'anthropic'; baseUrl?: string; apiKey?: string; apiKeyId?: string; realModel?: string; message: string };
+    const { provider, baseUrl, apiKey, apiKeyId, realModel, message, defaultParams } = body as { provider?: 'openai' | 'anthropic'; baseUrl?: string; apiKey?: string; apiKeyId?: string; realModel?: string; message: string; defaultParams?: Record<string, any> };
 
     if (!provider || !baseUrl || !realModel) {
       return c.json({ success: false, message: '请填写所有必填字段（Provider、Base URL、实际模型名称）' }, 400);
@@ -160,7 +165,7 @@ export function createModelFormRoute(deps: RouteDeps) {
     }
 
     const testMessage = message || '请介绍一下你自己';
-    const result = await testModelConnection(provider, baseUrl, resolvedApiKey, realModel, testMessage);
+    const result = await testModelConnection(provider, baseUrl, resolvedApiKey, realModel, testMessage, defaultParams);
     return c.json(result);
   });
 

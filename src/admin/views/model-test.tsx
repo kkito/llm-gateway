@@ -1,8 +1,18 @@
 import { FC } from 'hono/jsx';
 
-export const ModelTest: FC = () => {
+interface Props {
+  defaultParams?: Record<string, any>;
+}
+
+export const ModelTest: FC<Props> = (props) => {
+  // Serialize defaultParams for use in client-side JS
+  const defaultParamsJson = props.defaultParams ? JSON.stringify(props.defaultParams) : 'null';
+
   const jsCode = `
 (function() {
+  // defaultParams from server-side props
+  var DEFAULT_PARAMS = ${defaultParamsJson};
+
   window.runTest = async function() {
     var provider = document.getElementById('provider').value;
     var baseUrl = document.getElementById('baseUrl').value;
@@ -45,7 +55,8 @@ export const ModelTest: FC = () => {
       provider: provider,
       baseUrl: baseUrl,
       realModel: realModel,
-      message: message
+      message: message,
+      defaultParams: DEFAULT_PARAMS
     }, null, 2);
     document.getElementById('requestBodyContent').textContent = requestBody;
     document.getElementById('requestSection').style.display = 'block';
@@ -54,7 +65,7 @@ export const ModelTest: FC = () => {
       var res = await fetch('/admin/models/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider: provider, baseUrl: baseUrl, apiKey: apiKey, apiKeyId: apiKeyId, realModel: realModel, message: message })
+        body: JSON.stringify({ provider: provider, baseUrl: baseUrl, apiKey: apiKey, apiKeyId: apiKeyId, realModel: realModel, message: message, defaultParams: DEFAULT_PARAMS })
       });
       var data = await res.json();
 

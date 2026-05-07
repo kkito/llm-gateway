@@ -335,7 +335,7 @@ export const ModelFormPage: FC<Props> = (props) => {
               </div>
               )}
 
-              <ModelTest />
+              <ModelTest defaultParams={props.model?.defaultParams} />
 
               <div class="form-actions">
                 <button type="submit" class="btn btn-primary">{isEdit ? '保存修改' : '添加模型'}</button>
