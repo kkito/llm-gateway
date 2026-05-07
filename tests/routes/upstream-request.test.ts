@@ -97,6 +97,55 @@ describe('buildUpstreamRequest', () => {
       expect(providersModule.buildHeaders).toHaveBeenCalledWith(mockAnthropicProvider);
     });
   });
+
+  describe('with defaultParams', () => {
+    it('should merge defaultParams into request body for OpenAI provider', async () => {
+      const providerWithDefaults = {
+        ...mockProvider,
+        defaultParams: { temperature: 0.5, max_tokens: 2048 }
+      };
+      // Body without temperature/max_tokens - defaults should be applied
+      const bodyWithoutParams = {
+        model: 'gpt-4',
+        messages: [{ role: 'user', content: 'Hello' }]
+      };
+      const result = await buildUpstreamRequest(providerWithDefaults, bodyWithoutParams, false);
+
+      expect(result.body.temperature).toBe(0.5);
+      expect(result.body.max_tokens).toBe(2048);
+    });
+
+    it('should let user body override defaultParams', async () => {
+      const providerWithDefaults = {
+        ...mockProvider,
+        defaultParams: { temperature: 0.5, max_tokens: 2048 }
+      };
+      const result = await buildUpstreamRequest(providerWithDefaults, mockBody, false);
+
+      // User body values take priority
+      expect(result.body.temperature).toBe(0.7);
+      expect(result.body.max_tokens).toBe(1024);
+    });
+
+    it('should deeply merge extra_body', async () => {
+      const providerWithDefaults = {
+        ...mockProvider,
+        defaultParams: {
+          extra_body: { thinking: { type: 'disabled' }, top_k: 50 }
+        }
+      };
+      const bodyWithExtra = {
+        ...mockBody,
+        extra_body: { thinking: { type: 'enabled' } }
+      };
+      const result = await buildUpstreamRequest(providerWithDefaults, bodyWithExtra, false);
+
+      expect(result.body.extra_body).toEqual({
+        thinking: { type: 'enabled' },
+        top_k: 50
+      });
+    });
+  });
 });
 
 describe('sendUpstreamRequest', () => {

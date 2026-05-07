@@ -1,6 +1,7 @@
 import type { ProviderConfig } from '../../config.js';
 import { buildHeaders, buildUrl } from '../../providers/index.js';
 import { convertOpenAIRequestToAnthropic } from '../../converters/openai-to-anthropic.js';
+import { mergeModelParams } from '../../lib/params-merger.js';
 import { DetailLogger } from '../../detail-logger.js';
 
 export interface UpstreamRequest {
@@ -35,6 +36,9 @@ export async function buildUpstreamRequest(
 
   const requestHeaders = buildHeaders(provider);
   const url = buildUrl(provider, 'chat');
+
+  // 合并默认参数（用户参数优先级更高）
+  requestBody = mergeModelParams(provider.defaultParams, requestBody);
 
   return {
     url,

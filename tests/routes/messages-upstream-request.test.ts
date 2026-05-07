@@ -104,6 +104,88 @@ describe('buildMessagesUpstreamRequest', () => {
       expect(providersModule.buildHeaders).toHaveBeenCalledWith(mockOpenAIProvider);
     });
   });
+
+  describe('with defaultParams', () => {
+    it('should merge defaultParams into request body for Anthropic provider', async () => {
+      const providerWithDefaults = {
+        ...mockAnthropicProvider,
+        defaultParams: { temperature: 0.3, max_tokens: 2048 }
+      };
+      // Body without temperature/max_tokens - defaults should be applied
+      const bodyWithoutParams = {
+        model: 'claude-3-5-sonnet',
+        messages: [
+          { role: 'user', content: 'Hello' },
+          { role: 'assistant', content: 'Hi there' }
+        ]
+      };
+      const result = await buildMessagesUpstreamRequest(providerWithDefaults, bodyWithoutParams, true);
+
+      expect(result.body.temperature).toBe(0.3);
+      expect(result.body.max_tokens).toBe(2048);
+    });
+
+    it('should let user body override defaultParams for Anthropic provider', async () => {
+      const providerWithDefaults = {
+        ...mockAnthropicProvider,
+        defaultParams: { temperature: 0.3, max_tokens: 2048 }
+      };
+      const result = await buildMessagesUpstreamRequest(providerWithDefaults, mockAnthropicBody, true);
+
+      // User body values take priority
+      expect(result.body.temperature).toBe(0.7);
+      expect(result.body.max_tokens).toBe(4096);
+    });
+
+    it('should deeply merge extra_body for Anthropic provider', async () => {
+      const providerWithDefaults = {
+        ...mockAnthropicProvider,
+        defaultParams: {
+          extra_body: { thinking: { type: 'disabled' }, top_k: 50 }
+        }
+      };
+      const bodyWithExtra = {
+        ...mockAnthropicBody,
+        extra_body: { thinking: { type: 'enabled' } }
+      };
+      const result = await buildMessagesUpstreamRequest(providerWithDefaults, bodyWithExtra, true);
+
+      expect(result.body.extra_body).toEqual({
+        thinking: { type: 'enabled' },
+        top_k: 50
+      });
+    });
+
+    it('should merge defaultParams into converted request body for OpenAI provider', async () => {
+      const providerWithDefaults = {
+        ...mockOpenAIProvider,
+        defaultParams: { top_p: 0.9, frequency_penalty: 0.5 }
+      };
+      // Body without top_p/frequency_penalty - defaults should be applied
+      const bodyWithoutParams = {
+        messages: [{ role: 'user', content: 'Hello' }],
+        system: 'You are a helpful assistant.',
+        max_tokens: 4096,
+        temperature: 0.7
+      };
+      const result = await buildMessagesUpstreamRequest(providerWithDefaults, bodyWithoutParams, true);
+
+      expect(result.body.top_p).toBe(0.9);
+      expect(result.body.frequency_penalty).toBe(0.5);
+    });
+
+    it('should let user body override defaultParams for OpenAI provider', async () => {
+      const providerWithDefaults = {
+        ...mockOpenAIProvider,
+        defaultParams: { temperature: 0.8, max_tokens: 1024 }
+      };
+      const result = await buildMessagesUpstreamRequest(providerWithDefaults, mockOpenAIBody, true);
+
+      // User body values take priority
+      expect(result.body.temperature).toBe(0.7);
+      expect(result.body.max_tokens).toBe(4096);
+    });
+  });
 });
 
 describe('sendMessagesUpstreamRequest', () => {
