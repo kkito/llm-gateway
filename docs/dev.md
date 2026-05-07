@@ -1,0 +1,3 @@
+- https://platform.claude.com/docs/zh-CN/build-with-claude/extended-thinking
+- https://code.claude.com/docs/en/llm-gateway
+- https://api-docs.deepseek.com/zh-cn/guides/thinking_mode
