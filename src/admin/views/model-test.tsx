@@ -5,13 +5,14 @@ interface Props {
 }
 
 export const ModelTest: FC<Props> = (props) => {
-  // Serialize defaultParams for use in client-side JS
-  const defaultParamsJson = props.defaultParams ? JSON.stringify(props.defaultParams) : 'null';
+  // Double-stringify to safely embed in JS: JSON.stringify produces a quoted, escaped string
+  const defaultParamsJs = props.defaultParams
+    ? JSON.stringify(JSON.stringify(props.defaultParams))
+    : 'null';
 
   const jsCode = `
 (function() {
-  // defaultParams from server-side props
-  var DEFAULT_PARAMS = ${defaultParamsJson};
+  var DEFAULT_PARAMS = ${defaultParamsJs};
 
   window.runTest = async function() {
     var provider = document.getElementById('provider').value;
@@ -50,15 +51,14 @@ export const ModelTest: FC<Props> = (props) => {
     error.style.display = 'none';
     document.getElementById('responseSection').style.display = 'none';
 
-    // 立即显示发送的内容
-    var requestBody = JSON.stringify({
+    // 先显示用户输入的内容（发送前）
+    var userInput = JSON.stringify({
       provider: provider,
       baseUrl: baseUrl,
       realModel: realModel,
-      message: message,
-      defaultParams: DEFAULT_PARAMS
+      message: message
     }, null, 2);
-    document.getElementById('requestBodyContent').textContent = requestBody;
+    document.getElementById('requestBodyContent').textContent = userInput + '\\n\\n⏳ 发送中...';
     document.getElementById('requestSection').style.display = 'block';
 
     try {
@@ -70,6 +70,11 @@ export const ModelTest: FC<Props> = (props) => {
       var data = await res.json();
 
       if (data.success) {
+        // 替换为后端实际发送的内容（合并 defaultParams 后）
+        if (data.requestBody) {
+          document.getElementById('requestBodyContent').textContent = data.requestBody;
+        }
+
         document.getElementById('testResultModel').textContent = data.model || realModel;
         
         // 显示思考内容（如果有）
