@@ -25,7 +25,17 @@ async function testModelConnection(
   apiKey: string,
   realModel: string,
   message: string
-): Promise<{ success: boolean; model?: string; content?: string; usage?: { prompt_tokens: number; completion_tokens: number }; message?: string; rawResponse?: string }> {
+): Promise<{
+  success: boolean;
+  model?: string;
+  content?: string;
+  reasoningContent?: string;
+  usage?: { prompt_tokens: number; completion_tokens: number };
+  message?: string;
+  rawResponse?: string;
+  requestBody?: string;
+  fullResponse?: string;
+}> {
   const provider = createProvider(providerType);
   const url = provider.buildUrl({ baseUrl, provider: providerType, apiKey, realModel, customModel: '' }, 'chat');
   const headers = provider.buildHeaders(apiKey);
@@ -33,7 +43,7 @@ async function testModelConnection(
   const testBody = {
     model: realModel,
     messages: [{ role: 'user', content: message }],
-    max_tokens: 256,
+    max_tokens: 4096,
   };
 
   try {
@@ -44,7 +54,7 @@ async function testModelConnection(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(testBody),
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(60000),
     });
 
     const rawBody = await response.text();
@@ -54,15 +64,38 @@ async function testModelConnection(
       try {
         data = JSON.parse(rawBody);
       } catch {
-        return { success: true, model: realModel, content: rawBody };
+        return {
+          success: true,
+          model: realModel,
+          content: rawBody,
+          requestBody: JSON.stringify(testBody, null, 2),
+          fullResponse: rawBody,
+        };
       }
-      const content = data.choices?.[0]?.message?.content || data.content?.[0]?.text || JSON.stringify(data);
+
+      // 提取内容（OpenAI 格式）
+      const messageObj = data.choices?.[0]?.message;
+      let content = messageObj?.content || '';
+      let reasoningContent = messageObj?.reasoning_content || messageObj?.reasoning || '';
+
+      // 提取内容（Anthropic 格式）
+      if (data.content && Array.isArray(data.content)) {
+        const textBlocks = data.content.filter((block: any) => block.type === 'text');
+        const thinkingBlocks = data.content.filter((block: any) => block.type === 'thinking');
+        content = textBlocks.map((block: any) => block.text).join('\n\n');
+        reasoningContent = thinkingBlocks.map((block: any) => block.thinking).join('\n\n');
+      }
+
       const usage = data.usage ? { prompt_tokens: data.usage.prompt_tokens || 0, completion_tokens: data.usage.completion_tokens || 0 } : undefined;
+
       return {
         success: true,
         model: data.model || realModel,
         content,
+        reasoningContent,
         usage,
+        requestBody: JSON.stringify(testBody, null, 2),
+        fullResponse: JSON.stringify(data, null, 2),
       };
     }
 
@@ -70,10 +103,11 @@ async function testModelConnection(
       success: false,
       message: `HTTP ${response.status}: ${rawBody}`,
       rawResponse: rawBody,
+      requestBody: JSON.stringify(testBody, null, 2),
     };
   } catch (error: any) {
     if (error.name === 'AbortError') {
-      return { success: false, message: '请求超时（15秒），请检查网络连接或 API 地址' };
+      return { success: false, message: '请求超时（60秒），请检查网络连接或 API 地址', requestBody: JSON.stringify(testBody, null, 2) };
     }
     return { success: false, message: `网络错误: ${error.message}` };
   }
