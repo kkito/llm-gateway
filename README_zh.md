@@ -4,6 +4,28 @@
 
 LLM Proxy Gateway - 统一管理多个大模型 API 的代理服务器
 
+## 安装和使用
+
+```bash
+# 全局安装
+npm install -g @kkito/llm-gateway
+
+# 查看命令帮助
+kkito-llm-gateway -h
+
+# 启动服务（默认 4000 端口，可用 -p 指定端口）
+kkito-llm-gateway -D
+
+# 访问首页
+http://localhost:4000
+
+# 访问管理后台
+http://localhost:4000/admin/models
+
+# 停止服务器
+kkito-llm-gateway --stop
+```
+
 ## 使用场景
 
 - [个人开发者统一管理 API](docs/scenarios/personal-api-management.md)

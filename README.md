@@ -4,6 +4,28 @@
 
 LLM Proxy Gateway - Unified management of multiple LLM APIs
 
+## Installation & Usage
+
+```bash
+# Global install
+npm install -g @kkito/llm-gateway
+
+# View command help
+kkito-llm-gateway -h
+
+# Start service (default port 4000, use -p to specify)
+kkito-llm-gateway -D
+
+# Visit home page
+http://localhost:4000
+
+# Access admin panel
+http://localhost:4000/admin/models
+
+# Stop server
+kkito-llm-gateway --stop
+```
+
 ## Use Cases
 
 - [Personal Developer API Management](docs/scenarios/personal-api-management.md)
