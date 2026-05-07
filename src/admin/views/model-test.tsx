@@ -52,14 +52,8 @@ export const ModelTest: FC<Props> = (props) => {
     error.style.display = 'none';
     document.getElementById('responseSection').style.display = 'none';
 
-    // 先显示用户输入的内容（发送前）
-    var userInput = JSON.stringify({
-      provider: provider,
-      baseUrl: baseUrl,
-      realModel: realModel,
-      message: message
-    }, null, 2);
-    document.getElementById('requestBodyContent').textContent = userInput + '\\n\\n⏳ 发送中...';
+    // 显示发送中状态
+    document.getElementById('requestBodyContent').textContent = '⏳ 发送中...';
     document.getElementById('requestSection').style.display = 'block';
 
     try {
@@ -71,7 +65,7 @@ export const ModelTest: FC<Props> = (props) => {
       var data = await res.json();
 
       if (data.success) {
-        // 替换为后端实际发送的内容（合并 defaultParams 后）
+        // 显示后端实际发送的内容（合并 defaultParams 后）
         if (data.requestBody) {
           document.getElementById('requestBodyContent').textContent = data.requestBody;
         }
