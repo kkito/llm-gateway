@@ -6,6 +6,9 @@ import { ModelsPage } from '../views/models.js';
 import { OpenAIProvider } from '../../providers/openai.js';
 import { AnthropicProvider } from '../../providers/anthropic.js';
 import { mergeModelParams } from '../../lib/params-merger.js';
+import { writeFileSync, mkdirSync, existsSync } from 'fs';
+import { join } from 'path';
+import { getDetailLogDir } from '../../lib/paths.js';
 
 interface RouteDeps {
   config: ProxyConfig | (() => ProxyConfig);
@@ -50,6 +53,21 @@ async function testModelConnection(
 
   // Merge defaultParams (user-provided test params override defaults)
   const mergedBody = mergeModelParams(defaultParams, testBody);
+
+  // Debug: log the actual request being sent
+  const testLogDir = join(getDetailLogDir(), 'test');
+  if (!existsSync(testLogDir)) {
+    mkdirSync(testLogDir, { recursive: true });
+  }
+  const testLogPath = join(testLogDir, `test-${Date.now()}.json`);
+  writeFileSync(testLogPath, JSON.stringify({
+    timestamp: new Date().toISOString(),
+    provider: providerType,
+    url,
+    requestBody: mergedBody,
+    defaultParams: defaultParams || null
+  }, null, 2));
+  console.log(`   [Test] Request logged to: ${testLogPath}`);
 
   try {
     const response = await fetch(url, {
