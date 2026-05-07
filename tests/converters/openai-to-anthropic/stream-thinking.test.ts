@@ -38,6 +38,9 @@ describe('openai-to-anthropic converter - thinking/reasoning support', () => {
     // 应该开始 thinking block
     const thinkingStartEvent = events.find(e => e.type === 'content_block_start' && (e.content_block as any)?.type === 'thinking');
     expect(thinkingStartEvent).toBeDefined();
+    // thinking block 应该用 thinking 字段而不是 text 字段
+    expect((thinkingStartEvent!.content_block as any)?.thinking).toBe('');
+    expect((thinkingStartEvent!.content_block as any)?.text).toBeUndefined();
 
     // 应该包含 thinking delta
     const thinkingDeltaEvent = events.find(e => e.type === 'content_block_delta' && e.delta?.type === 'thinking_delta');
@@ -171,8 +174,11 @@ describe('openai-to-anthropic converter - thinking/reasoning support', () => {
     const thinkingEvents = convertOpenAIStreamChunkToAnthropic(thinkingChunk, state5);
     const textEvents = convertOpenAIStreamChunkToAnthropic(textChunk, state5);
 
-    // 验证 thinking block 被创建
+    // 验证 thinking block 被创建，且使用 thinking 字段
     expect(thinkingEvents.some(e => e.type === 'content_block_start' && (e.content_block as any)?.type === 'thinking')).toBe(true);
+    const thinkingBlock = thinkingEvents.find(e => e.type === 'content_block_start' && (e.content_block as any)?.type === 'thinking');
+    expect((thinkingBlock!.content_block as any)?.thinking).toBe('');
+    expect((thinkingBlock!.content_block as any)?.text).toBeUndefined();
 
     // 验证 text block 被创建（应该先结束 thinking block）
     expect(textEvents.some(e => e.type === 'content_block_stop')).toBe(true);
@@ -227,9 +233,12 @@ describe('openai-to-anthropic converter - thinking/reasoning support', () => {
 
     const events = convertOpenAIStreamChunkToAnthropic(chunk, state7);
 
-    // 应该包含 thinking block
+    // 应该包含 thinking block，且使用 thinking 字段
     expect(events.some(e => e.type === 'content_block_start' && (e.content_block as any)?.type === 'thinking')).toBe(true);
-    
+    const tb = events.find(e => e.type === 'content_block_start' && (e.content_block as any)?.type === 'thinking');
+    expect((tb!.content_block as any)?.thinking).toBe('');
+    expect((tb!.content_block as any)?.text).toBeUndefined();
+
     // 应该包含 thinking delta
     const thinkingDelta = events.find(e => e.type === 'content_block_delta' && e.delta?.type === 'thinking_delta');
     expect(thinkingDelta).toBeDefined();
@@ -277,6 +286,9 @@ describe('openai-to-anthropic converter - thinking/reasoning support', () => {
 
     // 验证 thinking chunk 被正确处理
     expect(thinkingEvents.some(e => e.type === 'content_block_start' && (e.content_block as any)?.type === 'thinking')).toBe(true);
+    const tb2 = thinkingEvents.find(e => e.type === 'content_block_start' && (e.content_block as any)?.type === 'thinking');
+    expect((tb2!.content_block as any)?.thinking).toBe('');
+    expect((tb2!.content_block as any)?.text).toBeUndefined();
     expect(thinkingEvents.some(e => e.type === 'content_block_delta' && (e.delta as any)?.thinking === 'Let me think')).toBe(true);
 
     // 验证 mixed chunk 同时处理了 thinking 和 content

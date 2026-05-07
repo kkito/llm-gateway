@@ -109,6 +109,15 @@ export interface OpenAIMessage {
     };
   }>;
   tool_call_id?: string;
+  /**
+   * 思考过程内容。多个厂商使用不同字段名：
+   * - `reasoning_content` — Qwen / DeepSeek / 大多数国产模型（标准）
+   * - `reasoning` — OpenRouter 转发格式 / 部分开源模型
+   * - 无标准字段 — OpenAI o1 使用 streaming delta 中的 `reasoning_details`
+   *
+   * 本项目中 converters 统一将 thinking 内容映射到本字段，
+   * 外部传递时也兼容 `reasoning_content` 字段。
+   */
   reasoning?: string;
 }
 

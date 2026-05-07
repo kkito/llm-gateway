@@ -25,9 +25,11 @@ export interface AnthropicStreamEvent {
   content_block?: {
     type: 'text' | 'tool_use' | 'thinking';
     text?: string;
+    thinking?: string;
     id?: string;
     name?: string;
     input?: any;
+    signature?: string;
   };
   delta?: {
     type?: 'text_delta' | 'input_json_delta' | 'thinking_delta' | 'signature_delta';

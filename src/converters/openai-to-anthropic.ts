@@ -413,7 +413,7 @@ function handleThinkingDelta(
       index: state.currentContentBlockIndex,
       content_block: {
         type: 'thinking',
-        text: ''
+        thinking: ''
       }
     });
   }

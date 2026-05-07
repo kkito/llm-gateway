@@ -583,7 +583,7 @@ describe('anthropic-to-openai converter - request conversion', () => {
 
       expect(result.messages).toHaveLength(2);
       expect(result.messages[1].content).toBe('The answer is 4.');
-      expect((result.messages[1] as any).reasoning).toBe('Let me calculate 2+2. That equals 4.');
+      expect((result.messages[1] as any).reasoning_content).toBe('Let me calculate 2+2. That equals 4.');
     });
 
     it('should handle assistant message with thinking and tool_calls', () => {
@@ -623,7 +623,7 @@ describe('anthropic-to-openai converter - request conversion', () => {
 
       expect(result.messages[1].content).toBe(null);
       expect(result.messages[1].tool_calls).toHaveLength(1);
-      expect((result.messages[1] as any).reasoning).toBe('I should use the weather tool.');
+      expect((result.messages[1] as any).reasoning_content).toBe('I should use the weather tool.');
     });
 
     it('should handle multiple thinking blocks in assistant message', () => {
@@ -661,7 +661,7 @@ describe('anthropic-to-openai converter - request conversion', () => {
 
       const result = convertAnthropicRequestToOpenAI(anthropicRequest);
 
-      expect((result.messages[1] as any).reasoning).toBe('First thought. Second thought.');
+      expect((result.messages[1] as any).reasoning_content).toBe('First thought. Second thought.');
     });
   });
 });
