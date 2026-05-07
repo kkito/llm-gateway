@@ -14,7 +14,7 @@ export function deepMerge(base: any, override: any): any {
 
   const result = { ...base };
   for (const key of Object.keys(override)) {
-    if (key in base) {
+    if (Object.prototype.hasOwnProperty.call(base, key)) {
       result[key] = deepMerge(base[key], override[key]);
     } else {
       result[key] = override[key];
