@@ -187,6 +187,16 @@ export function createModelFormRoute(deps: RouteDeps) {
     const apiKeySource = body.apiKeySource as string;
     const apiKey = body.apiKey as string;
 
+    // 解析 defaultParams
+    let defaultParams: Record<string, any> | undefined;
+    if (body.defaultParams && typeof body.defaultParams === 'string' && body.defaultParams.trim()) {
+      try {
+        defaultParams = JSON.parse(body.defaultParams);
+      } catch {
+        // JSON 解析失败，忽略
+      }
+    }
+
     // 获取当前配置
     const currentConfig = typeof config === 'function' ? config() : config;
 
@@ -226,7 +236,7 @@ export function createModelFormRoute(deps: RouteDeps) {
       return c.html(
         <ModelFormPage
           error={`模型 "${customModel}" 已存在，请使用不同的名称`}
-          model={{ customModel, realModel, apiKey: finalApiKey, baseUrl, provider, desc }}
+          model={{ customModel, realModel, apiKey: finalApiKey, baseUrl, provider, desc, defaultParams }}
           apiKeyOptions={getApiKeyOptions(proxyConfig.apiKeys || [])}
         />
       );
@@ -241,6 +251,7 @@ export function createModelFormRoute(deps: RouteDeps) {
         baseUrl,
         provider,
         desc: desc || undefined,
+        defaultParams,
       };
 
       // 保存到文件 - 保留 apiKeys 等其他配置
@@ -291,6 +302,16 @@ export function createModelFormRoute(deps: RouteDeps) {
     const apiKeySource = body.apiKeySource as string | undefined;
     const apiKey = body.apiKey as string | undefined;
 
+    // 解析 defaultParams
+    let defaultParams: Record<string, any> | undefined;
+    if (body.defaultParams && typeof body.defaultParams === 'string' && body.defaultParams.trim()) {
+      try {
+        defaultParams = JSON.parse(body.defaultParams);
+      } catch {
+        // JSON 解析失败，忽略
+      }
+    }
+
     // 获取当前配置
     const currentConfig = typeof config === 'function' ? config() : config;
     const oldEntry = currentConfig.models.find(p => p.customModel === oldModel);
@@ -332,7 +353,7 @@ export function createModelFormRoute(deps: RouteDeps) {
       return c.html(
         <ModelFormPage
           error={`模型 "${customModel}" 已存在，请使用不同的名称`}
-          model={{ customModel, realModel, apiKey: finalApiKey, baseUrl, provider, desc }}
+          model={{ customModel, realModel, apiKey: finalApiKey, baseUrl, provider, desc, defaultParams }}
           apiKeyOptions={getApiKeyOptions(proxyConfig.apiKeys || [])}
         />
       );
@@ -355,6 +376,7 @@ export function createModelFormRoute(deps: RouteDeps) {
         outputPricePer1M: oldEntry.outputPricePer1M,
         cachedPricePer1M: oldEntry.cachedPricePer1M,
         hidden: hidden || undefined,
+        defaultParams,
       };
 
       const newConfigList = updateConfigEntry(currentConfig.models, oldModel, newEntry);

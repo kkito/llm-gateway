@@ -1,5 +1,6 @@
 import { FC } from 'hono/jsx';
 import { TopbarNav } from '../components/TopbarNav.js';
+import { JsonEditor } from '../components/JsonEditor.js';
 import type { ProviderConfig } from '../../config.js';
 import { ModelTest } from './model-test.js';
 
@@ -298,6 +299,23 @@ export const ModelFormPage: FC<Props> = (props) => {
                     {props.model?.desc || ''}
                   </textarea>
                   <span class="form-hint">用于记录模型的用途或备注</span>
+                </label>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">
+                  默认参数（可选）
+                  <JsonEditor
+                    name="defaultParams"
+                    value={props.model?.defaultParams ? JSON.stringify(props.model.defaultParams, null, 2) : ''}
+                  />
+                  <span class="form-hint">
+                    配置模型的默认参数，请求时与用户参数合并（用户优先级更高）。
+                    参考：
+                    <a href="https://api-docs.deepseek.com/zh-cn/guides/thinking_mode" target="_blank">DeepSeek</a>
+                    {' '}|{' '}
+                    <a href="https://developers.openai.com/api-reference/resources/chat/subresources/completions/methods/create" target="_blank">OpenAI</a>
+                  </span>
                 </label>
               </div>
 
