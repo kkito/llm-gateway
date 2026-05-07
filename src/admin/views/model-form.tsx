@@ -314,6 +314,8 @@ export const ModelFormPage: FC<Props> = (props) => {
                     参考：
                     <a href="https://api-docs.deepseek.com/zh-cn/guides/thinking_mode" target="_blank">DeepSeek</a>
                     {' '}|{' '}
+                    <a href="https://api-docs.deepseek.com/zh-cn/api/create-chat-completion" target="_blank">DeepSeek</a>
+                    {' '}|{' '}
                     <a href="https://developers.openai.com/api-reference/resources/chat/subresources/completions/methods/create" target="_blank">OpenAI</a>
                   </span>
                 </label>
