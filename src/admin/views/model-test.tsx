@@ -5,9 +5,10 @@ interface Props {
 }
 
 export const ModelTest: FC<Props> = (props) => {
-  // Double-stringify to safely embed in JS: JSON.stringify produces a quoted, escaped string
+  // Embed defaultParams as a JS object literal
+  // Use JSON.stringify once to get a valid JS object string, then escape for template literal
   const defaultParamsJs = props.defaultParams
-    ? JSON.stringify(JSON.stringify(props.defaultParams))
+    ? JSON.stringify(props.defaultParams)
     : 'null';
 
   const jsCode = `
