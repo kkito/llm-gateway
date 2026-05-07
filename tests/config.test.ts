@@ -135,6 +135,44 @@ describe('config', () => {
       expect(() => loadConfig(testConfigPath)).toThrow('defaultParams must be an object');
     });
 
+    it('should reject defaultParams as null', () => {
+      unlinkSync(testConfigPath);
+      const configWithNull = {
+        models: [
+          {
+            customModel: 'test-model',
+            realModel: 'gpt-4',
+            apiKey: 'sk-test',
+            baseUrl: 'https://api.openai.com',
+            provider: 'openai' as const,
+            defaultParams: null
+          }
+        ]
+      };
+      writeFileSync(testConfigPath, JSON.stringify(configWithNull, null, 2));
+      expect(() => loadConfig(testConfigPath)).toThrow('defaultParams must be an object');
+    });
+
+    it('should reject defaultParams as primitive types', () => {
+      for (const badValue of ['string', 42, true]) {
+        unlinkSync(testConfigPath);
+        const configWithPrimitive = {
+          models: [
+            {
+              customModel: 'test-model',
+              realModel: 'gpt-4',
+              apiKey: 'sk-test',
+              baseUrl: 'https://api.openai.com',
+              provider: 'openai' as const,
+              defaultParams: badValue
+            }
+          ]
+        };
+        writeFileSync(testConfigPath, JSON.stringify(configWithPrimitive, null, 2));
+        expect(() => loadConfig(testConfigPath)).toThrow('defaultParams must be an object');
+      }
+    });
+
     it('should accept missing defaultParams (optional field)', () => {
       const result = loadConfig(testConfigPath);
       expect(result[0].defaultParams).toBeUndefined();
