@@ -95,7 +95,7 @@ export const PrivacySettingsPage: FC<Props> = (props) => {
               <div class="toggle-row" style={!s.enabled ? 'opacity: 0.5; pointer-events: none;' : ''}>
                 <div>
                   <div class="toggle-label">白名单字段过滤</div>
-                  <div class="toggle-desc">只转发已知安全字段，过滤掉 user、metadata、extra_body 等</div>
+                  <div class="toggle-desc">只转发已知安全字段，过滤掉 user、metadata 等</div>
                   <div class="whitelist-info">安全字段: messages, stream, temperature, max_tokens, top_p, presence_penalty, frequency_penalty, stop, response_format, tools, tool_choice, seed, stream_options</div>
                 </div>
                 <input type="hidden" name="whitelistFilter" value="off" />
