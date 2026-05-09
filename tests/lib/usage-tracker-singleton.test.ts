@@ -35,15 +35,19 @@ describe('UsageTracker 单例模式', () => {
     expect(instance2).toBe(instance3);
   });
 
-  it('logDir 不匹配时应抛出错误', () => {
+  it('logDir 不匹配时应自动重置实例', () => {
     const anotherDir = mkdtempSync(join(tmpdir(), 'usage-tracker-test-'));
-    
+
     // 第一次创建实例
-    UsageTracker.getInstance(testLogDir);
-    
-    // 第二次使用不同的 logDir 应该抛错
-    expect(() => UsageTracker.getInstance(anotherDir)).toThrow('logDir mismatch');
-    
+    const instance1 = UsageTracker.getInstance(testLogDir);
+
+    // 第二次使用不同的 logDir 应创建新实例（而不是抛错）
+    const instance2 = UsageTracker.getInstance(anotherDir);
+
+    // 应该是不同的实例
+    expect(instance1).not.toBe(instance2);
+    expect(instance2['logDir']).toBe(anotherDir);
+
     // 清理
     try {
       rmSync(anotherDir, { recursive: true, force: true });
@@ -54,13 +58,13 @@ describe('UsageTracker 单例模式', () => {
 
   it('resetInstance 后可以重新创建实例', () => {
     const instance1 = UsageTracker.getInstance(testLogDir);
-    
+
     // 重置
     UsageTracker.resetInstance();
-    
+
     // 重新获取应该可以成功
     const instance2 = UsageTracker.getInstance(testLogDir);
-    
+
     // 应该是不同的实例
     expect(instance1).not.toBe(instance2);
   });
@@ -68,13 +72,13 @@ describe('UsageTracker 单例模式', () => {
   it('RateLimiter 应使用与 UsageTracker 相同的单例实例', () => {
     // 创建 UsageTracker 实例
     const usageTracker = UsageTracker.getInstance(testLogDir);
-    
+
     // 创建 RateLimiter（内部会调用 getInstance）
     const rateLimiter = new RateLimiter(testLogDir);
-    
+
     // 获取 RateLimiter 内部的 tracker
     const trackerFromRateLimiter = rateLimiter.getTracker();
-    
+
     // 应该是同一个实例
     expect(usageTracker).toBe(trackerFromRateLimiter);
   });
@@ -82,23 +86,23 @@ describe('UsageTracker 单例模式', () => {
   it('多个 RateLimiter 实例应共享同一个 UsageTracker', () => {
     const rateLimiter1 = new RateLimiter(testLogDir);
     const rateLimiter2 = new RateLimiter(testLogDir);
-    
+
     expect(rateLimiter1.getTracker()).toBe(rateLimiter2.getTracker());
   });
 
   it('记录用量后应能在同一实例中读取', async () => {
     const usageTracker = UsageTracker.getInstance(testLogDir);
     const rateLimiter = new RateLimiter(testLogDir);
-    
+
     // 确保是同一实例
     expect(usageTracker).toBe(rateLimiter.getTracker());
-    
+
     // 获取计数器
     const counter = usageTracker.getCounter('test-model');
-    
+
     // 初始值应为 0
     expect(counter.today.requests).toBe(0);
-    
+
     // 通过 RateLimiter 记录用量
     const mockLogEntry = {
       timestamp: new Date().toISOString(),
@@ -115,9 +119,9 @@ describe('UsageTracker 单例模式', () => {
       cachedTokens: null,
       userName: 'test-user'
     };
-    
+
     rateLimiter.recordUsage('test-model', mockLogEntry, undefined);
-    
+
     // 再次获取计数器，验证用量已记录
     const counterAfter = usageTracker.getCounter('test-model');
     expect(counterAfter.today.requests).toBe(1);

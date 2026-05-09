@@ -23,14 +23,15 @@ export class UsageTracker {
 
   /**
    * 获取单例实例
+   * 注意：当 logDir 不同时会自动重置实例（支持测试隔离）
    */
   static getInstance(logDir: string): UsageTracker {
     if (!UsageTracker.instance) {
       UsageTracker.instance = new UsageTracker(logDir);
     }
-    // 验证 logDir 一致性
+    // logDir 不同时自动重置实例（用于测试隔离）
     if (UsageTracker.instance.logDir !== logDir) {
-      throw new Error(`logDir mismatch: ${logDir} vs ${UsageTracker.instance.logDir}`);
+      UsageTracker.instance = new UsageTracker(logDir);
     }
     return UsageTracker.instance;
   }

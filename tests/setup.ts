@@ -6,11 +6,11 @@ const originalLog = console.log;
 const originalWarn = console.warn;
 const originalError = console.error;
 
-// 在所有测试前静默 console
+// 在所有测试前静默 console (除 error 外)
 beforeAll(() => {
   console.log = () => {};
   console.warn = () => {};
-  console.error = () => {};
+  // console.error 保持原样，以便在 CI 中查看错误
 });
 
 // 所有测试后恢复

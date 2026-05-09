@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { Hono } from 'hono';
-import { createServer } from '../../src/server.js';
+import { createServer, resetServerGlobalState } from '../../src/server.js';
 import { Logger } from '../../src/logger.js';
 import { DetailLogger } from '../../src/detail-logger.js';
 import type { ProviderConfig, ProxyConfig } from '../../src/config.js';
 import { tmpdir } from 'os';
 import { join } from 'path';
+import { UsageTracker } from '../../src/lib/usage-tracker.js';
 
 describe('Default Params E2E', () => {
   let app: Hono;
@@ -13,6 +14,10 @@ describe('Default Params E2E', () => {
   let originalFetch: typeof fetch;
 
   beforeAll(() => {
+    // 重置全局状态，确保测试环境干净
+    resetServerGlobalState();
+    UsageTracker.resetInstance();
+    
     testLogDir = join(tmpdir(), 'test-e2e-default-params-' + Date.now());
     const logger = new Logger(testLogDir);
     const detailLogger = new DetailLogger(testLogDir);

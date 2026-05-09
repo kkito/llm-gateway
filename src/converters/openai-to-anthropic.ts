@@ -36,7 +36,7 @@ async function parseImageUrl(url: string): Promise<{ data: string; mediaType: st
   }
 
   // 远程 URL，需要 fetch
-  const response = await fetch(url);
+  const response = await globalThis.fetch(url);
   const arrayBuffer = await response.arrayBuffer();
   const base64 = Buffer.from(arrayBuffer).toString('base64');
   const mediaType = response.headers.get('content-type') || 'image/jpeg';

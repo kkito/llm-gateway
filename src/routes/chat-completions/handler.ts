@@ -29,6 +29,7 @@ export function createChatCompletionsHandler(
     let actualModel: string | undefined;
     let triedModels: Array<{ model: string; exceeded: boolean; message?: string }> = [];
     let body: any = {};
+    let provider: ProviderConfig | undefined = undefined;
 
     // Get current user
     const currentUser = (c as any).currentUser || getCurrentUser(c);
@@ -65,8 +66,7 @@ export function createChatCompletionsHandler(
         body = applyPrivacyProtection(body, currentConfig.privacySettings, requestId);
       }
 
-      let provider: ProviderConfig | undefined;
-
+      
       if (model_group) {
         // Model Group mode: fallback loop
         modelGroup = model_group;

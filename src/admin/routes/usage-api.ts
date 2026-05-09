@@ -4,6 +4,13 @@ import { UsageTracker } from '../../lib/usage-tracker.js';
 let usageTracker: UsageTracker | null = null;
 
 /**
+ * 重置 UsageTracker 实例（用于测试隔离）
+ */
+export function resetUsageApiTracker(): void {
+  usageTracker = null;
+}
+
+/**
  * 初始化 UsageTracker（在 server.ts 中调用）
  */
 export function initUsageApiTracker(tracker: UsageTracker): void {

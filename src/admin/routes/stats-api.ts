@@ -6,6 +6,13 @@ import { getLogDir } from '../../config.js';
 let statsProvider: StatsProvider | null = null;
 
 /**
+ * 重置 StatsProvider 实例（用于测试隔离）
+ */
+export function resetStatsProvider(): void {
+  statsProvider = null;
+}
+
+/**
  * 初始化 StatsProvider
  * 需要在 server.ts 中调用 initStatsProvider 进行初始化
  */

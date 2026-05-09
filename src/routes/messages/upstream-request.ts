@@ -55,7 +55,7 @@ export async function sendMessagesUpstreamRequest(
   detailLogger.logUpstreamRequest(requestId, upstream.body);
   console.log(`   📤 [Proxy 转发] ${upstream.url}`);
 
-  const response = await fetch(upstream.url, {
+  const response = await globalThis.fetch(upstream.url, {
     method: 'POST',
     headers: upstream.headers,
     body: JSON.stringify(upstream.body),
