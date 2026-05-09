@@ -47,10 +47,10 @@ LLM Proxy 是一个简单的代理服务器，帮你统一管理多个大模型 
 llm-gateway-start
 ```
 
-或者指定配置文件：
+或者指定工作目录：
 
 ```bash
-llm-gateway-start --config ./config.json --port 4000
+llm-gateway-start -C ./my-gateway --port 4000
 ```
 
 **后台启动**（守护进程模式）：
@@ -132,16 +132,22 @@ llm-gateway-start [选项]
 
 | 参数 | 简写 | 默认值 | 说明 |
 |------|------|--------|------|
-| `--dir` | `-d` | `~/.llm-gateway/` | 工作目录 |
-| `--config` | `-c` | `~/.llm-gateway/config.json` | 配置文件路径 |
-| `--log-dir` | `-l` | `~/.llm-gateway/logs/proxy` | 日志存放目录 |
+| `--config-dir` | `-C` | `~/.llm-gateway/` | 工作目录（配置文件、PID、日志都在这） |
 | `--port` | `-p` | `4000` | 服务端口 |
 | `--timeout` | `-t` | `300000` | 请求超时时间（毫秒） |
 | `--daemon` | `-D` | - | 后台启动（守护进程模式） |
 | `--debug` | - | - | 启用详细日志（记录完整请求/响应内容到文件） |
 | `--stop` | - | - | 停止后台运行的服务 |
 
-**优先级**：`--config` / `--log-dir` > `--dir` > 默认 `~/.llm-gateway/`
+**目录结构**：
+```
+<config-dir>/
+├─ config.json          # 配置文件
+├─ llm-gateway.pid      # PID 文件（后台服务）
+└─ logs/
+   ├─ proxy/            # 结构化日志
+   └─ ...               # 详细日志
+```
 
 **示例**：
 
@@ -150,19 +156,16 @@ llm-gateway-start [选项]
 llm-gateway-start
 
 # 指定自定义工作目录
-llm-gateway-start -d ./my-proxy
+llm-gateway-start -C ./my-gateway
 
-# 使用自定义配置文件和端口
-llm-gateway-start -c ./my-config.json -p 8080
-
-# 指定日志目录
-llm-gateway-start -c ./config.json -l ./my-logs
+# 指定自定义工作目录和端口
+llm-gateway-start -C ./my-gateway -p 8080
 
 # 后台启动（守护进程模式）
-llm-gateway-start --daemon -p 8080
+llm-gateway-start -C ./my-gateway --daemon -p 8080
 
-# 停止后台服务
-llm-gateway-start --stop
+# 停止指定工作目录的后台服务
+llm-gateway-start -C ./my-gateway --stop
 ```
 
 ---
@@ -234,10 +237,10 @@ curl http://localhost:4000/v1/messages \
 llm-gateway-stats
 ```
 
-或者指定日志目录：
+或者指定工作目录：
 
 ```bash
-llm-gateway-stats --log-dir ./logs/proxy
+llm-gateway-stats -C ./my-gateway
 ```
 
 **输出示例**：
@@ -291,14 +294,14 @@ llm-gateway-stats --month 2026-03
 #### 输出 JSON 格式
 
 ```bash
-llm-gateway-stats --log-dir ./logs/proxy --json
+llm-gateway-stats -C ./my-gateway --json
 ```
 
 ---
 
 ## 日志文件
 
-日志存放在 `--log-dir` 指定的目录（默认 `~/.llm-gateway/logs/proxy`），按天存储：
+日志存放在 `<config-dir>/logs/proxy/` 目录（默认 `~/.llm-gateway/logs/proxy`），按天存储：
 
 ```
 ~/.llm-gateway/logs/proxy/
