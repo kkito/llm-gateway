@@ -2,7 +2,8 @@
 
 import { Command } from 'commander';
 import { serve } from '@hono/node-server';
-import { loadFullConfig, getProxyDir, getLogDir, getDetailLogDir, createDefaultConfig } from '../config.js';
+import { loadFullConfig, createDefaultConfig } from '../config.js';
+import { createConfigContext, ConfigContext } from '../lib/config-context.js';
 import { Logger } from '../logger.js';
 import { DetailLogger } from '../detail-logger.js';
 import { createServer } from '../server.js';
@@ -12,9 +13,7 @@ import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 
 interface CliOptions {
-  dir: string;
-  config: string;
-  logDir: string;
+  configDir: string;
   port: number;
   timeout: number;
   daemon: boolean;
@@ -24,35 +23,10 @@ interface CliOptions {
 
 /**
  * 解析配置目录
- * 优先级：--config/--log-dir 指定值 > --dir 指定值 > 默认 ~/.llm-gateway/
+ * 使用 -C/--config-dir 指定的值，默认 ~/.llm-gateway/
  */
-function resolvePaths(options: CliOptions) {
-  const defaultDir = getProxyDir();
-  const userDir = options.dir || defaultDir;
-
-  // 如果用户指定了 --config，使用用户值；否则使用默认配置文件路径
-  const configPath = options.config
-    ? options.config
-    : join(userDir, 'config.json');
-
-  // 如果用户指定了 --log-dir，使用用户值；否则使用默认日志目录
-  const logDirPath = options.logDir
-    ? options.logDir
-    : getLogDir();
-
-  // 详细日志目录
-  const detailLogDir = options.logDir
-    ? join(options.logDir, '..')
-    : getDetailLogDir();
-
-  return { configPath, logDirPath, detailLogDir, userDir };
-}
-
-/**
- * 获取 PID 文件路径
- */
-function getPidFile(userDir: string): string {
-  return join(userDir, 'llm-gateway.pid');
+function resolveContext(options: CliOptions): ConfigContext {
+  return createConfigContext(options.configDir);
 }
 
 /**
@@ -111,8 +85,9 @@ function stopRunning(pidFile: string, userDir: string): void {
 /**
  * 以守护进程方式启动
  */
-function startDaemon(options: CliOptions, userDir: string): void {
-  const pidFile = getPidFile(userDir);
+function startDaemon(options: CliOptions, configDir: string): void {
+  const ctx = createConfigContext(configDir);
+  const pidFile = ctx.pidFile;
   
   // 检查是否已在运行
   const runningPid = checkRunning(pidFile);
@@ -143,12 +118,12 @@ function startDaemon(options: CliOptions, userDir: string): void {
   console.log(`   PID: ${child.pid}`);
   console.log(`   端口：http://localhost:${options.port}`);
   console.log(`   健康检查：http://localhost:${options.port}/health`);
-  console.log(`   工作目录：${userDir}`);
+  console.log(`   工作目录：${configDir}`);
   console.log(`\n停止服务:`);
   console.log(`   kill ${child.pid}`);
   console.log(`   或：llm-gateway-start --stop`);
   console.log(`\n查看日志:`);
-  const logDirForDisplay = options.logDir || getLogDir();
+  const logDirForDisplay = ctx.logDir;
   console.log(`   tail -f ${logDirForDisplay}/proxy-*.log`);
 
   // 父进程退出
@@ -158,9 +133,9 @@ function startDaemon(options: CliOptions, userDir: string): void {
 /**
  * 停止后台服务
  */
-function stopDaemon(userDir: string): void {
-  const pidFile = getPidFile(userDir);
-  stopRunning(pidFile, userDir);
+function stopDaemon(configDir: string): void {
+  const ctx = createConfigContext(configDir);
+  stopRunning(ctx.pidFile, ctx.configDir);
   console.log('✓ 服务已停止');
 }
 
@@ -170,9 +145,7 @@ function main() {
   program
     .name('llm-gateway-start')
     .description('启动 LLM 代理服务器')
-    .option('-d, --dir <path>', '工作目录 (默认 ~/.llm-gateway/)')
-    .option('-c, --config <path>', '配置文件路径')
-    .option('-l, --log-dir <path>', '日志目录')
+    .option('-C, --config-dir <path>', '工作目录 (默认 ~/.llm-gateway/)')
     .option('-p, --port <number>', '服务端口', '4000')
     .option('-t, --timeout <ms>', '请求超时 (ms)', '300000')
     .option('-D, --daemon', '后台启动 (守护进程模式)')
@@ -181,26 +154,25 @@ function main() {
     .action(async (options: CliOptions) => {
       try {
         // 解析路径
-        const { configPath, logDirPath, detailLogDir, userDir } = resolvePaths(options);
-        const pidFile = getPidFile(userDir);
+        const ctx = resolveContext(options);
 
         // 处理 --stop 选项
         if (options.stop) {
-          stopDaemon(userDir);
+          stopDaemon(ctx.configDir);
           return;
         }
 
         // 显示使用的目录
-        console.log(`📁 工作目录：${userDir}`);
+        console.log(`📁 工作目录：${ctx.configDir}`);
 
         // 检查配置文件是否存在，不存在则创建默认空配置
-        if (!existsSync(configPath)) {
-          console.log(`📝 配置文件不存在，正在创建默认配置：${configPath}`);
-          createDefaultConfig(configPath);
+        if (!existsSync(ctx.configPath)) {
+          console.log(`📝 配置文件不存在，正在创建默认配置：${ctx.configPath}`);
+          createDefaultConfig(ctx.configPath);
         }
 
         // 加载配置
-        const config = loadFullConfig(configPath);
+        const config = loadFullConfig(ctx.configPath);
         console.log(`✓ 已加载 ${config.models.length} 个 provider 配置`);
         config.models.forEach((p, i) => {
           console.log(`  [${i + 1}] ${p.customModel} -> ${p.baseUrl}`);
@@ -208,12 +180,12 @@ function main() {
 
         // 如果是后台模式，启动守护进程
         if (options.daemon) {
-          startDaemon(options, userDir);
+          startDaemon(options, ctx.configDir);
           return;
         }
 
         // 检查是否已有后台服务在运行
-        const runningPid = checkRunning(pidFile);
+        const runningPid = checkRunning(ctx.pidFile);
         if (runningPid) {
           console.log(`⚠️  检测到后台服务正在运行 (PID: ${runningPid})`);
           console.log('   如需重启，请先执行：llm-gateway-start --stop');
@@ -221,21 +193,21 @@ function main() {
         }
 
         // 创建日志实例
-        const logger = new Logger(logDirPath);
+        const logger = new Logger(ctx.logDir);
         const logPath = logger.getFilePath();
         console.log(`✓ 结构化日志目录：${logPath}`);
 
         // 创建详细日志实例 (输出到 logs/ 目录)
-        const detailLogger = new DetailLogger(detailLogDir, options.debug || false);
+        const detailLogger = new DetailLogger(ctx.detailLogDir, options.debug || false);
         if (options.debug) {
-          console.log(`✓ 详细日志已启用：${detailLogDir}/{requestId}_{stage}.log`);
+          console.log(`✓ 详细日志已启用：${ctx.detailLogDir}/{requestId}_{stage}.log`);
         } else {
           console.log(`✓ 详细日志已禁用 (使用 --debug 启用)`);
         }
 
         // 创建服务器 (确保 timeout 是数字类型)
         const timeoutMs = Number(options.timeout);
-        const app = createServer(config, logger, detailLogger, timeoutMs, configPath);
+        const app = createServer(config, logger, detailLogger, timeoutMs, ctx.configDir);
         console.log(`✓ 服务器已创建，超时设置：${timeoutMs}ms`);
 
         // 启动服务器
