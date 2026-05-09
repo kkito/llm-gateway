@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
-import { existsSync } from 'fs';
-import { getProxyDir, getLogDir } from '../config.js';
+import { createConfigContext } from '../lib/config-context.js';
 import {
   loadStats,
   formatDateRange,
@@ -15,8 +14,7 @@ import {
 } from '../lib/stats-core.js';
 
 interface CliStatsOptions {
-  dir?: string;
-  logDir?: string;
+  configDir?: string;
   date?: string;
   week?: string;
   month?: string;
@@ -26,11 +24,7 @@ interface CliStatsOptions {
 }
 
 function resolveLogDir(options: CliStatsOptions): string {
-  // 如果用户指定了 --log-dir，使用用户值；否则使用默认日志目录
-  if (options.logDir) {
-    return options.logDir;
-  }
-  return getLogDir();
+  return createConfigContext(options.configDir).logDir;
 }
 
 function formatModelStats(model: string, stats: ModelStats, indent = 2): string[] {
@@ -132,8 +126,7 @@ function main() {
   program
     .name('llm-gateway-stats')
     .description('查看代理服务器统计')
-    .option('-d, --dir <path>', '工作目录 (默认 ~/.llm-gateway/)')
-    .option('-l, --log-dir <path>', '日志目录')
+    .option('-C, --config-dir <path>', '工作目录 (默认 ~/.llm-gateway/)')
     .option('--date <date>', '指定日期 (YYYY-MM-DD)')
     .option('--week <week>', '指定周 (YYYY-Www，如 2026-W13)')
     .option('--month <month>', '指定月份 (YYYY-MM，如 2026-03)')
