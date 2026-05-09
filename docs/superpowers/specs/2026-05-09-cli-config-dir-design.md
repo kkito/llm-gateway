@@ -136,17 +136,17 @@ export function createServer(
 
 ```bash
 # 默认 ~/.llm-gateway/
-llm-gateway-start
+kkito-llm-gateway
 
 # 指定工作目录
-llm-gateway-start -C /my/work
-llm-gateway-start --config-dir /my/work
+kkito-llm-gateway -C /my/work
+kkito-llm-gateway --config-dir /my/work
 
 # 后台启动
-llm-gateway-start -C /my/work --daemon
+kkito-llm-gateway -C /my/work --daemon
 
 # 停止服务
-llm-gateway-start -C /my/work --stop
+kkito-llm-gateway -C /my/work --stop
 
 # 查看统计
 llm-gateway-stats -C /my/work

@@ -44,21 +44,21 @@ LLM Proxy 是一个简单的代理服务器，帮你统一管理多个大模型 
 **前台启动**（占用终端）：
 
 ```bash
-llm-gateway-start
+kkito-llm-gateway
 ```
 
 或者指定工作目录：
 
 ```bash
-llm-gateway-start -C ./my-gateway --port 4000
+kkito-llm-gateway -C ./my-gateway --port 4000
 ```
 
 **后台启动**（守护进程模式）：
 
 ```bash
-llm-gateway-start --daemon
+kkito-llm-gateway --daemon
 # 或简写
-llm-gateway-start -D
+kkito-llm-gateway -D
 ```
 
 后台启动后可以自由使用终端，服务会在后台运行。
@@ -66,7 +66,7 @@ llm-gateway-start -D
 **停止后台服务**：
 
 ```bash
-llm-gateway-start --stop
+kkito-llm-gateway --stop
 ```
 
 看到以下提示表示启动成功：
@@ -125,7 +125,7 @@ curl http://localhost:4000/v1/chat/completions \
 ## 启动命令参数
 
 ```bash
-llm-gateway-start [选项]
+kkito-llm-gateway [选项]
 ```
 
 **常用参数**：
@@ -153,19 +153,19 @@ llm-gateway-start [选项]
 
 ```bash
 # 使用默认目录 ~/.llm-gateway/
-llm-gateway-start
+kkito-llm-gateway
 
 # 指定自定义工作目录
-llm-gateway-start -C ./my-gateway
+kkito-llm-gateway -C ./my-gateway
 
 # 指定自定义工作目录和端口
-llm-gateway-start -C ./my-gateway -p 8080
+kkito-llm-gateway -C ./my-gateway -p 8080
 
 # 后台启动（守护进程模式）
-llm-gateway-start -C ./my-gateway --daemon -p 8080
+kkito-llm-gateway -C ./my-gateway --daemon -p 8080
 
 # 停止指定工作目录的后台服务
-llm-gateway-start -C ./my-gateway --stop
+kkito-llm-gateway -C ./my-gateway --stop
 ```
 
 ---
@@ -225,7 +225,7 @@ curl http://localhost:4000/v1/messages \
 - 📅 日期范围选择：支持按日期、周、月份查询
 
 **访问步骤**：
-1. 启动代理服务器：`llm-gateway-start`
+1. 启动代理服务器：`kkito-llm-gateway`
 2. 浏览器打开：http://localhost:4000/admin/stats
 3. 使用页面上的日期选择器切换不同时间范围
 
@@ -337,7 +337,7 @@ llm-gateway-stats -C ./my-gateway --json
 **后台模式**：执行以下命令停止后台服务：
 
 ```bash
-llm-gateway-start --stop
+kkito-llm-gateway --stop
 ```
 
 或者直接 kill 进程：
@@ -353,7 +353,7 @@ kill <PID>
 使用 `--daemon` 或 `-D` 参数即可：
 
 ```bash
-llm-gateway-start --daemon -p 8080
+kkito-llm-gateway --daemon -p 8080
 ```
 
 启动后会显示进程 PID，方便你管理。
@@ -399,7 +399,7 @@ curl http://localhost:4000/health
 启动时加 `-p` 参数：
 
 ```bash
-llm-gateway-start -p 8080
+kkito-llm-gateway -p 8080
 ```
 
 ---

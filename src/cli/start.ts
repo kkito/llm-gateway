@@ -121,7 +121,7 @@ function startDaemon(options: CliOptions, configDir: string): void {
   console.log(`   工作目录：${configDir}`);
   console.log(`\n停止服务:`);
   console.log(`   kill ${child.pid}`);
-  console.log(`   或：llm-gateway-start --stop`);
+  console.log(`   或：kkito-llm-gateway --stop`);
   console.log(`\n查看日志:`);
   const logDirForDisplay = ctx.logDir;
   console.log(`   tail -f ${logDirForDisplay}/proxy-*.log`);
@@ -143,7 +143,7 @@ function main() {
   const program = new Command();
 
   program
-    .name('llm-gateway-start')
+    .name('kkito-llm-gateway')
     .description('启动 LLM 代理服务器')
     .option('-C, --config-dir <path>', '工作目录 (默认 ~/.llm-gateway/)')
     .option('-p, --port <number>', '服务端口', '4000')
@@ -188,7 +188,7 @@ function main() {
         const runningPid = checkRunning(ctx.pidFile);
         if (runningPid) {
           console.log(`⚠️  检测到后台服务正在运行 (PID: ${runningPid})`);
-          console.log('   如需重启，请先执行：llm-gateway-start --stop');
+          console.log('   如需重启，请先执行：kkito-llm-gateway --stop');
           console.log('   或使用前台模式启动\n');
         }
 
