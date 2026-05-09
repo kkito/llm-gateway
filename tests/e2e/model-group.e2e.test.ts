@@ -54,10 +54,10 @@ describe('Model Group E2E', () => {
 
     writeFileSync(testConfigPath, JSON.stringify(proxyConfig, null, 2));
 
-    const logger = new Logger(testLogDir);
-    const detailLogger = new DetailLogger(testLogDir);
+    const logger = new Logger(join(tempDir, "logs", "proxy"));
+    const detailLogger = new DetailLogger(join(tempDir, "logs"));
 
-    app = createServer(proxyConfig, logger, detailLogger, 30000, testConfigPath);
+    app = createServer(proxyConfig, logger, detailLogger, 30000, tempDir);
     originalFetch = globalThis.fetch;
   });
 
@@ -349,9 +349,9 @@ describe('Model Group E2E', () => {
         ]
       };
 
-      const logger = new Logger(testLogDir);
-      const detailLogger = new DetailLogger(testLogDir);
-      const app3 = createServer(proxyConfig, logger, detailLogger, 30000, testConfigPath);
+      const logger = new Logger(join(tempDir, "logs", "proxy"));
+      const detailLogger = new DetailLogger(join(tempDir, "logs"));
+      const app3 = createServer(proxyConfig, logger, detailLogger, 30000, tempDir);
 
       // test-a 和 test-b 都失败，只有 test-c 成功
       let callOrder: string[] = [];
@@ -430,7 +430,7 @@ describe('Model Group E2E', () => {
       expect(res.status).toBe(200);
 
       // 验证实际使用的模型 'test-a' 的计数 > 0
-      const tracker = UsageTracker.getInstance(testLogDir);
+      const tracker = UsageTracker.getInstance(join(tempDir, 'logs', 'proxy'));
       const counterA = tracker.getCounter('test-a');
       expect(counterA.today.requests).toBeGreaterThan(0);
       expect(counterA.today.inputTokens).toBeGreaterThan(0);

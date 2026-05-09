@@ -32,7 +32,7 @@ describe('Admin Model Management E2E', () => {
 
     const logger = new Logger(testLogDir);
     const detailLogger = new DetailLogger(testLogDir);
-    app = createServer(testConfig, logger, detailLogger, 30000, testConfigPath);
+    app = createServer(testConfig, logger, detailLogger, 30000, testLogDir);
   });
 
   afterAll(() => {

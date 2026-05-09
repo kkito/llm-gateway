@@ -73,7 +73,7 @@ describe('User Auth - No Guest User E2E', () => {
 
       const logger = new Logger(testLogDir);
       const detailLogger = new DetailLogger(testLogDir);
-      const noAuthApp = createServer(testConfig, logger, detailLogger, 30000, testConfigPath);
+      const noAuthApp = createServer(testConfig, logger, detailLogger, 30000, testLogDir);
 
       try {
         const response = await noAuthApp.request('/user/main');
@@ -116,7 +116,7 @@ describe('User Auth - No Guest User E2E', () => {
 
       const logger = new Logger(testLogDir);
       const detailLogger = new DetailLogger(testLogDir);
-      const noAuthApp = createServer(testConfig, logger, detailLogger, 30000, testConfigPath);
+      const noAuthApp = createServer(testConfig, logger, detailLogger, 30000, testLogDir);
 
       try {
         const response = await noAuthApp.request('/user/stats');
@@ -150,7 +150,7 @@ describe('User Auth - No Guest User E2E', () => {
 
       const logger = new Logger(testLogDir);
       const detailLogger = new DetailLogger(testLogDir);
-      const noAuthApp = createServer(testConfig, logger, detailLogger, 30000, testConfigPath);
+      const noAuthApp = createServer(testConfig, logger, detailLogger, 30000, testLogDir);
 
       try {
         const response = await noAuthApp.request('/v1/chat/completions', {
@@ -201,7 +201,7 @@ describe('User Auth - No Guest User E2E', () => {
 
       const logger = new Logger(testLogDir);
       const detailLogger = new DetailLogger(testLogDir);
-      app = createServer(testConfig, logger, detailLogger, 30000, testConfigPath);
+      app = createServer(testConfig, logger, detailLogger, 30000, testLogDir);
     });
 
     afterEach(() => {

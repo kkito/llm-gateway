@@ -29,9 +29,9 @@ import { createAnnouncementRoute } from './admin/routes/announcement.js';
 import { authMiddleware, isPasswordConfigured, sessions } from './admin/middleware/auth.js';
 import { createUserAuthMiddleware } from './user/middleware/auth.js';
 import { loadFullConfig } from './config.js';
-import { join as pathJoin } from 'path';
 import { UsageTracker } from './lib/usage-tracker.js';
 import { StatsProvider } from './lib/stats-provider.js';
+import { createConfigContext } from './lib/config-context.js';
 
 // 获取当前模块目录 (用于静态文件服务)
 const __filename = fileURLToPath(import.meta.url);
@@ -46,12 +46,12 @@ export function createServer(
   logger: Logger,
   detailLogger: DetailLogger,
   timeoutMs: number = 300000,
-  configPath?: string
+  configDir?: string
 ): Hono {
   const app = new Hono();
 
-  // 从 logger 获取 logDir
-  const logDir = pathJoin(logger.getFilePath(), '..');
+  const ctx = createConfigContext(configDir);
+  const logDir = ctx.logDir;
 
   // 创建用量追踪器（单例）
   const usageTracker = UsageTracker.getInstance(logDir);
@@ -143,25 +143,25 @@ export function createServer(
   });
 
   // 用户登录路由（需要在认证中间件之前注册）
-  if (configPath) {
-    app.route('/user/login', createUserLoginRoute({ configPath }));
+  if (ctx.configDir) {
+    app.route('/user/login', createUserLoginRoute({ configPath: ctx.configPath }));
   }
 
   // 用户登出路由（需要在认证中间件之前注册）
   app.route('', createLogoutRoute());
 
   // 用户统计路由（需要在认证中间件之前注册，因为它内部处理认证）
-  if (configPath) {
-    app.route('/user/stats', createUserStatsRoute(configPath));
+  if (ctx.configDir) {
+    app.route('/user/stats', createUserStatsRoute(ctx.configPath));
   }
 
   // 用户认证中间件 - 应用到所有 API 路由（仅在配置 userApiKeys 时）
   // 注意：必须在 /user/login 和 /user/stats 之后注册，这样这些路由不会被中间件拦截
-  if (configPath) {
-    app.use('/user/*', createUserAuthMiddleware(configPath));
-    app.use('/v1/*', createUserAuthMiddleware(configPath));
-    app.use('/chat/completions', createUserAuthMiddleware(configPath));
-    app.use('/messages', createUserAuthMiddleware(configPath));
+  if (ctx.configDir) {
+    app.use('/user/*', createUserAuthMiddleware(ctx.configPath));
+    app.use('/v1/*', createUserAuthMiddleware(ctx.configPath));
+    app.use('/chat/completions', createUserAuthMiddleware(ctx.configPath));
+    app.use('/messages', createUserAuthMiddleware(ctx.configPath));
   }
 
   // 聊天完成路由
@@ -184,7 +184,7 @@ export function createServer(
 
   // 认证中间件 - 必须在这里注册（在所有 admin 路由之前），这样才能拦截所有 /admin/* 路由
   // 注意：/admin/login 路径会被单独处理，不需要认证
-  if (configPath) {
+  if (ctx.configDir) {
     app.use('/admin/*', async (c, next) => {
       // 登录页无需认证
       if (c.req.path === '/admin/login') {
@@ -194,7 +194,7 @@ export function createServer(
 
       // 检查是否已配置密码
       try {
-        const config = loadFullConfig(configPath);
+        const config = loadFullConfig(ctx.configPath);
         const hasPassword = isPasswordConfigured(config.adminPassword);
 
         if (hasPassword) {
@@ -240,67 +240,67 @@ export function createServer(
   }
 
   // 登录路由（无需认证）
-  if (configPath) {
-    app.route('', createLoginRoute({ configPath }));
+  if (ctx.configDir) {
+    app.route('', createLoginRoute({ configPath: ctx.configPath }));
   }
 
   // 密码管理路由（内部也做了认证检查，作为双重保障）
-  if (configPath) {
-    app.route('', createPasswordRoute({ configPath }));
+  if (ctx.configDir) {
+    app.route('', createPasswordRoute({ configPath: ctx.configPath }));
   }
 
   // 隐私保护路由
-  if (configPath) {
-    app.route('', createPrivacyRoute({ configPath, onConfigChange }));
+  if (ctx.configDir) {
+    app.route('', createPrivacyRoute({ configPath: ctx.configPath, onConfigChange }));
   }
 
   // 公告管理路由
-  if (configPath) {
+  if (ctx.configDir) {
     app.route('', createAnnouncementRoute({
-      configPath,
+      configPath: ctx.configPath,
       onConfigChange
     }));
   }
 
   // API Keys 管理路由
-  if (configPath) {
-    app.route('', createApiKeysRoute({ configPath }));
+  if (ctx.configDir) {
+    app.route('', createApiKeysRoute({ configPath: ctx.configPath }));
   }
 
   // 模型列表路由
   app.route('', createModelsRoute(() => currentConfig));
 
   // 模型表单路由
-  if (configPath) {
+  if (ctx.configDir) {
     app.route('', createModelFormRoute({
       config: () => currentConfig,
-      configPath,
+      configPath: ctx.configPath,
       onConfigChange
     }));
   }
 
   // 模型限制管理路由
-  if (configPath) {
+  if (ctx.configDir) {
     app.route('', createModelLimitsRoute({
       config: () => currentConfig,
-      configPath,
+      configPath: ctx.configPath,
       onConfigChange,
       usageTracker
     }));
   }
 
   // Model Groups 表单路由（需在列表路由之前注册，确保 /admin/model-groups/new 优先匹配）
-  if (configPath) {
+  if (ctx.configDir) {
     app.route('', createModelGroupFormRoute({
-      configPath,
+      configPath: ctx.configPath,
       onConfigChange
     }));
   }
 
   // Model Groups 管理路由
-  if (configPath) {
+  if (ctx.configDir) {
     app.route('', createModelGroupsRoute({
-      configPath,
+      configPath: ctx.configPath,
       onConfigChange
     }));
   }
@@ -315,12 +315,12 @@ export function createServer(
   app.route('', createUsageApiRoute());
 
   // 用户管理路由
-  if (configPath) {
-    app.route('', createUsersRoute(configPath));
+  if (ctx.configDir) {
+    app.route('', createUsersRoute(ctx.configPath));
   }
 
   // 用户首页路由
-  app.route('', createHomeRoute(() => currentConfig, configPath));
+  app.route('', createHomeRoute(() => currentConfig, ctx.configPath));
 
   return app;
 }

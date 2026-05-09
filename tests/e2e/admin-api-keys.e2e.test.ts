@@ -35,7 +35,7 @@ describe('Admin API Keys 页面认证测试', () => {
     const testConfig: ProxyConfig = { models: testModels };
     writeFileSync(testConfigPath, JSON.stringify(testConfig, null, 2));
 
-    app = createServer(testConfig, logger, detailLogger, 30000, testConfigPath);
+    app = createServer(testConfig, logger, detailLogger, 30000, testLogDir);
     originalFetch = globalThis.fetch;
   });
 

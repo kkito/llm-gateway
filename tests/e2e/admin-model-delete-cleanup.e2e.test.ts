@@ -72,7 +72,7 @@ describe('Admin Model Delete Cleanup E2E', () => {
     };
     writeFileSync(testConfigPath, JSON.stringify(testConfig, null, 2));
 
-    app = createServer(testConfig, logger, detailLogger, 30000, testConfigPath);
+    app = createServer(testConfig, logger, detailLogger, 30000, tempDir);
     originalFetch = globalThis.fetch;
   });
 

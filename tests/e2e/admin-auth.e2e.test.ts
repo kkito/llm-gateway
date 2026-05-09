@@ -42,7 +42,7 @@ describe('Admin 认证 E2E 测试', () => {
     // 创建临时配置文件
     writeFileSync(testConfigPath, JSON.stringify(testConfig, null, 2));
 
-    app = createServer(testConfig, logger, detailLogger, 30000, testConfigPath);
+    app = createServer(testConfig, logger, detailLogger, 30000, testLogDir);
     originalFetch = globalThis.fetch;
   });
 
@@ -509,7 +509,7 @@ describe('Admin 认证 E2E 测试', () => {
         }
       ];
       const testConfig: ProxyConfig = { models: testModels };
-      const freshApp = createServer(testConfig, logger, detailLogger, 30000, testConfigPath);
+      const freshApp = createServer(testConfig, logger, detailLogger, 30000, testLogDir);
 
       // 现在应该可以无密码访问
       const response = await freshApp.request('/admin/models');

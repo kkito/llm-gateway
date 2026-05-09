@@ -58,7 +58,7 @@ describe('Rate Limit E2E 测试', () => {
     const logger = new Logger(testLogDir);
     const detailLogger = new DetailLogger(testLogDir);
 
-    app = createServer(testConfig, logger, detailLogger, 30000, testConfigPath);
+    app = createServer(testConfig, logger, detailLogger, 30000, testLogDir);
     originalFetch = globalThis.fetch;
   });
 

@@ -62,7 +62,7 @@ describe('Admin Models Form E2E', () => {
       JSON.stringify(testConfig, null, 2)
     );
 
-    app = createServer(testConfig, logger, detailLogger, 30000, testConfigPath);
+    app = createServer(testConfig, logger, detailLogger, 30000, testLogDir);
     originalFetch = globalThis.fetch;
   });
 

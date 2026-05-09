@@ -70,7 +70,7 @@ describe('User Authentication E2E', () => {
     // 创建临时配置文件
     writeFileSync(testConfigPath, JSON.stringify(testConfig, null, 2));
 
-    app = createServer(testConfig, logger, detailLogger, 30000, testConfigPath);
+    app = createServer(testConfig, logger, detailLogger, 30000, testLogDir);
 
     // 设置测试 API Key
     testApiKey = 'sk-lg-test1234567890123456';
@@ -123,7 +123,7 @@ describe('User Authentication E2E', () => {
 
     const logger = new Logger(noAuthLogDir);
     const detailLogger = new DetailLogger(noAuthLogDir);
-    const noAuthApp = createServer(testConfig, logger, detailLogger, 30000, noAuthConfigPath);
+    const noAuthApp = createServer(testConfig, logger, detailLogger, 30000, noAuthLogDir);
 
     try {
       const response = await noAuthApp.request('/user/main');

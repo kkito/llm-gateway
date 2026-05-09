@@ -64,7 +64,7 @@ describe('User Home Page E2E', () => {
 
       const logger = new Logger(testLogDir);
       const detailLogger = new DetailLogger(testLogDir);
-      const app = createServer(testConfig, logger, detailLogger, 30000, testConfigPath);
+      const app = createServer(testConfig, logger, detailLogger, 30000, testLogDir);
 
       try {
         const response = await app.request('/user/main');
@@ -131,7 +131,7 @@ describe('User Home Page E2E', () => {
 
       const logger = new Logger(testLogDir);
       const detailLogger = new DetailLogger(testLogDir);
-      const app = createServer(testConfig, logger, detailLogger, 30000, testConfigPath);
+      const app = createServer(testConfig, logger, detailLogger, 30000, testLogDir);
 
       try {
         const response = await app.request('/user/main');
@@ -193,7 +193,7 @@ describe('User Home Page E2E', () => {
 
       const logger = new Logger(testLogDir);
       const detailLogger = new DetailLogger(testLogDir);
-      const app = createServer(testConfig, logger, detailLogger, 30000, testConfigPath);
+      const app = createServer(testConfig, logger, detailLogger, 30000, testLogDir);
 
       try {
         const response = await app.request('/user/main');
@@ -246,7 +246,7 @@ describe('User Home Page E2E', () => {
 
       const logger = new Logger(testLogDir);
       const detailLogger = new DetailLogger(testLogDir);
-      const app = createServer(testConfig, logger, detailLogger, 30000, testConfigPath);
+      const app = createServer(testConfig, logger, detailLogger, 30000, testLogDir);
 
       try {
         const response = await app.request('/user/main');
@@ -294,7 +294,7 @@ describe('User Home Page E2E', () => {
 
       const logger = new Logger(testLogDir);
       const detailLogger = new DetailLogger(testLogDir);
-      const app = createServer(testConfig, logger, detailLogger, 30000, testConfigPath);
+      const app = createServer(testConfig, logger, detailLogger, 30000, testLogDir);
 
       try {
         const response = await app.request('/user/main');
