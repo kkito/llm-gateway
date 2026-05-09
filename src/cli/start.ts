@@ -55,7 +55,7 @@ function checkRunning(pidFile: string): number | null {
 /**
  * 停止正在运行的服务
  */
-function stopRunning(pidFile: string, userDir: string): void {
+function stopRunning(pidFile: string): void {
   const pid = checkRunning(pidFile);
   if (pid) {
     console.log(`🛑 正在停止已运行的服务 (PID: ${pid})...`);
@@ -135,7 +135,7 @@ function startDaemon(options: CliOptions, configDir: string): void {
  */
 function stopDaemon(configDir: string): void {
   const ctx = createConfigContext(configDir);
-  stopRunning(ctx.pidFile, ctx.configDir);
+  stopRunning(ctx.pidFile);
   console.log('✓ 服务已停止');
 }
 
