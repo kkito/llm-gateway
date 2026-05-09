@@ -1,8 +1,3 @@
-/**
- * Configuration context - derives all paths from a single base directory.
- */
-
-import { join } from 'path';
 import {
   getProxyDir,
   getConfigPathFromDir,
