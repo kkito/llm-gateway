@@ -32,7 +32,7 @@ export function createStatsApiRoute() {
 
       // 使用统一的日志目录
       // 优先通过 query 参数指定的 logDir，否则从全局 StatsProvider 获取
-      // 这样即使服务器启动时使用了 --log-dir 参数，API 也能找到正确的日志目录
+      // 这样即使服务器启动时使用了 --config-dir 参数，API 也能找到正确的日志目录
       let actualLogDir: string;
       if (logDir) {
         actualLogDir = logDir;
