@@ -34,3 +34,31 @@ export function getLogDir(): string {
 export function getDetailLogDir(): string {
   return join(getProxyDir(), 'logs');
 }
+
+/**
+ * Get config file path from a base directory
+ */
+export function getConfigPathFromDir(configDir: string): string {
+  return join(configDir, 'config.json');
+}
+
+/**
+ * Get structured log directory from a base directory
+ */
+export function getLogDirFromDir(configDir: string): string {
+  return join(configDir, 'logs', 'proxy');
+}
+
+/**
+ * Get detail log directory from a base directory
+ */
+export function getDetailLogDirFromDir(configDir: string): string {
+  return join(configDir, 'logs');
+}
+
+/**
+ * Get PID file path from a base directory
+ */
+export function getPidFileFromDir(configDir: string): string {
+  return join(configDir, 'llm-gateway.pid');
+}
