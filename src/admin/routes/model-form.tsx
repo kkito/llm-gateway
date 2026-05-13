@@ -220,6 +220,18 @@ export function createModelFormRoute(deps: RouteDeps) {
       }
     }
 
+    // 解析价格字段
+    const parsePrice = (val: unknown): number | undefined => {
+      if (val === undefined || val === null || val === '') return undefined;
+      const num = Number(val);
+      if (!isNaN(num) && num >= 0) return num;
+      return undefined;
+    };
+
+    const inputPricePer1M = parsePrice(body.inputPricePer1M);
+    const outputPricePer1M = parsePrice(body.outputPricePer1M);
+    const cachedPricePer1M = parsePrice(body.cachedPricePer1M);
+
     // 获取当前配置
     const currentConfig = typeof config === 'function' ? config() : config;
 
@@ -259,14 +271,14 @@ export function createModelFormRoute(deps: RouteDeps) {
       return c.html(
         <ModelFormPage
           error={`模型 "${customModel}" 已存在，请使用不同的名称`}
-          model={{ customModel, realModel, apiKey: finalApiKey, baseUrl, provider, desc, defaultParams }}
+          model={{ customModel, realModel, apiKey: finalApiKey, baseUrl, provider, desc, defaultParams, inputPricePer1M, outputPricePer1M, cachedPricePer1M }}
           apiKeyOptions={getApiKeyOptions(proxyConfig.apiKeys || [])}
         />
       );
     }
 
     try {
-      // 创建新配置（不包含 limits 和价格配置）
+      // 创建新配置
       const newConfig: ProviderConfig = {
         customModel,
         realModel,
@@ -275,6 +287,9 @@ export function createModelFormRoute(deps: RouteDeps) {
         provider,
         desc: desc || undefined,
         defaultParams,
+        inputPricePer1M,
+        outputPricePer1M,
+        cachedPricePer1M,
       };
 
       // 保存到文件 - 保留 apiKeys 等其他配置
@@ -335,6 +350,18 @@ export function createModelFormRoute(deps: RouteDeps) {
       }
     }
 
+    // 解析价格字段
+    const parsePrice = (val: unknown): number | undefined => {
+      if (val === undefined || val === null || val === '') return undefined;
+      const num = Number(val);
+      if (!isNaN(num) && num >= 0) return num;
+      return undefined;
+    };
+
+    const inputPricePer1M = parsePrice(body.inputPricePer1M);
+    const outputPricePer1M = parsePrice(body.outputPricePer1M);
+    const cachedPricePer1M = parsePrice(body.cachedPricePer1M);
+
     // 获取当前配置
     const currentConfig = typeof config === 'function' ? config() : config;
     const oldEntry = currentConfig.models.find(p => p.customModel === oldModel);
@@ -346,7 +373,7 @@ export function createModelFormRoute(deps: RouteDeps) {
     // 验证必填字段
     if (!customModel || !realModel || !baseUrl || !provider) {
       const proxyConfig = loadFullConfig(configPath);
-      return c.html(<ModelFormPage error="请填写所有必填字段" model={{ customModel, realModel, apiKey: apiKey || '', baseUrl, provider, desc }} apiKeyOptions={getApiKeyOptions(proxyConfig.apiKeys || [])} />);
+      return c.html(<ModelFormPage error="请填写所有必填字段" model={{ customModel, realModel, apiKey: apiKey || '', baseUrl, provider, desc, defaultParams, inputPricePer1M, outputPricePer1M, cachedPricePer1M }} apiKeyOptions={getApiKeyOptions(proxyConfig.apiKeys || [])} />);
     }
 
     // 处理 API Key：优先使用下拉框选择的，其次使用手动输入的，最后使用原值
@@ -376,7 +403,7 @@ export function createModelFormRoute(deps: RouteDeps) {
       return c.html(
         <ModelFormPage
           error={`模型 "${customModel}" 已存在，请使用不同的名称`}
-          model={{ customModel, realModel, apiKey: finalApiKey, baseUrl, provider, desc, defaultParams }}
+          model={{ customModel, realModel, apiKey: finalApiKey, baseUrl, provider, desc, defaultParams, inputPricePer1M, outputPricePer1M, cachedPricePer1M }}
           apiKeyOptions={getApiKeyOptions(proxyConfig.apiKeys || [])}
         />
       );
@@ -395,9 +422,9 @@ export function createModelFormRoute(deps: RouteDeps) {
         provider,
         desc: desc || undefined,
         limits: oldEntry.limits,
-        inputPricePer1M: oldEntry.inputPricePer1M,
-        outputPricePer1M: oldEntry.outputPricePer1M,
-        cachedPricePer1M: oldEntry.cachedPricePer1M,
+        inputPricePer1M,
+        outputPricePer1M,
+        cachedPricePer1M,
         hidden: hidden || undefined,
         defaultParams,
       };
@@ -439,7 +466,7 @@ export function createModelFormRoute(deps: RouteDeps) {
       return c.redirect('/admin/models');
     } catch (error: any) {
       const proxyConfig = loadFullConfig(configPath);
-      return c.html(<ModelFormPage error={`保存失败：${error.message}`} model={{ customModel, realModel, apiKey: finalApiKey, baseUrl, provider, desc }} apiKeyOptions={getApiKeyOptions(proxyConfig.apiKeys || [])} />);
+      return c.html(<ModelFormPage error={`保存失败：${error.message}`} model={{ customModel, realModel, apiKey: finalApiKey, baseUrl, provider, desc, defaultParams, inputPricePer1M, outputPricePer1M, cachedPricePer1M }} apiKeyOptions={getApiKeyOptions(proxyConfig.apiKeys || [])} />);
     }
   });
 

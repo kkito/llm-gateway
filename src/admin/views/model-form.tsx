@@ -3,6 +3,7 @@ import { TopbarNav } from '../components/TopbarNav.js';
 import { JsonEditor } from '../components/JsonEditor.js';
 import type { ProviderConfig } from '../../config.js';
 import { ModelTest } from './model-test.js';
+import { PricingConfig } from '../components/PricingConfig.js';
 
 interface Props {
   model?: ProviderConfig;
@@ -337,6 +338,11 @@ export const ModelFormPage: FC<Props> = (props) => {
               </div>
               )}
 
+              <PricingConfig 
+                inputPricePer1M={props.model?.inputPricePer1M}
+                outputPricePer1M={props.model?.outputPricePer1M}
+                cachedPricePer1M={props.model?.cachedPricePer1M}
+              />
               <ModelTest defaultParams={props.model?.defaultParams} />
 
               <div class="form-actions">
