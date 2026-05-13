@@ -1,4 +1,4 @@
-# QWEN.md — LLM Gateway Project Context
+# AGENT.md — LLM Gateway Project Context
 
 ## Project Overview
 
