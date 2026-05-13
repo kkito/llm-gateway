@@ -7,7 +7,6 @@ dist
 .llmproxy
 .qwen
 AGENTS.md
-.agents
 .config
 skills-lock.json
 .worktrees
