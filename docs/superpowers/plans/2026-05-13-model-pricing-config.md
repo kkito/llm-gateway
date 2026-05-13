@@ -17,6 +17,7 @@
 | `src/admin/components/PricingConfig.tsx` | 新增，价格配置表单组件 |
 | `src/admin/views/model-form.tsx` | 修改，引入并使用新组件 |
 | `src/admin/routes/model-form.tsx` | 修改，处理表单提交的价格字段 |
+| `tests/components/pricing-config.test.tsx` | 新增，PricingConfig 组件测试 |
 
 ---
 
@@ -233,7 +234,51 @@ const newEntry: ProviderConfig = {
 
 ---
 
-### Task 5: 运行测试验证
+### Task 5: 创建 PricingConfig 组件的测试
+
+**Files:**
+- Create: `tests/components/pricing-config.test.tsx`
+
+- [ ] **Step 1: 创建测试文件**
+
+```tsx
+import { describe, it, expect } from 'vitest';
+import { PricingConfig } from '../../src/admin/components/PricingConfig.js';
+
+describe('PricingConfig', () =&gt; {
+  it('should render without errors when no props are provided', () =&gt; {
+    const html = String(&lt;PricingConfig /&gt;);
+    expect(html).toContain('价格配置');
+    expect(html).toContain('inputPricePer1M');
+    expect(html).toContain('outputPricePer1M');
+    expect(html).toContain('cachedPricePer1M');
+  });
+
+  it('should render with provided price values', () =&gt; {
+    const html = String(
+      &lt;PricingConfig 
+        inputPricePer1M={0.15}
+        outputPricePer1M={0.30}
+        cachedPricePer1M={0.05}
+      /&gt;,
+    );
+    expect(html).toContain('0.15');
+    expect(html).toContain('0.30');
+    expect(html).toContain('0.05');
+  });
+
+  it('should have number inputs with min="0"', () =&gt; {
+    const html = String(&lt;PricingConfig /&gt;);
+    expect(html).toContain('type="number"');
+    expect(html).toContain('min="0"');
+    expect(html).toContain('step="any"');
+  });
+});
+```
+
+---
+
+### Task 6: 运行测试验证
 
 **Files:**
 - Run: 项目的测试命令
