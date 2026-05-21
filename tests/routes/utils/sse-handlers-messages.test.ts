@@ -204,10 +204,10 @@ data: {"id":"chatcmpl-ed8fb9c62e7b4d87a6629594c0bc7215","object":"chat.completio
     expect(result.some(e => e.includes('"type":"text"'))).toBe(true);
     expect(result.some(e => e.includes('"text":"hello"'))).toBe(true);
 
-    // 应该产生 message_delta（因为有 finish_reason），但上游 usage:null，所以不含 usage
+    // 应该产生 message_delta（因为有 finish_reason），上游 usage:null 时使用默认值
     expect(result.some(e => e.includes('event: message_delta'))).toBe(true);
     const messageDelta = result.find(e => e.includes('event: message_delta'))!;
-    expect(messageDelta).not.toContain('"usage"');
+    expect(messageDelta).toContain('"usage":{"input_tokens":0,"output_tokens":0}');
 
     // 应该产生 message_stop
     expect(result.some(e => e.includes('event: message_stop'))).toBe(true);
@@ -230,9 +230,9 @@ data: {"id":"chatcmpl-ed8fb9c62e7b4d87a6629594c0bc7215","object":"chat.completio
     // 应该产生 message_delta
     expect(result.some(e => e.includes('event: message_delta'))).toBe(true);
 
-    // message_delta 中不应包含 usage（因为上游 usage 为 null）
+    // message_delta 应包含默认 usage（上游 usage 为 null 时使用 input_tokens:0, output_tokens:0）
     const messageDelta = result.find(e => e.includes('event: message_delta'))!;
-    expect(messageDelta).not.toContain('"usage"');
+    expect(messageDelta).toContain('"usage":{"input_tokens":0,"output_tokens":0}');
 
     // 应该产生 message_stop
     expect(result.some(e => e.includes('event: message_stop'))).toBe(true);

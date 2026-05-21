@@ -654,11 +654,15 @@ export function convertOpenAIStreamChunkToAnthropic(
       }
     };
     
-    // 添加 usage 信息
+    // 始终添加 usage 信息（即使 chunk.usage 为 null，也返回默认值）
+    // 上游（如 Fireworks/Kimi）可能在最终 chunk 中发 usage:null，
+    // 但 Anthropic 客户端要求 message_delta 必须包含 usage 字段
     if (chunk.usage) {
-      const inputTokens = chunk.usage.prompt_tokens || 0;
-      const outputTokens = chunk.usage.completion_tokens || 0;
-      const cacheTokens = chunk.usage.prompt_tokens_details?.cached_tokens || 0;
+      // 支持 prompt_tokens（OpenAI 标准）和 input_tokens（Anthropic 风格）两种字段名
+      const u = chunk.usage as any;
+      const inputTokens = (u.prompt_tokens ?? u.input_tokens) || 0;
+      const outputTokens = (u.completion_tokens ?? u.output_tokens) || 0;
+      const cacheTokens = u.prompt_tokens_details?.cached_tokens || 0;
       
       messageDeltaEvent.usage = {
         input_tokens: inputTokens,
@@ -668,6 +672,12 @@ export function convertOpenAIStreamChunkToAnthropic(
       if (cacheTokens > 0) {
         messageDeltaEvent.usage.cache_creation_input_tokens = cacheTokens;
       }
+    } else {
+      // usage 为 null/undefined 时提供默认值
+      messageDeltaEvent.usage = {
+        input_tokens: 0,
+        output_tokens: 0
+      };
     }
     
     events.push(messageDeltaEvent);
