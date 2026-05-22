@@ -34,13 +34,6 @@ function makeCtx(overrides?: Partial<UpstreamInterceptorContext>): UpstreamInter
 // ============ 非触发条件（直接跳过） ============
 
 describe('anthropicBillingCleaner - 触发条件', () => {
-  it('should skip when provider is not anthropic', async () => {
-    const upstream = makeUpstream()
-    const ctx = makeCtx({ provider: { ...makeCtx().provider, provider: 'openai' } as any })
-    const result = await anthropicBillingCleaner(upstream, ctx)
-    expect(result).toBe(upstream)
-  })
-
   it('should skip when body has no messages', async () => {
     const upstream = makeUpstream({ body: { model: 'claude-sonnet-4-20250514' } })
     const result = await anthropicBillingCleaner(upstream, makeCtx())
@@ -62,6 +55,21 @@ describe('anthropicBillingCleaner - 触发条件', () => {
     })
     const result = await anthropicBillingCleaner(upstream, makeCtx())
     expect(result).toBe(upstream)
+  })
+
+  it('should work regardless of provider type', async () => {
+    const upstream = makeUpstream({
+      body: {
+        model: 'claude-sonnet-4-20250514',
+        messages: [
+          { role: 'system', content: 'x-anthropic-billing-header: cc_version=2.1.0; cc_entrypoint=claude-vscode; cch=abc;正常内容。' },
+        ],
+      },
+    })
+    const ctx = makeCtx({ provider: { ...makeCtx().provider, provider: 'custom' } as any })
+    const result = await anthropicBillingCleaner(upstream, ctx)
+    const systemMsg = result.body.messages[0]
+    expect(systemMsg.content).toBe('正常内容。')
   })
 })
 
@@ -167,6 +175,55 @@ describe('anthropicBillingCleaner - string content', () => {
     const result = await anthropicBillingCleaner(upstream, makeCtx())
     expect(result).toBe(upstream)
   })
+
+  it('should handle multiple system messages, only first has billing header', async () => {
+    const upstream = makeUpstream({
+      body: {
+        model: 'claude-sonnet-4-20250514',
+        messages: [
+          { role: 'system', content: 'x-anthropic-billing-header: cc_version=2.1.0; cc_entrypoint=claude-vscode; cch=abc;第一条system。' },
+          { role: 'system', content: '第二条system，无billing header。' },
+          { role: 'user', content: 'hi' },
+        ],
+      },
+    })
+    const result = await anthropicBillingCleaner(upstream, makeCtx())
+    const msgs = result.body.messages
+    expect(msgs[0].content).toBe('第一条system。')
+    expect(msgs[1].content).toBe('第二条system，无billing header。')
+  })
+
+  it('should handle system message at end of messages array', async () => {
+    const upstream = makeUpstream({
+      body: {
+        model: 'claude-sonnet-4-20250514',
+        messages: [
+          { role: 'user', content: 'hi' },
+          { role: 'system', content: 'x-anthropic-billing-header: cc_version=2.1.0; cc_entrypoint=claude-vscode; cch=abc;末尾system。' },
+        ],
+      },
+    })
+    const result = await anthropicBillingCleaner(upstream, makeCtx())
+    const systemMsg = result.body.messages[1]
+    expect(systemMsg.content).toBe('末尾system。')
+  })
+
+  it('should handle cch value containing dots and underscores', async () => {
+    const upstream = makeUpstream({
+      body: {
+        model: 'claude-sonnet-4-20250514',
+        messages: [
+          {
+            role: 'system',
+            content: 'x-anthropic-billing-header: cc_version=2.1.0; cc_entrypoint=claude-vscode; cch=a1.b_c;内容。',
+          },
+        ],
+      },
+    })
+    const result = await anthropicBillingCleaner(upstream, makeCtx())
+    const systemMsg = result.body.messages[0]
+    expect(systemMsg.content).toBe('内容。')
+  })
 })
 
 // ============ 错误处理 ============
@@ -264,6 +321,74 @@ describe('anthropicBillingCleaner - array content', () => {
     const result = await anthropicBillingCleaner(upstream, makeCtx())
     // 没有匹配到，应返回原对象
     expect(result).toBe(upstream)
+  })
+
+  it('should handle array content where billing header is not in first block', async () => {
+    const upstream = makeUpstream({
+      body: {
+        model: 'claude-sonnet-4-20250514',
+        messages: [
+          {
+            role: 'system',
+            content: [
+              { type: 'text', text: '开头正常内容。' },
+              { type: 'text', text: 'x-anthropic-billing-header: cc_version=2.1.0; cc_entrypoint=claude-vscode; cch=abc;后面的块有billing header。' },
+            ],
+          },
+        ],
+      },
+    })
+    const result = await anthropicBillingCleaner(upstream, makeCtx())
+    const content = result.body.messages[0].content
+    expect(content[0].text).toBe('开头正常内容。')
+    expect(content[1].text).toBe('后面的块有billing header。')
+  })
+
+  it('should skip non-text blocks in array content', async () => {
+    const upstream = makeUpstream({
+      body: {
+        model: 'claude-sonnet-4-20250514',
+        messages: [
+          {
+            role: 'system',
+            content: [
+              { type: 'image', source: { type: 'base64', data: 'abc' } },
+              { type: 'text', text: 'x-anthropic-billing-header: cc_version=2.1.0; cc_entrypoint=claude-vscode; cch=abc;正文。' },
+            ],
+          },
+        ],
+      },
+    })
+    const result = await anthropicBillingCleaner(upstream, makeCtx())
+    const content = result.body.messages[0].content
+    // image block 不应被修改
+    expect(content[0].type).toBe('image')
+    expect(content[1].text).toBe('正文。')
+  })
+
+  it('should handle multiple system messages with array content', async () => {
+    const upstream = makeUpstream({
+      body: {
+        model: 'claude-sonnet-4-20250514',
+        messages: [
+          {
+            role: 'system',
+            content: [
+              { type: 'text', text: 'x-anthropic-billing-header: cc_version=2.1.0; cc_entrypoint=claude-vscode; cch=abc;第一条system。' },
+            ],
+          },
+          {
+            role: 'system',
+            content: [
+              { type: 'text', text: '第二条system无billing header。' },
+            ],
+          },
+        ],
+      },
+    })
+    const result = await anthropicBillingCleaner(upstream, makeCtx())
+    expect(result.body.messages[0].content[0].text).toBe('第一条system。')
+    expect(result.body.messages[1].content[0].text).toBe('第二条system无billing header。')
   })
 })
 
