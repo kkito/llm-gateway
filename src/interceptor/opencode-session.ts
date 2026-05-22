@@ -118,7 +118,7 @@ function getOrCreateSession(ip: string): string {
 // ============================================================
 
 const OPENCODE_DOMAINS = ['opencode.ai']
-const TARGET_MODELS = ['kimi', 'glm', 'mino']
+const TARGET_MODELS = ['kimi', 'glm']
 
 function shouldIntercept(ctx: UpstreamInterceptorContext): boolean {
   const baseUrl = ctx.provider.baseUrl?.toLowerCase() ?? ''
@@ -138,7 +138,7 @@ function shouldIntercept(ctx: UpstreamInterceptorContext): boolean {
 /**
  * OpenCode Session 拦截器。
  *
- * 当 baseUrl 含 "opencode.ai" 且 realModel 小写含 "kimi"/"glm"/"mino" 时：
+ * 当 baseUrl 含 "opencode.ai" 且 realModel 小写含 "kimi"/"glm" 时：
  * - header 添加 x-opencode-session
  * - body 添加 prompt_cache_key
  *

@@ -50,12 +50,6 @@ describe('shouldIntercept — 触发条件', () => {
     expect(result.headers).toHaveProperty('x-opencode-session')
   })
 
-  it('should intercept when baseUrl contains opencode.ai and model is mino', async () => {
-    const ctx = makeCtx({ provider: { ...makeCtx().provider, realModel: 'mino-v1' } as any })
-    const result = await opencodeSessionInterceptor(makeUpstream(), ctx)
-    expect(result.headers).toHaveProperty('x-opencode-session')
-  })
-
   it('should intercept case-insensitively: OPenCode.AI and KIMI', async () => {
     const ctx = makeCtx({
       provider: { ...makeCtx().provider, baseUrl: 'https://OPenCode.AI', realModel: 'KIMI-v1' } as any,
@@ -71,7 +65,7 @@ describe('shouldIntercept — 触发条件', () => {
     expect(result).toBe(upstream)
   })
 
-  it('should skip when model does not match kimi/glm/mino', async () => {
+  it('should skip when model does not match kimi/glm', async () => {
     const upstream = makeUpstream()
     const ctx = makeCtx({ provider: { ...makeCtx().provider, realModel: 'gpt-4' } as any })
     const result = await opencodeSessionInterceptor(upstream, ctx)
