@@ -34,11 +34,7 @@ export function cleanBillingHeader(text: string): string | undefined {
   return undefined
 }
 
-/**
- * 判断是否需要拦截（provider 是 anthropic 且 body 有非空 messages）。
- */
-function shouldIntercept(ctx: { provider: { provider: string } }, body: any): boolean {
-  if (ctx.provider.provider !== 'anthropic') return false
+function shouldIntercept(body: any): boolean {
   if (!body?.messages || !Array.isArray(body.messages) || body.messages.length === 0) return false
   return true
 }
@@ -46,14 +42,14 @@ function shouldIntercept(ctx: { provider: { provider: string } }, body: any): bo
 /**
  * Anthropic Billing Header 清理拦截器。
  *
- * 当 provider 为 anthropic 时，遍历 messages 中 role 为 "system" 的消息，
- * 检查其 content 是否包含 billing header 前缀。
- * 若包含，去除此前缀并返回新对象。
+ * 遍历 messages 中所有 role=system 的消息，
+ * 检查其 content（string 或 text block 数组）是否包含 billing header 前缀，
+ * 若包含则去除。
  *
  * 必须注册为第一个拦截器，优先执行。
  */
 export const anthropicBillingCleaner: UpstreamInterceptor = async (upstream, ctx) => {
-  if (!shouldIntercept(ctx, upstream.body)) return upstream
+  if (!shouldIntercept(upstream.body)) return upstream
 
   const body = upstream.body
   let hasChanges = false
@@ -94,8 +90,5 @@ export const anthropicBillingCleaner: UpstreamInterceptor = async (upstream, ctx
 
   if (!hasChanges) return upstream
 
-  return {
-    ...upstream,
-    body: { ...body, messages: newMessages },
-  }
+  return { ...upstream, body: { ...body, messages: newMessages } }
 }
