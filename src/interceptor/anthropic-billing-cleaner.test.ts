@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { anthropicBillingCleaner } from './anthropic-billing-cleaner.js'
+import { anthropicBillingCleaner, cleanBillingHeader } from './anthropic-billing-cleaner.js'
 import type { UpstreamRequest } from '../routes/chat-completions/upstream-request.js'
 import type { UpstreamInterceptorContext } from './types.js'
 
@@ -166,6 +166,40 @@ describe('anthropicBillingCleaner - string content', () => {
     })
     const result = await anthropicBillingCleaner(upstream, makeCtx())
     expect(result).toBe(upstream)
+  })
+})
+
+// ============ 错误处理 ============
+
+describe('anthropicBillingCleaner - error handling', () => {
+  it('should throw when text starts with billing header but has unrecognized format', () => {
+    // cc_version 字段名称拼写错误
+    expect(() => cleanBillingHeader(
+      'x-anthropic-billing-header: cc_ver=2.1.0; cc_entrypoint=claude-vscode; cch=abc;hello'
+    )).toThrow('Unrecognized anthropic billing header format')
+
+    // 缺少 cc_entrypoint 字段
+    expect(() => cleanBillingHeader(
+      'x-anthropic-billing-header: cc_version=2.1.0; cch=abc;hello'
+    )).toThrow('Unrecognized anthropic billing header format')
+  })
+
+  it('should throw from interceptor when header format is unrecognized', async () => {
+    // 需要导入 cleanBillingHeader
+    const upstream = makeUpstream({
+      body: {
+        model: 'claude-sonnet-4-20250514',
+        messages: [
+          {
+            role: 'system',
+            content: 'x-anthropic-billing-header: cc_ver=2.1.0; cc_entrypoint=claude-vscode; cch=abc;hello',
+          },
+        ],
+      },
+    })
+    await expect(anthropicBillingCleaner(upstream, makeCtx())).rejects.toThrow(
+      'Unrecognized anthropic billing header format'
+    )
   })
 })
 

@@ -14,13 +14,23 @@ export const BILLING_HEADER_RE = /^x-anthropic-billing-header:\s*cc_version=[a-z
 
 /**
  * 清理字符串中的 billing header 前缀。
- * 如果字符串以 billing header 开头，去除后返回剩余部分。
- * 否则返回 undefined。
+ *
+ * - 如果字符串以 "x-anthropic-billing-header" 开头但正则无法完整匹配，抛出错误。
+ * - 如果字符串以 billing header 开头且匹配成功，去除前缀后返回剩余部分。
+ * - 如果不以 billing header 开头，返回 undefined。
  */
 export function cleanBillingHeader(text: string): string | undefined {
-  const match = text.match(BILLING_HEADER_RE)
-  if (!match) return undefined
-  return text.slice(match[0].length)
+  if (/^x-anthropic-billing-header\s*:/i.test(text)) {
+    // 以 billing header 开头但正则无法完整匹配 => 未知格式，需要人工介入
+    const match = text.match(BILLING_HEADER_RE)
+    if (!match) {
+      throw new Error(
+        `Unrecognized anthropic billing header format: ${JSON.stringify(text.slice(0, 120))}`
+      )
+    }
+    return text.slice(match[0].length)
+  }
+  return undefined
 }
 
 /**
