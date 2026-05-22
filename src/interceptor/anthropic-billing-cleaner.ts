@@ -8,8 +8,9 @@ import type { UpstreamInterceptor } from './types.js'
  *
  * - i 标志：大小写不敏感
  * - cch= 后面的 ;? 可选（处理最后无分号的情况）
+ * - cch 值允许包含空格（如 "e0    bf8"）
  */
-export const BILLING_HEADER_RE = /^x-anthropic-billing-header:\s*cc_version=[a-zA-Z0-9._-]+;\s*cc_entrypoint=[a-zA-Z0-9._-]+;\s*cch=[a-zA-Z0-9]+;?\s*/i
+export const BILLING_HEADER_RE = /^x-anthropic-billing-header:\s*cc_version=[a-zA-Z0-9._-]+;\s*cc_entrypoint=[a-zA-Z0-9._-]+;\s*cch=[a-zA-Z0-9 ._-]+;?\s*/i
 
 /**
  * 清理字符串中的 billing header 前缀。

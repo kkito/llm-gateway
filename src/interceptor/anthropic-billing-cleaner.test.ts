@@ -120,6 +120,23 @@ describe('anthropicBillingCleaner - string content', () => {
     expect(systemMsg.content).toBe('Hello.')
   })
 
+  it('should handle cch value with spaces (e.g., "e0    bf8")', async () => {
+    const upstream = makeUpstream({
+      body: {
+        model: 'claude-sonnet-4-20250514',
+        messages: [
+          {
+            role: 'system',
+            content: 'x-anthropic-billing-header: cc_version=2.1.145.b73; cc_entrypoint=claude-vscode; cch=e0    bf8; You are Claude Code.',
+          },
+        ],
+      },
+    })
+    const result = await anthropicBillingCleaner(upstream, makeCtx())
+    const systemMsg = result.body.messages[0]
+    expect(systemMsg.content).toBe('You are Claude Code.')
+  })
+
   it('should handle billing header without trailing semicolon on cch', async () => {
     const upstream = makeUpstream({
       body: {
