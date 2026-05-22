@@ -1,3 +1,5 @@
+import type { UpstreamInterceptor } from './types.js'
+
 /**
  * Qwen 上下文缓存拦截器
  *
@@ -100,4 +102,53 @@ export function addCacheControlToSystemMessages(messages: any[], quota: number):
     newBlocks[textIdx] = { ...newBlocks[textIdx], cache_control: { type: 'ephemeral' as const } }
     return { ...msg, content: newBlocks }
   })
+}
+
+/**
+ * 检查 model 名称是否包含 "qwen"（大小写不敏感）。
+ */
+function isQwenModel(modelName: string): boolean {
+  return modelName.toLowerCase().includes('qwen')
+}
+
+/**
+ * Qwen 上下文缓存拦截器。
+ *
+ * 触发条件：realModel 小写包含 "qwen" 且 body 有非空 messages。
+ * 按优先级注入最多 4 个 cache_control 标记。
+ */
+export const qwenCacheInterceptor: UpstreamInterceptor = async (upstream, ctx) => {
+  const realModel = ctx.provider.realModel
+  if (!isQwenModel(realModel)) return upstream
+
+  const body = upstream.body
+  if (!body || !body.messages || !Array.isArray(body.messages) || body.messages.length === 0) {
+    return upstream
+  }
+
+  let count = 0
+
+  // 1. tools 最后一条
+  let newTools: any[] | undefined
+  if (body.tools) {
+    newTools = addCacheControlToTools(body.tools)
+    if (newTools !== body.tools) count++
+  }
+
+  // 2. messages 最后一条
+  let newMessages = addCacheControlToLastMessage(body.messages)
+  if (newMessages !== body.messages) count++
+
+  // 3. system messages（剩余配额）
+  const systemQuota = Math.max(0, 4 - count)
+  if (systemQuota > 0) {
+    newMessages = addCacheControlToSystemMessages(newMessages!, systemQuota)
+  }
+
+  const newBody: any = { ...body, messages: newMessages }
+  if (newTools !== undefined) {
+    newBody.tools = newTools
+  }
+
+  return { ...upstream, body: newBody }
 }
