@@ -59,7 +59,7 @@ export async function tryMessagesFallback(ctx: MsgFallbackContext): Promise<MsgF
       provider,
       c: ctx.c,
       currentUser: ctx.currentUser,
-      clientIp: ctx.c.req.header('x-forwarded-for') ?? ctx.c.req.header('x-real-ip') ?? null,
+      clientIp: ctx.c?.req?.header?.('x-forwarded-for') ?? ctx.c?.req?.header?.('x-real-ip') ?? null,
       requestId: ctx.requestId,
       customModel: modelName,
       stream: ctx.stream,

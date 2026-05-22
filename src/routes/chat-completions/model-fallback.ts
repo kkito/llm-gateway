@@ -60,7 +60,7 @@ export async function tryModelGroupWithFallback(ctx: FallbackContext): Promise<F
       provider,
       c: ctx.c,
       currentUser: ctx.currentUser,
-      clientIp: ctx.c.req.header('x-forwarded-for') ?? ctx.c.req.header('x-real-ip') ?? null,
+      clientIp: ctx.c?.req?.header?.('x-forwarded-for') ?? ctx.c?.req?.header?.('x-real-ip') ?? null,
       requestId: ctx.requestId,
       customModel: modelName,
       stream: ctx.stream,
