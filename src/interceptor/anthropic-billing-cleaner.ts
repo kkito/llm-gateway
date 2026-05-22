@@ -20,7 +20,8 @@ export const BILLING_HEADER_RE = /^x-anthropic-billing-header:\s*cc_version=[a-z
  * - 如果不以 billing header 开头，返回 undefined。
  */
 export function cleanBillingHeader(text: string): string | undefined {
-  if (/^x-anthropic-billing-header\s*:/i.test(text)) {
+  const prefix = text.slice(0, 120).toLowerCase()
+  if (prefix.includes('x-anthropic-billing-header')) {
     // 以 billing header 开头但正则无法完整匹配 => 未知格式，需要人工介入
     const match = text.match(BILLING_HEADER_RE)
     if (!match) {
