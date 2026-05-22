@@ -2,6 +2,7 @@ import type { ProviderConfig, PrivacySettings } from '../../config.js';
 import type { Logger } from '../../logger.js';
 import type { DetailLogger } from '../../detail-logger.js';
 import type { RateLimiter } from '../../lib/rate-limiter.js';
+import { interceptors } from '../../interceptor/index.js';
 import { buildMessagesUpstreamRequest, sendMessagesUpstreamRequest } from './upstream-request.js';
 import { processMessagesSuccess } from './msg-response.js';
 
@@ -52,7 +53,20 @@ export async function tryMessagesFallback(ctx: MsgFallbackContext): Promise<MsgF
 
     // 3. Build and send upstream request
     const upstream = await buildMessagesUpstreamRequest(provider, body, stream);
-    const response = await sendMessagesUpstreamRequest(upstream, detailLogger, requestId, timeoutMs);
+
+    // 执行注册的拦截器，允许对 upstream request 进行自定义修改（如添加缓存 header/body 字段）
+    const intercepted = await interceptors.execute(upstream, {
+      provider,
+      c: ctx.c,
+      currentUser: ctx.currentUser,
+      clientIp: ctx.c.req.header('x-forwarded-for') ?? ctx.c.req.header('x-real-ip') ?? null,
+      requestId: ctx.requestId,
+      customModel: modelName,
+      stream: ctx.stream,
+      modelGroup: ctx.modelGroupName,
+    });
+
+    const response = await sendMessagesUpstreamRequest(intercepted, detailLogger, requestId, timeoutMs);
 
     // 4. If response is not OK, save error and try next model
     if (!response.ok) {
