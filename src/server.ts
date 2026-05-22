@@ -34,9 +34,12 @@ import { StatsProvider } from './lib/stats-provider.js';
 import { createConfigContext } from './lib/config-context.js';
 import { interceptors } from './interceptor/index.js'
 import { qwenCacheInterceptor } from './interceptor/qwen-cache.js'
+import { opencodeSessionInterceptor } from './interceptor/opencode-session.js'
 
 // 注册 Qwen 缓存拦截器（模块级，只注册一次）
 interceptors.use(qwenCacheInterceptor)
+// 注册 OpenCode Session 拦截器（模块级，只注册一次）
+interceptors.use(opencodeSessionInterceptor)
 
 // 获取当前模块目录 (用于静态文件服务)
 const __filename = fileURLToPath(import.meta.url);
