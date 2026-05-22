@@ -11,6 +11,7 @@ import { handleStream } from './stream-handler.js';
 import { tryModelGroupWithFallback } from './model-fallback.js';
 import { applyPrivacyProtection } from '../../privacy/apply.js';
 import { restorePaths } from '../../privacy/sanitizer.js';
+import { interceptors } from '../../interceptor/index.js';
 
 export function createChatCompletionsHandler(
   config: ProxyConfig | (() => ProxyConfig),
@@ -157,7 +158,20 @@ export function createChatCompletionsHandler(
 
       // Build and send upstream request
       const upstream = await buildUpstreamRequest(provider, body, stream);
-      const response = await sendUpstreamRequest(upstream, detailLogger, requestId, timeoutMs);
+
+      // 执行注册的拦截器，允许对 upstream request 进行自定义修改（如添加缓存 header/body 字段）
+      const intercepted = await interceptors.execute(upstream, {
+        provider,
+        c,
+        currentUser,
+        clientIp: c.req.header('x-forwarded-for') ?? c.req.header('x-real-ip') ?? null,
+        requestId,
+        customModel,
+        stream,
+        modelGroup,
+      });
+
+      const response = await sendUpstreamRequest(intercepted, detailLogger, requestId, timeoutMs);
 
       // Build log entry
       const logEntry: any = {
