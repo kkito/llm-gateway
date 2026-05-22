@@ -33,9 +33,12 @@ import { UsageTracker } from './lib/usage-tracker.js';
 import { StatsProvider } from './lib/stats-provider.js';
 import { createConfigContext } from './lib/config-context.js';
 import { interceptors } from './interceptor/index.js'
+import { anthropicBillingCleaner } from './interceptor/anthropic-billing-cleaner.js'
 import { qwenCacheInterceptor } from './interceptor/qwen-cache.js'
 import { opencodeSessionInterceptor } from './interceptor/opencode-session.js'
 
+// !!! 必须放在第一个执行：在所有其他拦截器之前清理 Anthropic billing header
+interceptors.use(anthropicBillingCleaner)
 // 注册 Qwen 缓存拦截器（模块级，只注册一次）
 interceptors.use(qwenCacheInterceptor)
 // 注册 OpenCode Session 拦截器（模块级，只注册一次）
