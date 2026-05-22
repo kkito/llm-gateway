@@ -11,6 +11,7 @@ import { buildMessagesUpstreamRequest, sendMessagesUpstreamRequest } from './ups
 import { handleMessagesNonStream } from './non-stream-handler.js';
 import { handleStream as handleMessagesStream } from './stream-handler.js';
 import { tryMessagesFallback } from './msg-fallback.js';
+import { interceptors } from '../../interceptor/index.js';
 
 export function createMessagesHandler(
   config: ProxyConfig | (() => ProxyConfig),
@@ -152,7 +153,20 @@ export function createMessagesHandler(
 
       // Build and send upstream request
       const upstream = await buildMessagesUpstreamRequest(provider, body, stream);
-      const response = await sendMessagesUpstreamRequest(upstream, detailLogger, requestId, timeoutMs);
+
+      // 执行注册的拦截器，允许对 upstream request 进行自定义修改（如添加缓存 header/body 字段）
+      const intercepted = await interceptors.execute(upstream, {
+        provider,
+        c,
+        currentUser,
+        clientIp: c.req.header('x-forwarded-for') ?? c.req.header('x-real-ip') ?? null,
+        requestId,
+        customModel,
+        stream,
+        modelGroup,
+      });
+
+      const response = await sendMessagesUpstreamRequest(intercepted, detailLogger, requestId, timeoutMs);
 
       // Build log entry
       const logEntry: any = {
