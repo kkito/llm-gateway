@@ -251,7 +251,7 @@ export function updateCacheControlStickyState(body: any, priorState: any): {
     }
   }
 
-  const priorIndex = new Map(prior.positions.map((p: any, i: number) => [p.msg_hash, i]))
+  const priorIndex = new Map<string, number>(prior.positions.map((p: any, i: number) => [p.msg_hash, i]))
   const nextPositions = prior.positions.slice()
   for (const ob of observed) {
     if (priorIndex.has(ob.msg_hash)) {
