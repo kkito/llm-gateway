@@ -1,4 +1,6 @@
 import type { UpstreamInterceptor } from './types.js'
+import type { UpstreamRequest } from '../routes/chat-completions/upstream-request.js'
+import { isAnthropicV1Messages } from './helpers.js'
 
 /**
  * 匹配 Claude Code 注入的 x-anthropic-billing-header 前缀的正则。
@@ -34,7 +36,9 @@ export function cleanBillingHeader(text: string): string | undefined {
   return undefined
 }
 
-function shouldIntercept(body: any): boolean {
+function shouldIntercept(upstream: UpstreamRequest): boolean {
+  if (!isAnthropicV1Messages(upstream.url)) return false
+  const body = upstream.body
   if (!body?.messages || !Array.isArray(body.messages) || body.messages.length === 0) return false
   return true
 }
@@ -49,7 +53,7 @@ function shouldIntercept(body: any): boolean {
  * 必须注册为第一个拦截器，优先执行。
  */
 export const anthropicBillingCleaner: UpstreamInterceptor = async (upstream, ctx) => {
-  if (!shouldIntercept(upstream.body)) return upstream
+  if (!shouldIntercept(upstream)) return upstream
 
   const body = upstream.body
   let hasChanges = false
