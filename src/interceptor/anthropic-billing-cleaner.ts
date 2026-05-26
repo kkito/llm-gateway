@@ -1,7 +1,6 @@
 import { createHash } from 'node:crypto'
 import type { UpstreamInterceptor, UpstreamInterceptorContext } from './types.js'
 import type { UpstreamRequest } from '../routes/chat-completions/upstream-request.js'
-import { isAnthropicV1Messages } from './helpers.js'
 
 const FINGERPRINT_SALT = '59cf53e54c78'
 const FINGERPRINT_INDICES = [4, 7, 20]
@@ -31,23 +30,36 @@ export function cleanBillingHeader(text: string): string | undefined {
     // 以 billing header 开头但正则无法完整匹配 => 未知格式，需要人工介入
     const match = text.match(BILLING_HEADER_RE)
     if (!match) {
+      console.log(`  [cleanBillingHeader] ❌ UNRECOGNIZED format: ${JSON.stringify(text.slice(0, 120))}`)
       throw new Error(
         `Unrecognized anthropic billing header format: ${JSON.stringify(text.slice(0, 120))}`
       )
     }
-    return text.slice(match[0].length)
+    const removed = text.slice(match[0].length)
+    console.log(`  [cleanBillingHeader] ✅ MATCHED regex, removed ${match[0].length} chars, remaining=${JSON.stringify(removed.slice(0, 100))}`)
+    return removed
+  }
+  // billing header not found at start — check if partial prefix exists (debug)
+  if (prefix.includes('billing-header') || prefix.includes('cc_version=')) {
+    console.log(`  [cleanBillingHeader] ⚠️  partial match (billing-header or cc_version= found but not x-anthropic-billing-header at start): prefix=${JSON.stringify(prefix.slice(0, 80))}`)
   }
   return undefined
 }
 
 function shouldIntercept(upstream: UpstreamRequest, ctx?: UpstreamInterceptorContext): boolean {
-  // Anthropic provider 的 body 一定是 Anthropic 格式，billing header 只出现在 Anthropic API 请求中
-  if (ctx?.provider?.provider !== 'anthropic') {
-    // 回退：老逻辑通过 URL 判断（兼容非 provider 上下文，如测试中传 provider='custom' 的场景）
-    if (!isAnthropicV1Messages(upstream.url)) return false
+  const prefix = `[anthropic-billing-cleaner/shouldIntercept]`
+  // 只有 OpenAI provider 的 body 是 OpenAI 格式；其他所有 provider（anthropic/deepseek/custom 等）
+  // 的 body 都会被转为 Anthropic 格式，billing header 只出现在 Anthropic 格式的 body 中。
+  if (ctx?.provider?.provider === 'openai') {
+    console.log(`  ${prefix} SKIP: provider=openai, url=${upstream.url}`)
+    return false
   }
   const body = upstream.body
-  if (!body?.messages || !Array.isArray(body.messages) || body.messages.length === 0) return false
+  if (!body?.messages || !Array.isArray(body.messages) || body.messages.length === 0) {
+    console.log(`  ${prefix} SKIP: no messages array in body. bodyKeys=${JSON.stringify(body ? Object.keys(body) : null)}`)
+    return false
+  }
+  console.log(`  ${prefix} PASS: provider=${ctx?.provider?.provider}, url=${upstream.url}, messages.length=${body.messages.length}, hasSystemArray=${Array.isArray(body.system)}`)
   return true
 }
 
@@ -113,17 +125,30 @@ export function extractFirstMessageText(messages: any[]): string {
  * 6. Replace cc_version in block text
  */
 export function stabilizeFingerprint(system: any[], messages: any[]): { attrIdx: number; newText: string; oldFingerprint: string; stableFingerprint: string } | null {
-  if (!Array.isArray(system)) return null
+  const fpPrefix = `[stabilizeFingerprint]`
+  if (!Array.isArray(system)) {
+    console.log(`  ${fpPrefix} SKIP: system is not array`)
+    return null
+  }
   const attrIdx = system.findIndex(
     (b: any) => b.type === 'text' && typeof b.text === 'string' && b.text.includes('cc_version=')
   )
-  if (attrIdx === -1) return null
+  if (attrIdx === -1) {
+    console.log(`  ${fpPrefix} SKIP: no block with 'cc_version=' in system array (${system.length} blocks)`)
+    return null
+  }
   const attrBlock = system[attrIdx]
   const versionMatch = attrBlock.text.match(/cc_version=([^;]+)/)
-  if (!versionMatch) return null
+  if (!versionMatch) {
+    console.log(`  ${fpPrefix} SKIP: cc_version= found but regex match failed, text=${JSON.stringify(attrBlock.text.slice(0, 80))}`)
+    return null
+  }
   const fullVersion = versionMatch[1]
   const dotParts = fullVersion.split('.')
-  if (dotParts.length < 4) return null
+  if (dotParts.length < 4) {
+    console.log(`  ${fpPrefix} SKIP: cc_version=${fullVersion} has fewer than 4 dot parts, no fingerprint to stabilize`)
+    return null
+  }
   const baseVersion = dotParts.slice(0, 3).join('.')
   const oldFingerprint = dotParts[3]
 
@@ -134,18 +159,28 @@ export function stabilizeFingerprint(system: any[], messages: any[]): { attrIdx:
   const legacyVerification = computeFingerprint(legacyText, baseVersion)
 
   let verificationPassed = false
+  let verificationPath = ''
   if (realVerification === oldFingerprint) {
     verificationPassed = true
+    verificationPath = 'real'
   } else if (legacyVerification === oldFingerprint) {
     verificationPassed = true
+    verificationPath = 'legacy'
   }
-  if (!verificationPassed) return null
+  if (!verificationPassed) {
+    console.log(`  ${fpPrefix} SKIP: round-trip verification failed. oldFingerprint=${oldFingerprint}, realCalc=${realVerification}, legacyCalc=${legacyVerification}, baseVersion=${baseVersion}, realText=${JSON.stringify(realText.slice(0, 60))}, legacyText=${JSON.stringify(legacyText.slice(0, 60))}, realTextLen=${realText.length}, legacyTextLen=${legacyText.length}`)
+    return null
+  }
 
   const stableFingerprint = computeFingerprint(realText, baseVersion)
-  if (stableFingerprint === oldFingerprint) return null
+  if (stableFingerprint === oldFingerprint) {
+    console.log(`  ${fpPrefix} SKIP: already stable. fingerprint=${oldFingerprint}, path=${verificationPath}`)
+    return null
+  }
 
   const newVersion = `${baseVersion}.${stableFingerprint}`
   const newText = attrBlock.text.replace(`cc_version=${fullVersion}`, `cc_version=${newVersion}`)
+  console.log(`  ${fpPrefix} ✅ REPLACED: cc_version=${fullVersion} -> cc_version=${newVersion}, verificationPath=${verificationPath}, realText=${JSON.stringify(realText.slice(0, 40))}`)
   return { attrIdx, newText, oldFingerprint, stableFingerprint }
 }
 
@@ -159,6 +194,7 @@ export function stabilizeFingerprint(system: any[], messages: any[]): { attrIdx:
  * 必须注册为第一个拦截器，优先执行。
  */
 export const anthropicBillingCleaner: UpstreamInterceptor = async (upstream, ctx) => {
+  console.log(`\n[anthropic-billing-cleaner] ====== CALLED ====== provider=${ctx.provider.customModel}, providerType=${ctx.provider.provider}, stream=${ctx.stream}, url=${upstream.url}`)
   if (!shouldIntercept(upstream, ctx)) return upstream
 
   const body = upstream.body
@@ -167,6 +203,14 @@ export const anthropicBillingCleaner: UpstreamInterceptor = async (upstream, ctx
   // ---- Step 1: 清理 body.system（顶层 system 数组）中的 billing header 前缀 ----
   let newSystem: any[] | undefined
   if (Array.isArray(body.system)) {
+    console.log(`  [Step 1] body.system has ${body.system.length} blocks`)
+    body.system.forEach((block: any, i: number) => {
+      if (block.type === 'text' && typeof block.text === 'string') {
+        console.log(`  [Step 1]   block[${i}].text[:80]=${JSON.stringify(block.text.slice(0, 80))}`)
+      } else {
+        console.log(`  [Step 1]   block[${i}] type=${block.type}, text type=${typeof block.text}`)
+      }
+    })
     const cleanedSystem = body.system.map((block: any) => {
       if (block.type === 'text' && typeof block.text === 'string') {
         const cleaned = cleanBillingHeader(block.text)
@@ -179,10 +223,19 @@ export const anthropicBillingCleaner: UpstreamInterceptor = async (upstream, ctx
     })
     if (cleanedSystem !== body.system) {
       newSystem = cleanedSystem as any[]
+      console.log(`  [Step 1] ✅ Billing header prefix(es) cleaned`)
+      newSystem.forEach((block: any, i: number) => {
+        if (block.type === 'text') {
+          console.log(`  [Step 1]   after block[${i}].text[:80]=${JSON.stringify(block.text.slice(0, 80))}`)
+        }
+      })
+    } else {
+      console.log(`  [Step 1] No billing header prefix found in body.system blocks`)
     }
 
     // 清理 billing header 后，运行 fingerprint 稳定化
     if (hasChanges) {
+      console.log(`  [Step 1-fingerprint] Running stabilizeFingerprint after cleaning`)
       const systemToStabilize = newSystem ?? body.system
       const fpResult = stabilizeFingerprint(systemToStabilize, body.messages)
       if (fpResult) {
@@ -192,11 +245,25 @@ export const anthropicBillingCleaner: UpstreamInterceptor = async (upstream, ctx
           }
           return block
         })
+        console.log(`  [Step 1-fingerprint] ✅ Fingerprint stabilized`)
       }
     }
+  } else {
+    console.log(`  [Step 1] body.system is not array: ${typeof body.system}, value=${JSON.stringify(body.system?.toString?.()?.slice?.(0, 80) ?? body.system)}`)
   }
 
   // ---- Step 2: 处理 body.messages 中的 system 消息 ----
+  console.log(`  [Step 2] messages.length=${body.messages.length}`)
+  body.messages.forEach((msg: any, idx: number) => {
+    if (msg.role === 'system') {
+      const contentPreview = typeof msg.content === 'string'
+        ? JSON.stringify(msg.content.slice(0, 80))
+        : Array.isArray(msg.content)
+          ? `[array length=${msg.content.length}]`
+          : `${typeof msg.content}`
+      console.log(`  [Step 2]   msg[${idx}] role=system, content=${contentPreview}`)
+    }
+  })
   const newMessages = body.messages.map((msg: any) => {
     if (msg.role !== 'system') return msg
     if (!msg.content) return msg
@@ -207,10 +274,11 @@ export const anthropicBillingCleaner: UpstreamInterceptor = async (upstream, ctx
       const cleaned = cleanBillingHeader(msg.content)
       if (cleaned !== undefined) {
         hasChanges = true
+        console.log(`  [Step 2] ✅ msg[${body.messages.indexOf(msg)}] string content cleaned, len=${msg.content.length} -> ${cleaned.length}`)
         newContent = cleaned
       }
     } else if (Array.isArray(msg.content)) {
-      const newBlocks = msg.content.map((block: any) => {
+      const newBlocks = msg.content.map((block: any, bidx: number) => {
         if (block.type === 'text' && typeof block.text === 'string') {
           const cleaned = cleanBillingHeader(block.text)
           if (cleaned !== undefined) {
@@ -231,11 +299,16 @@ export const anthropicBillingCleaner: UpstreamInterceptor = async (upstream, ctx
     return msg
   })
 
-  if (!hasChanges) return upstream
+  if (!hasChanges) {
+    console.log(`  [anthropic-billing-cleaner] 👋 NO changes made, returning upstream unchanged\n`)
+    return upstream
+  }
 
   const newBody: any = { ...body, messages: newMessages }
   if (newSystem !== undefined) {
     newBody.system = newSystem as any[]
+    console.log(`  [anthropic-billing-cleaner] ✅ system array replaced (${newBody.system.length} blocks)`)
   }
+  console.log(`  [anthropic-billing-cleaner] ✅ Modified upstream returned, hasChanges=true\n`)
   return { ...upstream, body: newBody }
 }
