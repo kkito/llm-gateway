@@ -4,9 +4,9 @@ import {
   addCacheControlToLastMessage,
   addCacheControlToSystemMessages,
   qwenCacheInterceptor,
-} from './qwen-cache.js'
-import type { UpstreamRequest } from '../routes/chat-completions/upstream-request.js'
-import type { UpstreamInterceptorContext } from './types.js'
+} from '../../src/interceptor/qwen-cache.js'
+import type { UpstreamRequest } from '../../src/routes/chat-completions/upstream-request.js'
+import type { UpstreamInterceptorContext } from '../../src/interceptor/types.js'
 
 describe('addCacheControlToTools', () => {
   it('should add cache_control to the last tool', () => {

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { opencodeSessionInterceptor, resetSessionCache } from './opencode-session.js'
-import type { UpstreamRequest } from '../routes/chat-completions/upstream-request.js'
-import type { UpstreamInterceptorContext } from './types.js'
+import { opencodeSessionInterceptor, resetSessionCache } from '../../src/interceptor/opencode-session.js'
+import type { UpstreamRequest } from '../../src/routes/chat-completions/upstream-request.js'
+import type { UpstreamInterceptorContext } from '../../src/interceptor/types.js'
 
 beforeEach(() => {
   resetSessionCache()

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { InterceptorManager } from './index.js'
-import type { UpstreamRequest } from '../routes/chat-completions/upstream-request.js'
-import type { UpstreamInterceptorContext } from './types.js'
+import { InterceptorManager } from '../../src/interceptor/index.js'
+import type { UpstreamRequest } from '../../src/routes/chat-completions/upstream-request.js'
+import type { UpstreamInterceptorContext } from '../../src/interceptor/types.js'
 
 describe('InterceptorManager', () => {
   let manager: InterceptorManager
