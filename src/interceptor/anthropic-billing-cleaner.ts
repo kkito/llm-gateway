@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import type { UpstreamInterceptor } from './types.js'
+import type { UpstreamInterceptor, UpstreamInterceptorContext } from './types.js'
 import type { UpstreamRequest } from '../routes/chat-completions/upstream-request.js'
 import { isAnthropicV1Messages } from './helpers.js'
 
@@ -40,8 +40,12 @@ export function cleanBillingHeader(text: string): string | undefined {
   return undefined
 }
 
-function shouldIntercept(upstream: UpstreamRequest): boolean {
-  if (!isAnthropicV1Messages(upstream.url)) return false
+function shouldIntercept(upstream: UpstreamRequest, ctx?: UpstreamInterceptorContext): boolean {
+  // Anthropic provider 的 body 一定是 Anthropic 格式，billing header 只出现在 Anthropic API 请求中
+  if (ctx?.provider?.provider !== 'anthropic') {
+    // 回退：老逻辑通过 URL 判断（兼容非 provider 上下文，如测试中传 provider='custom' 的场景）
+    if (!isAnthropicV1Messages(upstream.url)) return false
+  }
   const body = upstream.body
   if (!body?.messages || !Array.isArray(body.messages) || body.messages.length === 0) return false
   return true
@@ -155,7 +159,7 @@ export function stabilizeFingerprint(system: any[], messages: any[]): { attrIdx:
  * 必须注册为第一个拦截器，优先执行。
  */
 export const anthropicBillingCleaner: UpstreamInterceptor = async (upstream, ctx) => {
-  if (!shouldIntercept(upstream)) return upstream
+  if (!shouldIntercept(upstream, ctx)) return upstream
 
   const body = upstream.body
   let hasChanges = false

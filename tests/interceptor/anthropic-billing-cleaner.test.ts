@@ -425,7 +425,7 @@ describe('anthropicBillingCleaner - immutability', () => {
 // ============ URL 守卫 ============
 
 describe('anthropicBillingCleaner - URL guard', () => {
-  it('should skip when URL is not /v1/messages', async () => {
+  it('should skip when URL is not /v1/messages and provider is not anthropic', async () => {
     const upstream = makeUpstream({
       url: 'https://api.openai.com/v1/chat/completions',
       body: {
@@ -435,11 +435,12 @@ describe('anthropicBillingCleaner - URL guard', () => {
         ],
       },
     })
-    const result = await anthropicBillingCleaner(upstream, makeCtx())
+    const ctx = makeCtx({ provider: { ...makeCtx().provider, provider: 'openai' } as any })
+    const result = await anthropicBillingCleaner(upstream, ctx)
     expect(result).toBe(upstream)
   })
 
-  it('should process when URL is /v1/messages', async () => {
+  it('should process when URL is /v1/messages and provider is anthropic', async () => {
     const upstream = makeUpstream({
       url: 'https://api.anthropic.com/v1/messages',
       body: {
@@ -454,13 +455,29 @@ describe('anthropicBillingCleaner - URL guard', () => {
     expect(systemMsg.content).toBe('内容。')
   })
 
-  it('should skip when URL is /v1/messages but body has no messages', async () => {
+  it('should skip when body has no messages even if URL is /v1/messages', async () => {
     const upstream = makeUpstream({
       url: 'https://api.anthropic.com/v1/messages',
       body: { model: 'claude-sonnet-4-20250514' },
     })
     const result = await anthropicBillingCleaner(upstream, makeCtx())
     expect(result).toBe(upstream)
+  })
+
+  it('should process when URL is not /v1/messages but provider is anthropic', async () => {
+    const upstream = makeUpstream({
+      url: 'https://opencode.ai/zen/go/v1/chat/completions',
+      body: {
+        model: 'claude-sonnet-4-20250514',
+        messages: [
+          { role: 'system', content: 'x-anthropic-billing-header: cc_version=2.1.0; cc_entrypoint=claude-vscode; cch=abc;内容。' },
+        ],
+      },
+    })
+    const ctx = makeCtx({ provider: { ...makeCtx().provider, provider: 'anthropic' } as any })
+    const result = await anthropicBillingCleaner(upstream, ctx)
+    const systemMsg = result.body.messages[0]
+    expect(systemMsg.content).toBe('内容。')
   })
 })
 
