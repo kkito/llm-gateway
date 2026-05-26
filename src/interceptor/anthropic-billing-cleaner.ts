@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import type { UpstreamInterceptor, UpstreamInterceptorContext } from './types.js'
 import type { UpstreamRequest } from '../routes/chat-completions/upstream-request.js'
+import { isChatCompletionsEndpoint } from './helpers.js'
 
 const FINGERPRINT_SALT = '59cf53e54c78'
 const FINGERPRINT_INDICES = [4, 7, 20]
@@ -48,10 +49,10 @@ export function cleanBillingHeader(text: string): string | undefined {
 
 function shouldIntercept(upstream: UpstreamRequest, ctx?: UpstreamInterceptorContext): boolean {
   const prefix = `[anthropic-billing-cleaner/shouldIntercept]`
-  // 只处理 /v1/chat/completions 入口（OpenAI 格式），billing header 由 Claude Code 从客户端带入
-  const entryPath = ctx?.c?.req?.path
-  if (entryPath !== '/v1/chat/completions') {
-    console.log(`  ${prefix} SKIP: entryPath=${entryPath}, only process /v1/chat/completions`)
+  // 只处理 /chat/completions 类入口（OpenAI 格式），billing header 由 Claude Code 从客户端带入
+  const entryPath: string | undefined = ctx?.c?.req?.path
+  if (!isChatCompletionsEndpoint(entryPath)) {
+    console.log(`  ${prefix} SKIP: entryPath=${entryPath}, only process /chat/completions endpoints`)
     return false
   }
   const body = upstream.body
