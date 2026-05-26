@@ -48,10 +48,10 @@ export function cleanBillingHeader(text: string): string | undefined {
 
 function shouldIntercept(upstream: UpstreamRequest, ctx?: UpstreamInterceptorContext): boolean {
   const prefix = `[anthropic-billing-cleaner/shouldIntercept]`
-  // 只有 OpenAI provider 的 body 是 OpenAI 格式；其他所有 provider（anthropic/deepseek/custom 等）
-  // 的 body 都会被转为 Anthropic 格式，billing header 只出现在 Anthropic 格式的 body 中。
-  if (ctx?.provider?.provider === 'openai') {
-    console.log(`  ${prefix} SKIP: provider=openai, url=${upstream.url}`)
+  // 只处理 /v1/chat/completions 入口（OpenAI 格式），billing header 由 Claude Code 从客户端带入
+  const entryPath = ctx?.c?.req?.path
+  if (entryPath !== '/v1/chat/completions') {
+    console.log(`  ${prefix} SKIP: entryPath=${entryPath}, only process /v1/chat/completions`)
     return false
   }
   const body = upstream.body
@@ -59,7 +59,7 @@ function shouldIntercept(upstream: UpstreamRequest, ctx?: UpstreamInterceptorCon
     console.log(`  ${prefix} SKIP: no messages array in body. bodyKeys=${JSON.stringify(body ? Object.keys(body) : null)}`)
     return false
   }
-  console.log(`  ${prefix} PASS: provider=${ctx?.provider?.provider}, url=${upstream.url}, messages.length=${body.messages.length}, hasSystemArray=${Array.isArray(body.system)}`)
+  console.log(`  ${prefix} PASS: entryPath=${entryPath}, url=${upstream.url}, messages.length=${body.messages.length}, hasSystemArray=${Array.isArray(body.system)}`)
   return true
 }
 
@@ -194,7 +194,7 @@ export function stabilizeFingerprint(system: any[], messages: any[]): { attrIdx:
  * 必须注册为第一个拦截器，优先执行。
  */
 export const anthropicBillingCleaner: UpstreamInterceptor = async (upstream, ctx) => {
-  console.log(`\n[anthropic-billing-cleaner] ====== CALLED ====== provider=${ctx.provider.customModel}, providerType=${ctx.provider.provider}, stream=${ctx.stream}, url=${upstream.url}`)
+  console.log(`\n[anthropic-billing-cleaner] ====== CALLED ====== entryPath=${ctx.c?.req?.path}, customModel=${ctx.provider.customModel}, stream=${ctx.stream}, upstreamUrl=${upstream.url}`)
   if (!shouldIntercept(upstream, ctx)) return upstream
 
   const body = upstream.body
