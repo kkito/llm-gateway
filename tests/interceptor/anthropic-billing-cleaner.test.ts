@@ -31,7 +31,7 @@ function makeCtx(overrides?: Partial<UpstreamInterceptorContext>): UpstreamInter
       baseUrl: 'https://api.anthropic.com',
       provider: 'anthropic',
     },
-    c: { req: { path: '/v1/chat/completions' } } as any,
+    c: { req: { path: '/v1/messages' } } as any,
     currentUser: null,
     clientIp: '192.168.1.1',
     requestId: 'test-001',
@@ -425,22 +425,22 @@ describe('anthropicBillingCleaner - immutability', () => {
 // ============ 入口路径守卫 ============
 
 describe('anthropicBillingCleaner - entry path guard', () => {
-  it('should skip when entry path is not /v1/chat/completions', async () => {
+  it('should skip when entry path is /v1/chat/completions (OpenAI format)', async () => {
     const upstream = makeUpstream({
-      url: 'https://opencode.ai/zen/go/v1/chat/completions',
+      url: 'https://api.anthropic.com/v1/messages',
       body: {
-        model: 'deepseek-v4-flash-nothinking',
+        model: 'claude-sonnet-4-20250514',
         messages: [
           { role: 'system', content: 'x-anthropic-billing-header: cc_version=2.1.0; cc_entrypoint=claude-vscode; cch=abc;内容。' },
         ],
       },
     })
-    const ctx = makeCtx({ c: { req: { path: '/v1/messages' } } as any })
+    const ctx = makeCtx({ c: { req: { path: '/v1/chat/completions' } } as any })
     const result = await anthropicBillingCleaner(upstream, ctx)
     expect(result).toBe(upstream)
   })
 
-  it('should process when entry path is /v1/chat/completions', async () => {
+  it('should process when entry path is /v1/messages (Anthropic format)', async () => {
     const upstream = makeUpstream({
       url: 'https://api.anthropic.com/v1/messages',
       body: {
@@ -455,7 +455,39 @@ describe('anthropicBillingCleaner - entry path guard', () => {
     expect(systemMsg.content).toBe('内容。')
   })
 
-  it('should skip when body has no messages even if entry path is /v1/chat/completions', async () => {
+  it('should process when entry path is /messages (short form)', async () => {
+    const upstream = makeUpstream({
+      url: 'https://api.anthropic.com/v1/messages',
+      body: {
+        model: 'claude-sonnet-4-20250514',
+        messages: [
+          { role: 'system', content: 'x-anthropic-billing-header: cc_version=2.1.0; cc_entrypoint=claude-vscode; cch=abc;内容。' },
+        ],
+      },
+    })
+    const ctx = makeCtx({ c: { req: { path: '/messages' } } as any })
+    const result = await anthropicBillingCleaner(upstream, ctx)
+    const systemMsg = result.body.messages[0]
+    expect(systemMsg.content).toBe('内容。')
+  })
+
+  it('should process when entry path is /v1/v1/messages (double prefix)', async () => {
+    const upstream = makeUpstream({
+      url: 'https://api.anthropic.com/v1/messages',
+      body: {
+        model: 'claude-sonnet-4-20250514',
+        messages: [
+          { role: 'system', content: 'x-anthropic-billing-header: cc_version=2.1.0; cc_entrypoint=claude-vscode; cch=abc;内容。' },
+        ],
+      },
+    })
+    const ctx = makeCtx({ c: { req: { path: '/v1/v1/messages' } } as any })
+    const result = await anthropicBillingCleaner(upstream, ctx)
+    const systemMsg = result.body.messages[0]
+    expect(systemMsg.content).toBe('内容。')
+  })
+
+  it('should skip when body has no messages even if entry path is /v1/messages', async () => {
     const upstream = makeUpstream({
       url: 'https://api.anthropic.com/v1/messages',
       body: { model: 'claude-sonnet-4-20250514' },
@@ -464,7 +496,7 @@ describe('anthropicBillingCleaner - entry path guard', () => {
     expect(result).toBe(upstream)
   })
 
-  it('should process deepseek via non-standard upstream URL when entry is /v1/chat/completions', async () => {
+  it('should process via non-standard upstream URL when entry is /v1/messages', async () => {
     const upstream = makeUpstream({
       url: 'https://opencode.ai/zen/go/v1/chat/completions',
       body: {

@@ -1,5 +1,5 @@
 import type { UpstreamInterceptor } from './types.js'
-import { isAnthropicV1Messages } from './helpers.js'
+import { isAnthropicEndpoint } from './helpers.js'
 import { createHash } from 'node:crypto'
 
 /**
@@ -429,8 +429,8 @@ export function stripContentBlocks(messages: any[] | null | undefined): { messag
  * 4. content-strip: remove continue trailers and bookkeeping reminders
  */
 export const claudeCodeCache: UpstreamInterceptor = async (upstream, ctx) => {
-  // Step 0: URL guard - only process Anthropic /v1/messages requests
-  if (!isAnthropicV1Messages(upstream.url)) return upstream
+  // Step 0: Entry path guard - only process Anthropic /v1/messages requests
+  if (!isAnthropicEndpoint(ctx?.c?.req?.path)) return upstream
 
   const body = upstream.body
   if (!body || !body.messages) return upstream

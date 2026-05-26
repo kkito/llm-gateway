@@ -1,6 +1,6 @@
 import type { UpstreamInterceptor } from './types.js'
 import type { UpstreamRequest } from '../routes/chat-completions/upstream-request.js'
-import { isAnthropicV1Messages } from './helpers.js'
+import { isAnthropicEndpoint } from './helpers.js'
 
 /**
  * Strip all `cache_control` markers from a user message's content blocks.
@@ -86,7 +86,7 @@ export const cacheControlNormalize: UpstreamInterceptor = async (
   upstream: UpstreamRequest,
   _ctx,
 ) => {
-  if (!isAnthropicV1Messages(upstream.url)) return upstream
+  if (!isAnthropicEndpoint(_ctx?.c?.req?.path)) return upstream
 
   const body = upstream.body
   if (!body?.messages || !Array.isArray(body.messages) || body.messages.length === 0) {

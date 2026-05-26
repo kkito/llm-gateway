@@ -39,7 +39,7 @@ function makeCtx(overrides?: Partial<UpstreamInterceptorContext>): UpstreamInter
       baseUrl: 'https://api.anthropic.com',
       provider: 'anthropic',
     },
-    c: {} as any,
+    c: { req: { path: '/v1/messages' } } as any,
     currentUser: null,
     clientIp: '192.168.1.1',
     requestId: 'test-004',
@@ -635,9 +635,9 @@ describe('sub-step 4: content-strip', () => {
 // Integration: full interceptor
 // ============================================================
 describe('integration: full interceptor', () => {
-  it('should skip non-Anthropic URL', async () => {
+  it('should skip non-Anthropic entry path', async () => {
     const upstream = makeUpstream({ url: 'https://api.openai.com/v1/chat/completions' })
-    const ctx = makeCtx()
+    const ctx = makeCtx({ c: { req: { path: '/v1/chat/completions' } } as any })
     const result = await claudeCodeCache(upstream, ctx)
     expect(result).toBe(upstream)
   })

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isAnthropicV1Messages, isAnthropicEndpoint, isChatCompletionsEndpoint } from '../../src/interceptor/helpers.js'
+import { isAnthropicV1Messages, isAnthropicEndpoint } from '../../src/interceptor/helpers.js'
 
 describe('isAnthropicV1Messages', () => {
   it('should return true for /v1/messages URL', () => {
@@ -54,35 +54,5 @@ describe('isAnthropicEndpoint', () => {
 
   it('should return false for empty string', () => {
     expect(isAnthropicEndpoint('')).toBe(false)
-  })
-})
-
-describe('isChatCompletionsEndpoint', () => {
-  it('should return true for /v1/chat/completions', () => {
-    expect(isChatCompletionsEndpoint('/v1/chat/completions')).toBe(true)
-  })
-
-  it('should return true for /chat/completions', () => {
-    expect(isChatCompletionsEndpoint('/chat/completions')).toBe(true)
-  })
-
-  it('should return true for /v1/v1/chat/completions', () => {
-    expect(isChatCompletionsEndpoint('/v1/v1/chat/completions')).toBe(true)
-  })
-
-  it('should return false for /v1/messages', () => {
-    expect(isChatCompletionsEndpoint('/v1/messages')).toBe(false)
-  })
-
-  it('should return false for /messages', () => {
-    expect(isChatCompletionsEndpoint('/messages')).toBe(false)
-  })
-
-  it('should return false for undefined', () => {
-    expect(isChatCompletionsEndpoint(undefined)).toBe(false)
-  })
-
-  it('should return false for empty string', () => {
-    expect(isChatCompletionsEndpoint('')).toBe(false)
   })
 })

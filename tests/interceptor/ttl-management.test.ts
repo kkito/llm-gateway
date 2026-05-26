@@ -30,7 +30,7 @@ function makeCtx(overrides: Partial<UpstreamInterceptorContext> = {}): UpstreamI
       baseUrl: 'https://api.anthropic.com',
       provider: 'anthropic',
     },
-    c: {} as any,
+    c: { req: { path: '/v1/messages' } } as any,
     currentUser: null,
     clientIp: '127.0.0.1',
     requestId: 'test-request-id',
@@ -110,7 +110,7 @@ describe('ttlManagement', () => {
     expect((result.body.messages as any[])[0].content[0].cache_control).toEqual({ type: 'ephemeral', ttl: '1h' })
   })
 
-  it('should skip when URL is not /v1/messages', async () => {
+  it('should skip when entry path is not /v1/messages', async () => {
     const upstream = makeUpstream({
       url: 'https://api.openai.com/v1/chat/completions',
       body: {
@@ -119,7 +119,8 @@ describe('ttlManagement', () => {
         messages: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }],
       },
     })
-    const result = await ttlManagement(upstream, makeCtx())
+    const ctx = makeCtx({ c: { req: { path: '/v1/chat/completions' } } as any })
+    const result = await ttlManagement(upstream, ctx)
     expect(result).toBe(upstream)
   })
 

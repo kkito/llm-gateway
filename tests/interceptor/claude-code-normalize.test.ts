@@ -44,7 +44,7 @@ function makeCtx(overrides?: Partial<UpstreamInterceptorContext>): UpstreamInter
       baseUrl: 'https://api.anthropic.com',
       provider: 'anthropic',
     },
-    c: {} as any,
+    c: { req: { path: '/v1/messages' } } as any,
     currentUser: null,
     clientIp: '192.168.1.1',
     requestId: 'test-001',
@@ -58,8 +58,8 @@ function makeCtx(overrides?: Partial<UpstreamInterceptorContext>): UpstreamInter
 // URL Guard
 // ============================================================
 
-describe('claudeCodeNormalize - URL guard', () => {
-  it('should skip when URL is not /v1/messages', async () => {
+describe('claudeCodeNormalize - entry path guard', () => {
+  it('should skip when entry path is not /v1/messages', async () => {
     const upstream = makeUpstream({
       url: 'https://api.openai.com/v1/chat/completions',
       body: {
@@ -67,7 +67,8 @@ describe('claudeCodeNormalize - URL guard', () => {
         messages: [{ role: 'user', content: 'hi' }],
       },
     })
-    const result = await claudeCodeNormalize(upstream, makeCtx())
+    const ctx = makeCtx({ c: { req: { path: '/v1/chat/completions' } } as any })
+    const result = await claudeCodeNormalize(upstream, ctx)
     expect(result).toBe(upstream)
   })
 

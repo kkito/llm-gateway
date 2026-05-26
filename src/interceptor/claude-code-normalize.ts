@@ -3,7 +3,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import type { UpstreamInterceptor } from './types.js'
-import { isAnthropicV1Messages } from './helpers.js'
+import { isAnthropicEndpoint } from './helpers.js'
 
 // ============================================================
 // Step 1: session_start_normalize
@@ -330,7 +330,7 @@ export function applyCacheControlSticky(body: any, key: string): number {
 // ============================================================
 
 export const claudeCodeNormalize: UpstreamInterceptor = async (upstream, ctx) => {
-  if (!isAnthropicV1Messages(upstream.url)) return upstream
+  if (!isAnthropicEndpoint(ctx?.c?.req?.path)) return upstream
   if (!upstream.body) return upstream
 
   const body = upstream.body

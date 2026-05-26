@@ -1,5 +1,5 @@
 import type { UpstreamInterceptor } from './types.js'
-import { isAnthropicV1Messages } from './helpers.js'
+import { isAnthropicEndpoint } from './helpers.js'
 
 export const AGENT_SDK_PREFIX = "You are a Claude agent, built on Anthropic's Claude Agent SDK."
 
@@ -49,7 +49,7 @@ export function injectTtl(block: any, ttlParam: string): any {
  * 6. Return modified upstream
  */
 export const ttlManagement: UpstreamInterceptor = async (upstream, ctx) => {
-  if (!isAnthropicV1Messages(upstream.url)) return upstream
+  if (!isAnthropicEndpoint(ctx?.c?.req?.path)) return upstream
 
   const body = upstream.body
   if (!body || (!body.messages && !body.system)) return upstream

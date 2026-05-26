@@ -26,7 +26,7 @@ function makeCtx(): UpstreamInterceptorContext {
       customModel: 'my-claude',
       realModel: 'claude-sonnet-4-20250514',
     },
-    c: {} as any,
+    c: { req: { path: '/v1/messages' } } as any,
     currentUser: { name: 'test-user' },
     clientIp: '127.0.0.1',
     requestId: 'test-req-123',
@@ -157,7 +157,7 @@ describe('cacheControlNormalize', () => {
       expect(result).toBe(upstream)
     })
 
-    it('should skip when URL is not /v1/messages', async () => {
+    it('should skip when entry path is not /v1/messages', async () => {
       const upstream = makeUpstream({
         url: 'https://api.openai.com/v1/chat/completions',
         body: {
@@ -167,7 +167,9 @@ describe('cacheControlNormalize', () => {
           ],
         },
       })
-      const result = await cacheControlNormalize(upstream, makeCtx())
+      const ctx = makeCtx()
+      ctx.c = { req: { path: '/v1/chat/completions' } } as any
+      const result = await cacheControlNormalize(upstream, ctx)
       expect(result).toBe(upstream)
     })
 
