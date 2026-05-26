@@ -101,4 +101,94 @@ describe('InterceptorManager', () => {
     const result = await manager.execute(baseUpstream, mockCtx)
     expect((result.headers as any)['x-removed']).toBeUndefined()
   })
+
+  describe('interceptor registration order', () => {
+    it('should execute in the order defined in server.ts', async () => {
+      // 模拟 server.ts 中 6 个拦截器的注册顺序和职责
+      const steps: string[] = []
+
+      // 1. anthropic-billing-cleaner
+      manager.use(async (upstream, ctx) => {
+        steps.push('billing-cleaner')
+        return upstream
+      })
+
+      // 2. claude-code-cache
+      manager.use(async (upstream, ctx) => {
+        steps.push('claude-code-cache')
+        return upstream
+      })
+
+      // 3. cache-control-normalize
+      manager.use(async (upstream, ctx) => {
+        steps.push('cache-control-normalize')
+        return upstream
+      })
+
+      // 4. ttl-management
+      manager.use(async (upstream, ctx) => {
+        steps.push('ttl-management')
+        return upstream
+      })
+
+      // 5. opencode-session
+      manager.use(async (upstream, ctx) => {
+        steps.push('opencode-session')
+        return upstream
+      })
+
+      // 6. qwen-cache
+      manager.use(async (upstream, ctx) => {
+        steps.push('qwen-cache')
+        return upstream
+      })
+
+      await manager.execute(baseUpstream, mockCtx)
+
+      expect(steps).toEqual([
+        'billing-cleaner',
+        'claude-code-cache',
+        'cache-control-normalize',
+        'ttl-management',
+        'opencode-session',
+        'qwen-cache',
+      ])
+    })
+
+    it('should pipe body modifications through the full chain', async () => {
+      // billing-cleaner: 清理 billing header
+      manager.use(async (upstream, ctx) => {
+        return { ...upstream, headers: { ...upstream.headers, 'x-billing': 'cleaned' } }
+      })
+      // claude-code-cache: 注入 cache_control
+      manager.use(async (upstream, ctx) => {
+        return { ...upstream, body: { ...upstream.body, cache_control: { type: 'ephemeral' } } }
+      })
+      // cache-control-normalize: 添加标记
+      manager.use(async (upstream, ctx) => {
+        return { ...upstream, headers: { ...upstream.headers, 'x-normalized': 'true' } }
+      })
+      // ttl-management: 注入 TTL
+      manager.use(async (upstream, ctx) => {
+        return { ...upstream, body: { ...upstream.body, ttl: '1h' } }
+      })
+      // opencode-session: 添加 session
+      manager.use(async (upstream, ctx) => {
+        return { ...upstream, headers: { ...upstream.headers, 'x-session': 'opencode' } }
+      })
+      // qwen-cache: 添加 cache key
+      manager.use(async (upstream, ctx) => {
+        return { ...upstream, headers: { ...upstream.headers, 'x-cache-key': 'qwen' } }
+      })
+
+      const result = await manager.execute(baseUpstream, mockCtx)
+
+      expect(result.headers['x-billing']).toBe('cleaned')
+      expect(result.body.cache_control).toEqual({ type: 'ephemeral' })
+      expect(result.headers['x-normalized']).toBe('true')
+      expect(result.body.ttl).toBe('1h')
+      expect(result.headers['x-session']).toBe('opencode')
+      expect(result.headers['x-cache-key']).toBe('qwen')
+    })
+  })
 })
