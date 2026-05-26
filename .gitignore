@@ -12,3 +12,6 @@ skills-lock.json
 .worktrees
 *.tsbuildinfo
 .superpowers
+.codegraph
+.claude
+.mcp.json

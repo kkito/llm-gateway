@@ -26,18 +26,12 @@ export function normalizeSessionStartText(text: string): [string, number] {
   if (typeof text !== 'string' || !text.includes('SessionStart:')) return [text, 0]
   let count = 0
   let out = text
-  if (SESSION_START_RESUME_MARKER.test(out)) {
-    out = out.replace(SESSION_START_RESUME_MARKER, 'SessionStart:startup hook success:')
-    count++
-  }
-  if (SESSION_START_ID_TAG.test(out)) {
-    out = out.replace(SESSION_START_ID_TAG, '')
-    count++
-  }
-  if (SESSION_START_LAST_ACTIVE_LINE.test(out)) {
-    out = out.replace(SESSION_START_LAST_ACTIVE_LINE, '')
-    count++
-  }
+  const replacedResume = out.replace(SESSION_START_RESUME_MARKER, 'SessionStart:startup hook success:')
+  if (replacedResume !== out) { out = replacedResume; count++ }
+  const replacedId = out.replace(SESSION_START_ID_TAG, '')
+  if (replacedId !== out) { out = replacedId; count++ }
+  const replacedLastActive = out.replace(SESSION_START_LAST_ACTIVE_LINE, '')
+  if (replacedLastActive !== out) { out = replacedLastActive; count++ }
   return [out, count]
 }
 

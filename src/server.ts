@@ -37,20 +37,23 @@ import { anthropicBillingCleaner } from './interceptor/anthropic-billing-cleaner
 import { claudeCodeCache } from './interceptor/claude-code-cache.js'
 import { cacheControlNormalize } from './interceptor/cache-control-normalize.js'
 import { ttlManagement } from './interceptor/ttl-management.js'
+import { claudeCodeNormalize } from './interceptor/claude-code-normalize.js'
 import { qwenCacheInterceptor } from './interceptor/qwen-cache.js'
 import { opencodeSessionInterceptor } from './interceptor/opencode-session.js'
 
 // 拦截器执行顺序：
-// 1. anthropic-billing-cleaner — 必须最先执行：先清理掉 billing header 残留
+// 1. anthropic-billing-cleaner — 必须最先执行：先清理掉 billing header 残留 + fingerprint 稳定化
 // 2. claude-code-cache — 针对 Claude Code 请求的 4 个缓存子优化（smoosh-split → sort-stabilization → fresh-session-sort → content-strip）
 // 3. cache-control-normalize — 规范化 cache_control 标记：分散标记 → 最后一个块
 // 4. ttl-management — 在所有 cache_control 标记上注入正确的 TTL 值
-// 5. opencode-session — OpenCode 会话注入（应用层功能）
-// 6. qwen-cache — Qwen 缓存处理（应用层功能）
+// 5. claude-code-normalize — 针对 Claude Code 的 4 个规范化功能（session-start → tool-use-input → deferred-tools-restore → cache-control-sticky）
+// 6. opencode-session — OpenCode 会话注入（应用层功能）
+// 7. qwen-cache — Qwen 缓存处理（应用层功能）
 interceptors.use(anthropicBillingCleaner)
 interceptors.use(claudeCodeCache)
 interceptors.use(cacheControlNormalize)
 interceptors.use(ttlManagement)
+interceptors.use(claudeCodeNormalize)
 interceptors.use(opencodeSessionInterceptor)
 interceptors.use(qwenCacheInterceptor)
 
