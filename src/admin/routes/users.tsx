@@ -49,7 +49,13 @@ export function createUsersRoute(configPath?: string) {
 
   // 新增用户页面
   app.get('/admin/users/new', (c) => {
-    return c.html(<UserFormPage mode="new" />);
+    const config = loadFullConfig(getConfig());
+    const models = config.models.map(m => ({
+      customModel: m.customModel,
+      realModel: m.realModel,
+      desc: m.desc,
+    }));
+    return c.html(<UserFormPage mode="new" models={models} />);
   });
 
   // 新增用户
@@ -69,10 +75,16 @@ export function createUsersRoute(configPath?: string) {
       return c.json({ error: '用户已存在' }, 400);
     }
 
+    const allowedModelsRaw = body.allowedModels;
+    const allowedModels: string[] | undefined = allowedModelsRaw
+      ? (Array.isArray(allowedModelsRaw) ? allowedModelsRaw.map(v => String(v)) : [String(allowedModelsRaw)])
+      : undefined;
+
     const newUser = {
       name,
       apikey: generateUserApiKey(),
-      desc: desc || undefined
+      desc: desc || undefined,
+      allowedModels: allowedModels && allowedModels.length > 0 ? allowedModels : undefined,
     };
 
     if (!config.userApiKeys) {
@@ -123,7 +135,12 @@ export function createUsersRoute(configPath?: string) {
       );
     }
 
-    return c.html(<UserFormPage mode="edit" user={user} />);
+    const models = config.models.map(m => ({
+      customModel: m.customModel,
+      realModel: m.realModel,
+      desc: m.desc,
+    }));
+    return c.html(<UserFormPage mode="edit" user={user} models={models} />);
   });
 
   // 编辑用户
@@ -149,6 +166,11 @@ export function createUsersRoute(configPath?: string) {
       return c.json({ error: '用户已存在' }, 400);
     }
 
+    const allowedModelsRaw = body.allowedModels;
+    const allowedModels: string[] | undefined = allowedModelsRaw
+      ? (Array.isArray(allowedModelsRaw) ? allowedModelsRaw.map(v => String(v)) : [String(allowedModelsRaw)])
+      : undefined;
+
     // 更新用户信息
     if (!config.userApiKeys) {
       config.userApiKeys = [];
@@ -156,7 +178,8 @@ export function createUsersRoute(configPath?: string) {
     config.userApiKeys[userIndex] = {
       ...config.userApiKeys[userIndex],
       name: newName,
-      desc: desc || undefined
+      desc: desc || undefined,
+      allowedModels: allowedModels && allowedModels.length > 0 ? allowedModels : undefined,
     };
 
     saveConfig(config, getConfig());
