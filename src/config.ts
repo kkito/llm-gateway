@@ -48,6 +48,8 @@ export interface UserApiKey {
   name: string;
   apikey: string;
   desc?: string;
+  /** 允许使用的模型列表（customModel 名称）。空或 undefined 表示不限制 */
+  allowedModels?: string[];
 }
 
 /**
