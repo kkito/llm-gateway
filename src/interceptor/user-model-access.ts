@@ -8,10 +8,12 @@ export class PermissionError extends Error {
 }
 
 export const userModelAccessInterceptor: UpstreamInterceptor = async (upstream, ctx) => {
-  const { currentUser, customModel } = ctx
+  const { currentUser, customModel, modelGroup } = ctx
+  // 模型组请求不做限制（由 spec 约束）
+  if (modelGroup) return upstream
   if (!currentUser) return upstream
 
-  const allowed: string[] | undefined = (currentUser as any).allowedModels
+  const allowed = currentUser.allowedModels
   if (!allowed || allowed.length === 0) return upstream
 
   if (!allowed.includes(customModel)) {
