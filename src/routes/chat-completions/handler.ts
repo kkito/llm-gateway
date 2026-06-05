@@ -283,6 +283,12 @@ export function createChatCompletionsHandler(
         }, 400);
       }
 
+      if (error.name === 'PermissionError') {
+        return c.json({
+          error: { message: error.message, type: 'permission_error' }
+        }, 403);
+      }
+
       return c.json({ error: { message: error.message || 'Internal error' } }, 500);
     }
   };
