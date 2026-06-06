@@ -108,7 +108,8 @@ export function createMessagesHandler(
               c, modelNames, allProviders: currentConfig.models, body, stream,
               rateLimiter, logger, detailLogger, requestId, startTime,
               currentUser, modelGroupName: model, timeoutMs, logDir,
-              privacySettings: currentConfig.privacySettings
+              privacySettings: currentConfig.privacySettings,
+              apiKeys: currentConfig.apiKeys ?? [],
             });
             actualModel = fallbackResult.actualModel;
             triedModels = fallbackResult.triedModels;
