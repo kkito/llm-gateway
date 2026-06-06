@@ -277,11 +277,16 @@ export const ModelFormPage: FC<Props> = (props) => {
                       id="apiKeyManual"
                       name="apiKey"
                       type="password"
-                      placeholder={isEdit ? '留空则保持原密钥不变' : '请输入 API Key'}
+                      disabled={!!props.selectedApiKeyRef}
+                      placeholder={props.selectedApiKeyRef ? `使用引用：$$${escapeHtml(props.selectedApiKeyRef) || ''}$$` : (isEdit ? '留空则保持原密钥不变' : '请输入 API Key')}
                       value={isEdit ? '' : safeValue(props.model?.apiKey)}
-                      required={!isEdit}
+                      required={!isEdit && !props.selectedApiKeyRef}
                     />
-                    <span class="form-hint">可以选择已保存的 API Key，或手动输入</span>
+                    <span class="form-hint">
+                      {props.selectedApiKeyRef
+                        ? `引用 API Key「${escapeHtml(props.selectedApiKeyRef)}」，修改后将全局生效`
+                        : '可以选择已保存的 API Key，或手动输入'}
+                    </span>
                   </div>
                   {isEdit && <span class="form-hint">留空则保持原密钥不变</span>}
                 </label>
