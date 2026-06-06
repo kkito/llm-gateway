@@ -81,7 +81,8 @@ export function createChatCompletionsHandler(
           c, modelNames, allProviders: currentConfig.models, body, stream,
           rateLimiter, logger, detailLogger, requestId, startTime,
           currentUser, modelGroupName: model_group, timeoutMs, logDir,
-          privacySettings: currentConfig.privacySettings
+          privacySettings: currentConfig.privacySettings,
+          apiKeys: currentConfig.apiKeys ?? [],
         };
         const fallbackResult = await tryModelGroupWithFallback(ctx);
         actualModel = fallbackResult.actualModel;
@@ -111,7 +112,8 @@ export function createChatCompletionsHandler(
               c, modelNames, allProviders: currentConfig.models, body, stream,
               rateLimiter, logger, detailLogger, requestId, startTime,
               currentUser, modelGroupName: model, timeoutMs, logDir,
-              privacySettings: currentConfig.privacySettings
+              privacySettings: currentConfig.privacySettings,
+              apiKeys: currentConfig.apiKeys ?? [],
             };
             const fallbackResult = await tryModelGroupWithFallback(ctx);
             actualModel = fallbackResult.actualModel;
@@ -157,7 +159,7 @@ export function createChatCompletionsHandler(
       }
 
       // Build and send upstream request
-      const upstream = await buildUpstreamRequest(provider, body, stream);
+      const upstream = await buildUpstreamRequest(provider, body, stream, currentConfig.apiKeys ?? []);
 
       // 执行注册的拦截器，允许对 upstream request 进行自定义修改（如添加缓存 header/body 字段）
       const intercepted = await interceptors.execute(upstream, {

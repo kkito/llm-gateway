@@ -78,7 +78,8 @@ export function createMessagesHandler(
           c, modelNames, allProviders: currentConfig.models, body, stream,
           rateLimiter, logger, detailLogger, requestId, startTime,
           currentUser, modelGroupName: model_group, timeoutMs, logDir,
-          privacySettings: currentConfig.privacySettings
+          privacySettings: currentConfig.privacySettings,
+          apiKeys: currentConfig.apiKeys ?? [],
         });
         actualModel = fallbackResult.actualModel;
         triedModels = fallbackResult.triedModels;
@@ -152,7 +153,7 @@ export function createMessagesHandler(
       }
 
       // Build and send upstream request
-      const upstream = await buildMessagesUpstreamRequest(provider, body, stream);
+      const upstream = await buildMessagesUpstreamRequest(provider, body, stream, currentConfig.apiKeys ?? []);
 
       // 执行注册的拦截器，允许对 upstream request 进行自定义修改（如添加缓存 header/body 字段）
       const intercepted = await interceptors.execute(upstream, {
