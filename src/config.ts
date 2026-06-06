@@ -369,6 +369,9 @@ export function addApiKey(
   name: string,
   key: string
 ): ApiKey {
+  if (config.some(k => k.name === name)) {
+    throw new Error(`API Key name "${name}" already exists`);
+  }
   const now = Date.now();
   const newKey: ApiKey = {
     id: generateId(),
@@ -391,6 +394,11 @@ export function updateApiKey(
   const index = config.findIndex(k => k.id === id);
   if (index === -1) {
     throw new Error(`API Key not found: ${id}`);
+  }
+  if (updates.name && updates.name !== config[index].name) {
+    if (config.some(k => k.name === updates.name && k.id !== id)) {
+      throw new Error(`API Key name "${updates.name}" already exists`);
+    }
   }
   const updated = { ...config[index], ...updates, updatedAt: Date.now() };
   const newConfig = [...config];
@@ -421,4 +429,23 @@ export function getApiKey(config: ApiKey[], id: string): ApiKey | null {
  */
 export function getApiKeyOptions(config: ApiKey[]): Omit<ApiKey, 'key'>[] {
   return config.map(({ key, ...rest }) => rest);
+}
+
+export function isApiKeyRef(apiKey: string): boolean {
+  return /^\$\$(.+)\$\$$/.test(apiKey);
+}
+
+export function getApiKeyRefName(apiKey: string): string | null {
+  const match = apiKey.match(/^\$\$(.+)\$\$$/);
+  return match ? match[1] : null;
+}
+
+export function resolveApiKey(apiKey: string, apiKeys: ApiKey[]): string {
+  if (!isApiKeyRef(apiKey)) return apiKey;
+  const name = apiKey.slice(2, -2);
+  const found = apiKeys.find(k => k.name === name);
+  if (!found) {
+    throw new Error(`API Key reference $$${name}$$ not found in saved API keys`);
+  }
+  return found.key;
 }
