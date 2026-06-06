@@ -134,6 +134,69 @@ describe('Admin Users Management E2E', () => {
       expect(data.users).toHaveLength(1);
       expect(data.users[0].name).toBe('初始用户');
     });
+
+    it('用户卡片应显示模型权限信息', async () => {
+      // 先创建一个带模型权限的用户
+      await app.request('/admin/users/new', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Cookie: adminSessionCookie
+        },
+        body: new URLSearchParams({
+          name: '受限用户',
+          desc: '测试模型显示',
+          allowedModels: 'test-openai'
+        })
+      });
+
+      const response = await app.request('/admin/users', {
+        headers: { Cookie: adminSessionCookie }
+      });
+
+      expect(response.status).toBe(200);
+      const html = await response.text();
+      expect(html).toContain('可用模型');
+      expect(html).toContain('test-openai');
+    });
+
+    it('用户卡片超过3个模型时应显示"等x个模型"', async () => {
+      // 创建多个模型
+      const testModels = ['model-a', 'model-b', 'model-c', 'model-d'];
+      
+      // 创建带多个模型权限的用户
+      const body = new URLSearchParams();
+      body.append('name', '多模型用户');
+      body.append('desc', '测试多模型显示');
+      testModels.forEach(m => body.append('allowedModels', m));
+
+      await app.request('/admin/users/new', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Cookie: adminSessionCookie
+        },
+        body
+      });
+
+      const response = await app.request('/admin/users', {
+        headers: { Cookie: adminSessionCookie }
+      });
+
+      expect(response.status).toBe(200);
+      const html = await response.text();
+      expect(html).toContain('等1个模型');
+    });
+
+    it('用户卡片未设置模型时应显示"所有模型"', async () => {
+      const response = await app.request('/admin/users', {
+        headers: { Cookie: adminSessionCookie }
+      });
+
+      expect(response.status).toBe(200);
+      const html = await response.text();
+      expect(html).toContain('所有模型');
+    });
   });
 
   describe('新增用户', () => {

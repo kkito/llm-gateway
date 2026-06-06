@@ -464,6 +464,20 @@ export function createModelFormRoute(deps: RouteDeps) {
           .filter(group => group.models.length > 0); // 删除变为空的 group
       }
 
+      // 清理用户绑定中的模型引用
+      if (proxyConfig.userApiKeys && proxyConfig.userApiKeys.length > 0) {
+        proxyConfig.userApiKeys = proxyConfig.userApiKeys.map(user => {
+          if (user.allowedModels && user.allowedModels.length > 0) {
+            const newAllowedModels = user.allowedModels.filter(m => m !== modelParam);
+            return {
+              ...user,
+              allowedModels: newAllowedModels.length > 0 ? newAllowedModels : undefined,
+            };
+          }
+          return user;
+        });
+      }
+
       saveConfig(proxyConfig, configPath);
 
       // 触发配置更新回调

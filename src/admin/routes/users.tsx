@@ -21,8 +21,12 @@ export function createUsersRoute(configPath?: string) {
     try {
       const config = loadFullConfig(getConfig());
       const users = config.userApiKeys || [];
+      const models = config.models.map(m => ({
+        customModel: m.customModel,
+        desc: m.desc,
+      }));
       const authEnabled = config.userApiKeys && config.userApiKeys.length > 0;
-      return c.html(<UsersPage users={users} authEnabled={authEnabled} />);
+      return c.html(<UsersPage users={users} models={models} authEnabled={authEnabled} />);
     } catch (error: any) {
       console.error('用户列表页面错误:', error.message);
       return c.html(
@@ -44,7 +48,11 @@ export function createUsersRoute(configPath?: string) {
   app.get('/admin/users/api', (c) => {
     const config = loadFullConfig(getConfig());
     const users = config.userApiKeys || [];
-    return c.json({ users });
+    const models = config.models.map(m => ({
+      customModel: m.customModel,
+      desc: m.desc,
+    }));
+    return c.json({ users, models });
   });
 
   // 新增用户页面
