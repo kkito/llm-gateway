@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type { ProviderConfig, ProxyConfig } from '../../config.js';
-import { saveConfig, updateConfigEntry, loadFullConfig, getApiKeyOptions } from '../../config.js';
+import { saveConfig, updateConfigEntry, loadFullConfig, getApiKeyOptions, isApiKeyRef, getApiKeyRefName, resolveApiKey } from '../../config.js';
 import { removeModelFromConfig, renameModelInConfig } from '../../config-operations.js';
 import { ModelFormPage } from '../views/model-form.js';
 import { ModelsPage } from '../views/models.js';
@@ -166,6 +166,16 @@ export function createModelFormRoute(deps: RouteDeps) {
       }
     }
 
+    // 如果 API Key 是 $$name$$ 引用，解析为真实 key
+    if (resolvedApiKey) {
+      try {
+        const proxyConfig = loadFullConfig(configPath);
+        resolvedApiKey = resolveApiKey(resolvedApiKey, proxyConfig.apiKeys ?? []);
+      } catch {
+        // 引用不存在时继续使用原值（会得到错误提示）
+      }
+    }
+
     if (!resolvedApiKey) {
       // 尝试从已保存的模型配置中读取（编辑模式下的兜底逻辑）
       try {
@@ -176,6 +186,16 @@ export function createModelFormRoute(deps: RouteDeps) {
         }
       } catch {
         // 加载失败则继续
+      }
+    }
+
+    // 再次解析，处理从保存配置读取到的 $$name$$ 引用
+    if (resolvedApiKey) {
+      try {
+        const proxyConfig = loadFullConfig(configPath);
+        resolvedApiKey = resolveApiKey(resolvedApiKey, proxyConfig.apiKeys ?? []);
+      } catch {
+        // 引用不存在时继续使用原值（会得到错误提示）
       }
     }
 
@@ -234,12 +254,12 @@ export function createModelFormRoute(deps: RouteDeps) {
         if (!selectedKey) {
           return c.html(<ModelFormPage error={`未找到 API Key：${apiKeySource}`} apiKeyOptions={getApiKeyOptions(proxyConfig.apiKeys || [])} />);
         }
-        finalApiKey = selectedKey.key;
+        finalApiKey = `$$${selectedKey.name}$$`;
       } catch (error: any) {
         return c.html(<ModelFormPage error={`加载配置失败：${error.message}`} />);
       }
     } else if (apiKey) {
-      // 使用手动输入的 API Key
+      // 使用手动输入的 API Key（可以是真实 key 或 $$name$$）
       finalApiKey = apiKey;
     } else {
       // 两者都没有，返回错误
@@ -307,7 +327,11 @@ export function createModelFormRoute(deps: RouteDeps) {
     try {
       const proxyConfig = loadFullConfig(configPath);
       const apiKeyOptions = getApiKeyOptions(proxyConfig.apiKeys || []);
-      return c.html(<ModelFormPage model={model} apiKeyOptions={apiKeyOptions} />);
+
+      // 检测模型是否使用 $$name$$ 引用
+      const selectedApiKeyRef = getApiKeyRefName(model.apiKey);
+
+      return c.html(<ModelFormPage model={model} apiKeyOptions={apiKeyOptions} selectedApiKeyRef={selectedApiKeyRef} />);
     } catch (error: any) {
       return c.html(<ModelFormPage model={model} error={`加载配置失败：${error.message}`} />);
     }
@@ -359,13 +383,13 @@ export function createModelFormRoute(deps: RouteDeps) {
         const proxyConfig = loadFullConfig(configPath);
         const selectedKey = proxyConfig.apiKeys?.find(k => k.id === apiKeySource);
         if (selectedKey) {
-          finalApiKey = selectedKey.key;
+          finalApiKey = `$$${selectedKey.name}$$`;
         }
       } catch (error: any) {
         // 加载失败则使用原值
       }
     } else if (apiKey && apiKey !== '') {
-      // 使用手动输入的 API Key
+      // 使用手动输入的 API Key（可以是真实 key 或 $$name$$）
       finalApiKey = apiKey;
     }
     // 如果两者都没有，使用原值（finalApiKey 已初始化为原值）

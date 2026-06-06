@@ -8,6 +8,7 @@ interface Props {
   model?: ProviderConfig;
   error?: string;
   apiKeyOptions?: { id: string; name: string }[];
+  selectedApiKeyRef?: string | null;
 }
 
 // HTML 转义函数，防止 XSS 攻击
@@ -268,7 +269,7 @@ export const ModelFormPage: FC<Props> = (props) => {
                     >
                       <option value="manual">手动输入...</option>
                       {props.apiKeyOptions?.map((opt) => (
-                        <option value={opt.id}>{opt.name}</option>
+                        <option value={opt.id} selected={props.selectedApiKeyRef === opt.name}>{opt.name}</option>
                       ))}
                     </select>
                     <input
