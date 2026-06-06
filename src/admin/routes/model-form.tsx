@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type { ProviderConfig, ProxyConfig } from '../../config.js';
-import { saveConfig, updateConfigEntry, loadFullConfig, getApiKeyOptions, isApiKeyRef, getApiKeyRefName, resolveApiKey } from '../../config.js';
+import { saveConfig, updateConfigEntry, loadFullConfig, getApiKeyOptions, getApiKeyRefName, resolveApiKey } from '../../config.js';
 import { removeModelFromConfig, renameModelInConfig } from '../../config-operations.js';
 import { ModelFormPage } from '../views/model-form.js';
 import { ModelsPage } from '../views/models.js';
@@ -328,8 +328,11 @@ export function createModelFormRoute(deps: RouteDeps) {
       const proxyConfig = loadFullConfig(configPath);
       const apiKeyOptions = getApiKeyOptions(proxyConfig.apiKeys || []);
 
-      // 检测模型是否使用 $$name$$ 引用
-      const selectedApiKeyRef = getApiKeyRefName(model.apiKey);
+      // 检测模型是否使用 $$name$$ 引用，验证引用的 API Key 仍然存在
+      const apiKeyRefName = getApiKeyRefName(model.apiKey);
+      const selectedApiKeyRef = apiKeyRefName && (proxyConfig.apiKeys ?? []).some(k => k.name === apiKeyRefName)
+        ? apiKeyRefName
+        : undefined;
 
       return c.html(<ModelFormPage model={model} apiKeyOptions={apiKeyOptions} selectedApiKeyRef={selectedApiKeyRef} />);
     } catch (error: any) {

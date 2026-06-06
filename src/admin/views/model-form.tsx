@@ -267,7 +267,7 @@ export const ModelFormPage: FC<Props> = (props) => {
                       name="apiKeySource"
                       onchange="const manualInput = document.getElementById('apiKeyManual'); if (this.value === 'manual') { manualInput.disabled = false; manualInput.required = true; manualInput.focus(); } else { manualInput.disabled = true; manualInput.value = ''; manualInput.required = false; }"
                     >
-                      <option value="manual">手动输入...</option>
+                      <option value="manual" selected={!props.selectedApiKeyRef}>手动输入...</option>
                       {props.apiKeyOptions?.map((opt) => (
                         <option value={opt.id} selected={props.selectedApiKeyRef === opt.name}>{opt.name}</option>
                       ))}
