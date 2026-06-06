@@ -404,13 +404,14 @@ describe('tryModelGroupWithFallback', () => {
       vi.mocked(upstreamRequestModule.sendUpstreamRequest).mockResolvedValue(mockResponse);
       vi.mocked(responseProcessorModule.processSuccessfulResponse).mockResolvedValue(processedResponse as any);
 
-      const ctx = createContext({ stream: true });
+      const ctx = createContext({ stream: true, apiKeys: [] });
       await tryModelGroupWithFallback(ctx);
 
       expect(upstreamRequestModule.buildUpstreamRequest).toHaveBeenCalledWith(
         expect.anything(),
         expect.anything(),
-        true
+        true,
+        expect.anything()
       );
       expect(responseProcessorModule.processSuccessfulResponse).toHaveBeenCalled();
       const procCall = vi.mocked(responseProcessorModule.processSuccessfulResponse).mock.calls[0];
