@@ -60,7 +60,7 @@ export function createUsersRoute(configPath?: string) {
 
   // 新增用户
   app.post('/admin/users/new', async (c) => {
-    const body = await c.req.parseBody();
+    const body = await c.req.parseBody({ all: true });
     const name = body.name as string;
     const desc = body.desc as string;
 
@@ -146,7 +146,7 @@ export function createUsersRoute(configPath?: string) {
   // 编辑用户
   app.post('/admin/users/edit/:name', async (c) => {
     const name = c.req.param('name');
-    const body = await c.req.parseBody();
+    const body = await c.req.parseBody({ all: true });
     const newName = body.name as string;
     const desc = body.desc as string;
 

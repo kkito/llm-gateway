@@ -64,6 +64,13 @@ describe('Admin Users Management E2E', () => {
         apiKey: 'sk-test-openai-key',
         baseUrl: 'https://api.openai.com/v1',
         provider: 'openai'
+      },
+      {
+        customModel: 'test-claude',
+        realModel: 'claude-3-opus',
+        apiKey: 'sk-test-anthropic-key',
+        baseUrl: 'https://api.anthropic.com/v1',
+        provider: 'anthropic'
       }
     ];
 
@@ -178,6 +185,31 @@ describe('Admin Users Management E2E', () => {
       expect(data.error).toBe('用户名称不能为空');
     });
 
+    it('应该支持为新增用户指定多个 allowedModels', async () => {
+      const body = new URLSearchParams();
+      body.append('name', '受限用户');
+      body.append('desc', '多模型用户');
+      body.append('allowedModels', 'test-openai');
+      body.append('allowedModels', 'test-claude');
+
+      const response = await app.request('/admin/users/new', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Cookie: adminSessionCookie
+        },
+        body
+      });
+
+      expect(response.status).toBe(302);
+
+      const configContent = readFileSync(testConfigPath, 'utf-8');
+      const config = JSON.parse(configContent);
+      const user = config.userApiKeys.find((u: any) => u.name === '受限用户');
+      expect(user).toBeTruthy();
+      expect(user.allowedModels).toEqual(['test-openai', 'test-claude']);
+    });
+
     it('应该拒绝新增重名用户', async () => {
       const response = await app.request('/admin/users/new', {
         method: 'POST',
@@ -239,6 +271,30 @@ describe('Admin Users Management E2E', () => {
       expect(html).toContain('编辑用户');
       expect(html).toContain('编辑测试用户');
       expect(html).toContain('原始描述');
+    });
+
+    it('应该支持为编辑用户指定多个 allowedModels', async () => {
+      const body = new URLSearchParams();
+      body.append('name', '编辑测试用户');
+      body.append('desc', '更新后的描述');
+      body.append('allowedModels', 'test-openai');
+      body.append('allowedModels', 'test-claude');
+
+      const response = await app.request('/admin/users/edit/编辑测试用户', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Cookie: adminSessionCookie
+        },
+        body
+      });
+
+      expect(response.status).toBe(302);
+
+      const configContent = readFileSync(testConfigPath, 'utf-8');
+      const config = JSON.parse(configContent);
+      const user = config.userApiKeys.find((u: any) => u.name === '编辑测试用户');
+      expect(user.allowedModels).toEqual(['test-openai', 'test-claude']);
     });
 
     it('应该成功更新用户描述', async () => {
