@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { ProviderConfig, ProxyConfig } from '../../config.js';
-import { saveConfig, updateConfigEntry, deleteConfigEntry, loadFullConfig, getApiKeyOptions } from '../../config.js';
+import { saveConfig, updateConfigEntry, loadFullConfig, getApiKeyOptions } from '../../config.js';
+import { removeModelFromConfig, renameModelInConfig } from '../../config-operations.js';
 import { ModelFormPage } from '../views/model-form.js';
 import { ModelsPage } from '../views/models.js';
 import { OpenAIProvider } from '../../providers/openai.js';
@@ -423,11 +424,9 @@ export function createModelFormRoute(deps: RouteDeps) {
       proxyConfig.models = finalList;
 
       // 更新 model group 中对该模型的引用（模型改名时）
-      if (oldModel !== customModel && proxyConfig.modelGroups) {
-        proxyConfig.modelGroups = proxyConfig.modelGroups.map(group => ({
-          ...group,
-          models: group.models.map(m => m === oldModel ? customModel : m)
-        }));
+      if (oldModel !== customModel) {
+        const renamed = renameModelInConfig(proxyConfig, oldModel, customModel);
+        proxyConfig.modelGroups = renamed.modelGroups;
       }
 
       saveConfig(proxyConfig, configPath);
@@ -449,34 +448,12 @@ export function createModelFormRoute(deps: RouteDeps) {
     const currentConfig = typeof config === 'function' ? config() : config;
 
     try {
-      const newConfigList = deleteConfigEntry(currentConfig.models, modelParam);
       // 保存到文件 - 保留 apiKeys 等其他配置
       const proxyConfig = loadFullConfig(configPath);
-      proxyConfig.models = newConfigList;
-
-      // 清理所有 model group 中对该模型的引用
-      if (proxyConfig.modelGroups && proxyConfig.modelGroups.length > 0) {
-        proxyConfig.modelGroups = proxyConfig.modelGroups
-          .map(group => ({
-            ...group,
-            models: group.models.filter(m => m !== modelParam)
-          }))
-          .filter(group => group.models.length > 0); // 删除变为空的 group
-      }
-
-      // 清理用户绑定中的模型引用
-      if (proxyConfig.userApiKeys && proxyConfig.userApiKeys.length > 0) {
-        proxyConfig.userApiKeys = proxyConfig.userApiKeys.map(user => {
-          if (user.allowedModels && user.allowedModels.length > 0) {
-            const newAllowedModels = user.allowedModels.filter(m => m !== modelParam);
-            return {
-              ...user,
-              allowedModels: newAllowedModels.length > 0 ? newAllowedModels : undefined,
-            };
-          }
-          return user;
-        });
-      }
+      const newProxyConfig = removeModelFromConfig(proxyConfig, modelParam);
+      proxyConfig.models = newProxyConfig.models;
+      proxyConfig.modelGroups = newProxyConfig.modelGroups;
+      proxyConfig.userApiKeys = newProxyConfig.userApiKeys;
 
       saveConfig(proxyConfig, configPath);
 

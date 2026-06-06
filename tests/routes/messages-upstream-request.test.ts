@@ -187,11 +187,3 @@ describe('buildMessagesUpstreamRequest', () => {
     });
   });
 });
-
-describe('sendMessagesUpstreamRequest', () => {
-  // Skipping by default because mocking global fetch with AbortSignal.timeout is tricky.
-  // This function is tested at e2e level.
-  it.skip('should fetch and return response', async () => {
-    // This is tested at e2e level
-  });
-});

@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { ProxyConfig } from '../../config.js';
 import { loadFullConfig, saveConfig } from '../../config.js';
+import { removeModelGroupFromConfig } from '../../config-operations.js';
 import { ModelGroupsPage } from '../views/model-groups.js';
 
 interface RouteDeps {
@@ -25,7 +26,8 @@ export function createModelGroupsRoute(deps: RouteDeps) {
     const name = c.req.param('name');
     try {
       const proxyConfig = loadFullConfig(configPath);
-      proxyConfig.modelGroups = (proxyConfig.modelGroups || []).filter(g => g.name !== name);
+      const newProxyConfig = removeModelGroupFromConfig(proxyConfig, name);
+      proxyConfig.modelGroups = newProxyConfig.modelGroups;
       saveConfig(proxyConfig, configPath);
       onConfigChange(proxyConfig);
       return c.redirect('/admin/model-groups');
