@@ -441,8 +441,8 @@ export function getApiKeyRefName(apiKey: string): string | null {
 }
 
 export function resolveApiKey(apiKey: string, apiKeys: ApiKey[]): string {
-  if (!isApiKeyRef(apiKey)) return apiKey;
-  const name = apiKey.slice(2, -2);
+  const name = getApiKeyRefName(apiKey);
+  if (name === null) return apiKey;
   const found = apiKeys.find(k => k.name === name);
   if (!found) {
     throw new Error(`API Key reference $$${name}$$ not found in saved API keys`);
