@@ -1,4 +1,4 @@
-import type { ProviderConfig } from '../../config.js';
+import { resolveApiKey, type ApiKey, type ProviderConfig } from '../../config.js';
 import { buildHeaders, buildUrl } from '../../providers/index.js';
 import { convertAnthropicRequestToOpenAI } from '../../converters/anthropic-to-openai.js';
 import { mergeModelParams } from '../../lib/params-merger.js';
@@ -19,22 +19,28 @@ export interface UpstreamRequest {
 export async function buildMessagesUpstreamRequest(
   provider: ProviderConfig,
   body: any,
-  _stream: boolean
+  _stream: boolean,
+  apiKeys?: ApiKey[]
 ): Promise<UpstreamRequest> {
   let requestBody: any;
 
-  if (provider.provider === 'anthropic') {
-    requestBody = { ...body, model: provider.realModel };
+  const resolvedKey = resolveApiKey(provider.apiKey, apiKeys ?? []);
+  const effectiveProvider = resolvedKey !== provider.apiKey
+    ? { ...provider, apiKey: resolvedKey }
+    : provider;
+
+  if (effectiveProvider.provider === 'anthropic') {
+    requestBody = { ...body, model: effectiveProvider.realModel };
   } else {
     const openaiRequest = convertAnthropicRequestToOpenAI(body);
-    requestBody = { ...openaiRequest, model: provider.realModel };
+    requestBody = { ...openaiRequest, model: effectiveProvider.realModel };
   }
 
-  const requestHeaders = buildHeaders(provider);
-  const url = buildUrl(provider, 'chat');
+  const requestHeaders = buildHeaders(effectiveProvider);
+  const url = buildUrl(effectiveProvider, 'chat');
 
   // 合并默认参数（用户参数优先级更高）
-  requestBody = mergeModelParams(provider.defaultParams, requestBody);
+  requestBody = mergeModelParams(effectiveProvider.defaultParams, requestBody);
 
   return {
     url,
