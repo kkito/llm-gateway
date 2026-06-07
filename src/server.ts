@@ -37,6 +37,8 @@ import { anthropicBillingCleaner } from './interceptor/anthropic-billing-cleaner
 import { qwenCacheInterceptor } from './interceptor/qwen-cache.js'
 import { opencodeSessionInterceptor } from './interceptor/opencode-session.js'
 import { userModelAccessInterceptor } from './interceptor/user-model-access.js'
+import { DatabaseManager } from './lib/db.js';
+import { RequestLogger } from './lib/request-logger.js';
 
 // !!! 必须放在第一个执行：在所有其他拦截器之前清理 Anthropic billing header
 interceptors.use(anthropicBillingCleaner)
@@ -113,6 +115,14 @@ export function createServer(
   // 当 configDir 未指定时，从 logger 获取 logDir（用于测试环境）
   const logDir = configDir ? ctx.logDir : pathJoin(logger.getFilePath(), '..');
 
+  // Initialize SQLite database for request logging
+  const dbManager = DatabaseManager.getInstance(ctx.logDir);
+  dbManager.initialize();
+
+  // Start async request logger
+  const requestLogger = RequestLogger.getInstance(dbManager);
+  requestLogger.start();
+
   // 创建用量追踪器（单例）
   const usageTracker = UsageTracker.getInstance(logDir);
 
@@ -127,7 +137,8 @@ export function createServer(
   if (!cleanupInterval) {
     cleanupInterval = setInterval(() => {
       statsProvider.cleanup();
-      console.log('🧹 已清理过期的滑动窗口数据');
+      dbManager.cleanupOldRequests(90);
+      console.log('🧹 已清理过期数据');
     }, 60 * 60 * 1000); // 1 小时
   }
 
@@ -137,11 +148,15 @@ export function createServer(
     
     sigintHandler = () => {
       if (cleanupInterval) clearInterval(cleanupInterval);
+      requestLogger.stop();
+      dbManager.close();
       process.exit(0);
     };
-    
+
     sigtermHandler = () => {
       if (cleanupInterval) clearInterval(cleanupInterval);
+      requestLogger.stop();
+      dbManager.close();
       process.exit(0);
     };
     
