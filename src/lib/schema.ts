@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
 
 export const requests = sqliteTable('requests', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -29,3 +29,8 @@ export const requests = sqliteTable('requests', {
 
   responseMetadata: text('response_metadata'),
 });
+
+export const idxTimestamp = index('idx_timestamp').on(requests.timestamp);
+export const idxUserName = index('idx_user_name').on(requests.userName);
+export const idxCustomModel = index('idx_custom_model').on(requests.customModel);
+export const idxCreatedAt = index('idx_created_at').on(requests.createdAt);

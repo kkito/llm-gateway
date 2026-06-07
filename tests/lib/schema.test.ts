@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { requests } from '../../src/lib/schema.js';
+import { requests, idxTimestamp, idxUserName, idxCustomModel, idxCreatedAt } from '../../src/lib/schema.js';
 
 describe('requests table schema', () => {
   it('should define all expected columns', () => {
@@ -24,6 +24,13 @@ describe('requests table schema', () => {
     expect(requests.errorMessage).toBeDefined();
     expect(requests.errorType).toBeDefined();
     expect(requests.responseMetadata).toBeDefined();
+  });
+
+  it('should export all four indexes', () => {
+    expect(idxTimestamp).toBeDefined();
+    expect(idxUserName).toBeDefined();
+    expect(idxCustomModel).toBeDefined();
+    expect(idxCreatedAt).toBeDefined();
   });
 
   it('should have correct column types', () => {
