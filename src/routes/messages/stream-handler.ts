@@ -109,6 +109,9 @@ export function handleStream(options: StreamHandlerOptions): Response {
                 cachedTokens: logEntry.cachedTokens,
                 modelGroup: logEntry.modelGroup,
                 actualModel: logEntry.actualModel,
+                errorMessage: logEntry.error?.message,
+                errorType: logEntry.error?.type,
+                responseMetadata: logEntry.responseMetadata,
               });
             }
             logger.log(logEntry);

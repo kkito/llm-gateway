@@ -290,6 +290,29 @@ export function createChatCompletionsHandler(
       }
 
       logger.log(logEntry);
+      if (requestLogger && currentUser) {
+        requestLogger.log({
+          requestId: logEntry.requestId,
+          timestamp: logEntry.timestamp,
+          userName: currentUser.name,
+          customModel: logEntry.customModel,
+          realModel: logEntry.realModel,
+          provider: logEntry.provider,
+          endpoint: logEntry.endpoint,
+          statusCode: logEntry.statusCode,
+          durationMs: logEntry.durationMs,
+          isStreaming: logEntry.isStreaming,
+          promptTokens: logEntry.promptTokens,
+          completionTokens: logEntry.completionTokens,
+          totalTokens: logEntry.totalTokens,
+          cachedTokens: logEntry.cachedTokens,
+          modelGroup: logEntry.modelGroup,
+          actualModel: logEntry.actualModel,
+          errorMessage: logEntry.error?.message,
+          errorType: logEntry.error?.type,
+          responseMetadata: logEntry.responseMetadata,
+        });
+      }
 
       // Fallback for non-OK or empty body
       if (!response.body) {
