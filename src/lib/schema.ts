@@ -28,9 +28,9 @@ export const requests = sqliteTable('requests', {
   errorType: text('error_type'),
 
   responseMetadata: text('response_metadata'),
-});
-
-export const idxTimestamp = index('idx_timestamp').on(requests.timestamp);
-export const idxUserName = index('idx_user_name').on(requests.userName);
-export const idxCustomModel = index('idx_custom_model').on(requests.customModel);
-export const idxCreatedAt = index('idx_created_at').on(requests.createdAt);
+}, (t) => [
+  index('idx_timestamp').on(t.timestamp),
+  index('idx_user_name').on(t.userName),
+  index('idx_custom_model').on(t.customModel),
+  index('idx_created_at').on(t.createdAt),
+]);
