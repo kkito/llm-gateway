@@ -132,14 +132,10 @@ export function renameApiKeyRefInConfig(
 
 export function removeApiKeyRefFromConfig(
   config: ProxyConfig,
-  keyName: string
+  _keyName: string
 ): ProxyConfig {
-  return {
-    ...config,
-    models: config.models.map(m =>
-      m.apiKey === `$$${keyName}$$`
-        ? { ...m, apiKey: '' }
-        : m
-    ),
-  };
+  // Don't clear model refs — keep the $$name$$ ref so resolveApiKey
+  // produces a clear error at request time. If the key is re-added
+  // with the same name, models automatically recover.
+  return config;
 }

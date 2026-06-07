@@ -167,12 +167,12 @@ export function createModelFormRoute(deps: RouteDeps) {
     }
 
     // 如果 API Key 是 $$name$$ 引用，解析为真实 key
-    if (resolvedApiKey) {
+    if (resolvedApiKey && /^\$\$(.+)\$\$$/.test(resolvedApiKey)) {
       try {
         const proxyConfig = loadFullConfig(configPath);
         resolvedApiKey = resolveApiKey(resolvedApiKey, proxyConfig.apiKeys ?? []);
       } catch {
-        // 引用不存在时继续使用原值（会得到错误提示）
+        return c.json({ success: false, message: `API Key 引用 ${resolvedApiKey} 不存在，请检查 API Key 配置` });
       }
     }
 
@@ -189,13 +189,13 @@ export function createModelFormRoute(deps: RouteDeps) {
       }
     }
 
-    // 再次解析，处理从保存配置读取到的 $$name$$ 引用
-    if (resolvedApiKey) {
+    // 如果从已保存配置中读取的仍是 $$name$$ 引用，再次解析
+    if (resolvedApiKey && /^\$\$(.+)\$\$$/.test(resolvedApiKey)) {
       try {
         const proxyConfig = loadFullConfig(configPath);
         resolvedApiKey = resolveApiKey(resolvedApiKey, proxyConfig.apiKeys ?? []);
       } catch {
-        // 引用不存在时继续使用原值（会得到错误提示）
+        return c.json({ success: false, message: `API Key 引用 ${resolvedApiKey} 不存在，请检查 API Key 配置` });
       }
     }
 

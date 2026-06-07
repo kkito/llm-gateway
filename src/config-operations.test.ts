@@ -39,7 +39,7 @@ describe('renameApiKeyRefInConfig', () => {
 });
 
 describe('removeApiKeyRefFromConfig', () => {
-  it('clears apiKey for models referencing the deleted key', () => {
+  it('leaves $$name$$ refs intact so they produce clear errors at request time', () => {
     const config: ProxyConfig = {
       models: [
         { customModel: 'm1', realModel: 'gpt-4', apiKey: '$$to-delete$$', baseUrl: 'https://api.openai.com', provider: 'openai' },
@@ -47,17 +47,17 @@ describe('removeApiKeyRefFromConfig', () => {
       ],
     };
     const result = removeApiKeyRefFromConfig(config, 'to-delete');
-    expect(result.models[0].apiKey).toBe('');
+    expect(result.models[0].apiKey).toBe('$$to-delete$$');
     expect(result.models[1].apiKey).toBe('sk-keep');
   });
 
-  it('does not modify models with different refs', () => {
+  it('returns the same config instance (no-op)', () => {
     const config: ProxyConfig = {
       models: [
         { customModel: 'm1', realModel: 'gpt-4', apiKey: '$$other$$', baseUrl: 'https://api.openai.com', provider: 'openai' },
       ],
     };
     const result = removeApiKeyRefFromConfig(config, 'non-existent');
-    expect(result.models[0].apiKey).toBe('$$other$$');
+    expect(result).toBe(config);
   });
 });
