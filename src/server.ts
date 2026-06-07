@@ -80,6 +80,8 @@ export function resetServerGlobalState(): void {
   // 重置模块级全局变量（用于测试隔离）
   resetStatsProvider();
   resetUsageApiTracker();
+  DatabaseManager.resetInstance();
+  RequestLogger.resetInstance();
 }
 
 export function createServer(
@@ -115,14 +117,6 @@ export function createServer(
   // 当 configDir 未指定时，从 logger 获取 logDir（用于测试环境）
   const logDir = configDir ? ctx.logDir : pathJoin(logger.getFilePath(), '..');
 
-  // Initialize SQLite database for request logging
-  const dbManager = DatabaseManager.getInstance(ctx.logDir);
-  dbManager.initialize();
-
-  // Start async request logger
-  const requestLogger = RequestLogger.getInstance(dbManager);
-  requestLogger.start();
-
   // 创建用量追踪器（单例）
   const usageTracker = UsageTracker.getInstance(logDir);
 
@@ -133,35 +127,45 @@ export function createServer(
   const statsProvider = new StatsProvider(usageTracker, logDir);
   initStatsProvider(statsProvider);
 
-  // 定期清理过期的滑动窗口数据（每小时清理一次）
-  if (!cleanupInterval) {
-    cleanupInterval = setInterval(() => {
-      statsProvider.cleanup();
-      dbManager.cleanupOldRequests(90);
-      console.log('🧹 已清理过期数据');
-    }, 60 * 60 * 1000); // 1 小时
-  }
+  // Initialize SQLite database for request logging (only in non-test mode)
+  if (!isTestEnv) {
+    const dbManager = DatabaseManager.getInstance(ctx.logDir);
+    dbManager.initialize();
 
-  // 确保进程退出时清理定时器（只注册一次）
-  if (!hasSetupSignalHandlers) {
-    hasSetupSignalHandlers = true;
-    
-    sigintHandler = () => {
-      if (cleanupInterval) clearInterval(cleanupInterval);
-      requestLogger.stop();
-      dbManager.close();
-      process.exit(0);
-    };
+    // Start async request logger
+    const requestLogger = RequestLogger.getInstance(dbManager);
+    requestLogger.start();
 
-    sigtermHandler = () => {
-      if (cleanupInterval) clearInterval(cleanupInterval);
-      requestLogger.stop();
-      dbManager.close();
-      process.exit(0);
-    };
-    
-    process.on('SIGINT', sigintHandler);
-    process.on('SIGTERM', sigtermHandler);
+    // 定期清理过期的滑动窗口数据（每小时清理一次）
+    if (!cleanupInterval) {
+      cleanupInterval = setInterval(() => {
+        statsProvider.cleanup();
+        dbManager.cleanupOldRequests(90);
+        console.log('🧹 已清理过期数据');
+      }, 60 * 60 * 1000); // 1 小时
+    }
+
+    // 确保进程退出时清理定时器（只注册一次）
+    if (!hasSetupSignalHandlers) {
+      hasSetupSignalHandlers = true;
+
+      sigintHandler = () => {
+        if (cleanupInterval) clearInterval(cleanupInterval);
+        requestLogger.stop();
+        dbManager.close();
+        process.exit(0);
+      };
+
+      sigtermHandler = () => {
+        if (cleanupInterval) clearInterval(cleanupInterval);
+        requestLogger.stop();
+        dbManager.close();
+        process.exit(0);
+      };
+
+      process.on('SIGINT', sigintHandler);
+      process.on('SIGTERM', sigtermHandler);
+    }
   }
 
   // 可变配置引用，用于后台 API 更新
