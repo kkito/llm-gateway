@@ -36,6 +36,7 @@ import { interceptors } from './interceptor/index.js'
 import { anthropicBillingCleaner } from './interceptor/anthropic-billing-cleaner.js'
 import { qwenCacheInterceptor } from './interceptor/qwen-cache.js'
 import { opencodeSessionInterceptor } from './interceptor/opencode-session.js'
+import { userModelAccessInterceptor } from './interceptor/user-model-access.js'
 
 // !!! 必须放在第一个执行：在所有其他拦截器之前清理 Anthropic billing header
 interceptors.use(anthropicBillingCleaner)
@@ -43,6 +44,8 @@ interceptors.use(anthropicBillingCleaner)
 interceptors.use(qwenCacheInterceptor)
 // 注册 OpenCode Session 拦截器（模块级，只注册一次）
 interceptors.use(opencodeSessionInterceptor)
+// 注册用户模型访问权限拦截器
+interceptors.use(userModelAccessInterceptor)
 
 // 获取当前模块目录 (用于静态文件服务)
 const __filename = fileURLToPath(import.meta.url);

@@ -26,27 +26,6 @@ const createMockAnthropicStreamResponse = (text: string) => {
   });
 };
 
-const createMockOpenAIStreamResponse = (text: string) => {
-  const chunks = [
-    { id: 'chatcmpl-123', object: 'chat.completion.chunk', created: Math.floor(Date.now() / 1000), model: 'gpt-4', choices: [{ index: 0, delta: { role: 'assistant', content: '' }, finish_reason: null }] },
-    ...text.split(' ').map((word, i) => ({
-      id: 'chatcmpl-123',
-      object: 'chat.completion.chunk',
-      created: Math.floor(Date.now() / 1000),
-      model: 'gpt-4',
-      choices: [{ index: 0, delta: { content: `${word}${i === text.split(' ').length - 1 ? '' : ' '}` }, finish_reason: null }]
-    })),
-    { id: 'chatcmpl-123', object: 'chat.completion.chunk', created: Math.floor(Date.now() / 1000), model: 'gpt-4', choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] }
-  ];
-
-  const body = chunks.map(chunk => `data: ${JSON.stringify(chunk)}`).join('\n') + '\ndata: [DONE]';
-
-  return new Response(body, {
-    status: 200,
-    headers: { 'Content-Type': 'text/event-stream' }
-  });
-};
-
 const createMockOpenAINonStreamResponse = (text: string) => {
   return new Response(JSON.stringify({
     id: 'chatcmpl-123',
@@ -131,92 +110,6 @@ describe('proxy e2e', () => {
       const json = await response.json() as any;
       expect(json.choices[0].message.content).toBe('Hello from OpenAI');
       expect(json.usage).toBeDefined();
-    });
-  });
-
-  // 注意：流式测试在 Hono 测试环境中存在已知问题，无法正确读取 ReadableStream
-  // 流式转换的核心逻辑已在单元测试中验证
-  describe.skip('OpenAI passthrough (stream)', () => {
-    it('should pass through OpenAI stream response', async () => {
-      // Mock fetch
-      globalThis.fetch = vi.fn().mockResolvedValue(createMockOpenAIStreamResponse('Hello stream'));
-
-      const response = await app.request('/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer test-openai'
-        },
-        body: JSON.stringify({
-          model: 'test-openai',
-          messages: [{ role: 'user', content: 'Say hello' }],
-          stream: true
-        })
-      });
-
-      expect(response.status).toBe(200);
-
-      // 读取流式响应 - 使用 ReadableStream 方式
-      const reader = response.body?.getReader();
-      expect(reader).toBeDefined();
-
-      const decoder = new TextDecoder();
-      let fullContent = '';
-
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          fullContent += decoder.decode(value, { stream: false });
-        }
-      }
-
-      expect(fullContent).toBeTruthy();
-      expect(fullContent).toContain('Hello');
-      expect(fullContent).toContain('stream');
-    });
-  });
-
-  // 注意：流式测试在 Hono 测试环境中存在已知问题，无法正确读取 ReadableStream
-  // 流式转换的核心逻辑已在单元测试中验证
-  describe.skip('OpenAI to Anthropic conversion (stream)', () => {
-    it('should pass through Anthropic stream response', async () => {
-      // Mock Anthropic API 返回流式响应
-      globalThis.fetch = vi.fn().mockResolvedValue(createMockAnthropicStreamResponse('Hello from Anthropic'));
-
-      const response = await app.request('/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer test-anthropic'
-        },
-        body: JSON.stringify({
-          model: 'test-anthropic',
-          messages: [{ role: 'user', content: 'Say hello' }],
-          stream: true
-        })
-      });
-
-      expect(response.status).toBe(200);
-
-      // 读取流式响应 - 使用 ReadableStream 方式
-      const reader = response.body?.getReader();
-      expect(reader).toBeDefined();
-
-      const decoder = new TextDecoder();
-      let fullContent = '';
-
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          fullContent += decoder.decode(value, { stream: false });
-        }
-      }
-
-      expect(fullContent).toBeTruthy();
-      expect(fullContent).toContain('Hello');
-      expect(fullContent).toContain('Anthropic');
     });
   });
 

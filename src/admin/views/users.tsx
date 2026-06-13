@@ -5,10 +5,12 @@ export interface UserApiKey {
   name: string;
   apikey: string;
   desc?: string;
+  allowedModels?: string[];
 }
 
 interface Props {
   users: UserApiKey[];
+  models?: { customModel: string; desc?: string }[];
   error?: string;
   authEnabled?: boolean;
 }
@@ -343,6 +345,35 @@ export const UsersPage: FC<Props> = (props) => {
             margin-top: 0.5rem;
           }
 
+          /* Model tags */
+          .model-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+            margin-top: 0.85rem;
+          }
+          .model-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 0.3rem 0.6rem;
+            background: hsl(245 80% 96%);
+            color: hsl(245 80% 50%);
+            border-radius: 6px;
+            font-size: 0.78rem;
+            font-weight: 500;
+          }
+          .model-tag-more {
+            background: var(--bg-page);
+            color: var(--text-secondary);
+          }
+          .model-tags-label {
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-top: 0.85rem;
+          }
+
           @media (max-width: 768px) {
             .main-content { padding: 1.5rem 1rem 3rem !important; }
             .page-title { font-size: 1.5rem; }
@@ -462,6 +493,27 @@ export const UsersPage: FC<Props> = (props) => {
                   {user.desc && (
                     <div class="user-desc">{user.desc}</div>
                   )}
+
+                  {/* 模型权限 */}
+                  {props.models && props.models.length > 0 && (
+                    <div class="model-tags-label">可用模型</div>
+                  )}
+                  <div class="model-tags">
+                    {!user.allowedModels || user.allowedModels.length === 0 ? (
+                      <span class="model-tag">所有模型</span>
+                    ) : (
+                      <>
+                        {user.allowedModels.slice(0, 3).map(model => (
+                          <span class="model-tag">{model}</span>
+                        ))}
+                        {user.allowedModels.length > 3 && (
+                          <span class="model-tag model-tag-more">
+                            等{user.allowedModels.length - 3}个模型
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </div>
 
                   {/* 操作按钮 */}
                   <div class="user-card-actions">

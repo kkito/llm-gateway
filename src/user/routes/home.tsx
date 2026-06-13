@@ -36,7 +36,15 @@ export function createHomeRoute(config: ProxyConfig | (() => ProxyConfig), confi
 
     const currentConfig = typeof config === 'function' ? config() : config;
     const fullConfig = configPath ? loadFullConfig(configPath) : undefined;
-    return c.html(<HomePage models={currentConfig.models} modelGroups={currentConfig.modelGroups} userName={currentUser.name} uiSettings={fullConfig?.uiSettings} />);
+
+    let visibleModels = currentConfig.models;
+    if (currentUser?.allowedModels?.length) {
+      visibleModels = currentConfig.models.filter(
+        m => currentUser.allowedModels!.includes(m.customModel)
+      );
+    }
+
+    return c.html(<HomePage models={visibleModels} modelGroups={currentConfig.modelGroups} userName={currentUser.name} uiSettings={fullConfig?.uiSettings} />);
   });
 
   return app;

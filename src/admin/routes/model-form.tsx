@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { ProviderConfig, ProxyConfig } from '../../config.js';
-import { saveConfig, updateConfigEntry, deleteConfigEntry, loadFullConfig, getApiKeyOptions } from '../../config.js';
+import { saveConfig, updateConfigEntry, loadFullConfig, getApiKeyOptions } from '../../config.js';
+import { removeModelFromConfig, renameModelInConfig } from '../../config-operations.js';
 import { ModelFormPage } from '../views/model-form.js';
 import { ModelsPage } from '../views/models.js';
 import { OpenAIProvider } from '../../providers/openai.js';
@@ -423,11 +424,9 @@ export function createModelFormRoute(deps: RouteDeps) {
       proxyConfig.models = finalList;
 
       // 更新 model group 中对该模型的引用（模型改名时）
-      if (oldModel !== customModel && proxyConfig.modelGroups) {
-        proxyConfig.modelGroups = proxyConfig.modelGroups.map(group => ({
-          ...group,
-          models: group.models.map(m => m === oldModel ? customModel : m)
-        }));
+      if (oldModel !== customModel) {
+        const renamed = renameModelInConfig(proxyConfig, oldModel, customModel);
+        proxyConfig.modelGroups = renamed.modelGroups;
       }
 
       saveConfig(proxyConfig, configPath);
@@ -449,20 +448,12 @@ export function createModelFormRoute(deps: RouteDeps) {
     const currentConfig = typeof config === 'function' ? config() : config;
 
     try {
-      const newConfigList = deleteConfigEntry(currentConfig.models, modelParam);
       // 保存到文件 - 保留 apiKeys 等其他配置
       const proxyConfig = loadFullConfig(configPath);
-      proxyConfig.models = newConfigList;
-
-      // 清理所有 model group 中对该模型的引用
-      if (proxyConfig.modelGroups && proxyConfig.modelGroups.length > 0) {
-        proxyConfig.modelGroups = proxyConfig.modelGroups
-          .map(group => ({
-            ...group,
-            models: group.models.filter(m => m !== modelParam)
-          }))
-          .filter(group => group.models.length > 0); // 删除变为空的 group
-      }
+      const newProxyConfig = removeModelFromConfig(proxyConfig, modelParam);
+      proxyConfig.models = newProxyConfig.models;
+      proxyConfig.modelGroups = newProxyConfig.modelGroups;
+      proxyConfig.userApiKeys = newProxyConfig.userApiKeys;
 
       saveConfig(proxyConfig, configPath);
 
