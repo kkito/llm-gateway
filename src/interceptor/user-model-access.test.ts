@@ -72,14 +72,24 @@ describe('userModelAccessInterceptor', () => {
       .rejects.toThrow(PermissionError)
   })
 
-  it('should pass through when modelGroup is set (skip restriction)', async () => {
+  it('should still check allowedModels when modelGroup is set and model is allowed', async () => {
     const ctx = makeCtx({
-      currentUser: { name: 'Alice', apikey: 'sk-lg-xxx', allowedModels: ['gpt-4'] },
+      currentUser: { name: 'Alice', apikey: 'sk-lg-xxx', allowedModels: ['claude-3'] },
       customModel: 'claude-3',
       modelGroup: 'my-group',
     })
     const result = await userModelAccessInterceptor(baseUpstream, ctx)
     expect(result).toBe(baseUpstream)
+  })
+
+  it('should throw PermissionError when modelGroup is set but model is not in allowedModels', async () => {
+    const ctx = makeCtx({
+      currentUser: { name: 'Alice', apikey: 'sk-lg-xxx', allowedModels: ['gpt-4'] },
+      customModel: 'claude-3',
+      modelGroup: 'my-group',
+    })
+    await expect(userModelAccessInterceptor(baseUpstream, ctx))
+      .rejects.toThrow(PermissionError)
   })
 
   it('should not mutate upstream when passing through', async () => {
