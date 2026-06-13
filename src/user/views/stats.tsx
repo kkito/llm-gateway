@@ -45,6 +45,7 @@ export interface RecentRequestEntry {
   promptTokens: number | null;
   completionTokens: number | null;
   totalTokens: number | null;
+  cachedTokens: number | null;
   isStreaming: number | null;
   errorMessage: string | null;
 }
@@ -62,7 +63,11 @@ export interface StatsViewProps {
   tzOffset: number;
 }
 
-// ---- 样式 ----
+export function formatTokenCacheSum(prompt: number | null | undefined, cache: number | null | undefined): string {
+  if (prompt === null || prompt === undefined) return '—';
+  if (!cache) return formatNumber(prompt);
+  return formatNumber(cache) + '/' + formatNumber(prompt);
+}
 
 const styles = `
 :root {
@@ -673,7 +678,8 @@ export const StatsView: FC<StatsViewProps> = (props) => {
                         <th>模型</th>
                         <th>状态码</th>
                         <th>耗时</th>
-                        <th>Token</th>
+                        <th>输入Token(缓存/总输入)</th>
+                        <th>输出Token</th>
                         <th>错误</th>
                       </tr>
                     </thead>
@@ -689,7 +695,8 @@ export const StatsView: FC<StatsViewProps> = (props) => {
                             </span>
                           </td>
                           <td style={{ fontSize: '0.8rem' }}>{formatDuration(r.durationMs)}</td>
-                          <td style={{ fontSize: '0.8rem' }}>{formatNumber(r.totalTokens)}</td>
+                          <td style={{ fontSize: '0.8rem' }}>{formatTokenCacheSum(r.promptTokens, r.cachedTokens)}</td>
+                          <td style={{ fontSize: '0.8rem' }}>{formatNumber(r.completionTokens)}</td>
                           <td>
                             {r.errorMessage ? (
                               <span class="error-msg" title={r.errorMessage}>{r.errorMessage}</span>

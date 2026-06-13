@@ -135,6 +135,7 @@ export function createStatsRoute(configPath?: string) {
         prompt_tokens AS promptTokens,
         completion_tokens AS completionTokens,
         total_tokens AS totalTokens,
+        cached_tokens AS cachedTokens,
         is_streaming AS isStreaming,
         error_message AS errorMessage
       FROM requests
@@ -154,6 +155,7 @@ export function createStatsRoute(configPath?: string) {
       promptTokens: number | null;
       completionTokens: number | null;
       totalTokens: number | null;
+      cachedTokens: number | null;
       isStreaming: number | null;
       errorMessage: string | null;
     }>;

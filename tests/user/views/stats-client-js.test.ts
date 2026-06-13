@@ -27,8 +27,8 @@ const mockProps: StatsViewProps = {
     { hour: '2026-06-14 04:00', requests: 1, successful: 1, failed: 0, inputTokens: 150, outputTokens: 60, totalTokens: 210 },
   ],
   recentRequests: [
-    { id: 5, requestId: 'req-5', timestamp: '2026-06-14T04:00:00.000Z', customModel: 'claude-3', realModel: 'claude-3-opus', provider: 'anthropic', statusCode: 200, durationMs: 1000, promptTokens: 150, completionTokens: 60, totalTokens: 210, isStreaming: 1, errorMessage: null },
-    { id: 4, requestId: 'req-4', timestamp: '2026-06-14T03:30:00.000Z', customModel: 'gpt-4', realModel: 'gpt-4-0613', provider: 'openai', statusCode: 400, durationMs: 500, promptTokens: 50, completionTokens: 0, totalTokens: 50, isStreaming: 0, errorMessage: 'Rate limit exceeded' },
+    { id: 5, requestId: 'req-5', timestamp: '2026-06-14T04:00:00.000Z', customModel: 'claude-3', realModel: 'claude-3-opus', provider: 'anthropic', statusCode: 200, durationMs: 1000, promptTokens: 150, completionTokens: 60, totalTokens: 210, cachedTokens: 0, isStreaming: 1, errorMessage: null },
+    { id: 4, requestId: 'req-4', timestamp: '2026-06-14T03:30:00.000Z', customModel: 'gpt-4', realModel: 'gpt-4-0613', provider: 'openai', statusCode: 400, durationMs: 500, promptTokens: 50, completionTokens: 0, totalTokens: 50, cachedTokens: 20, isStreaming: 0, errorMessage: 'Rate limit exceeded' },
   ],
   userName: 'test-user',
   startDate: '2026-06-14',
@@ -107,6 +107,42 @@ describe('StatsView client JS - hour distribution', () => {
     expect(items[0].getAttribute('data-hour-utc')).toBe('2026-06-14T02:00:00.000Z');
     expect(items[0].getAttribute('data-requests')).toBe('2');
     expect(items[0].getAttribute('data-tokens')).toBe('430');
+  });
+});
+
+describe('StatsView - 表格列', () => {
+  it('表头应包含 输入Token 和 输出Token', () => {
+    const html = renderHtml();
+    const dom = new JSDOM(html);
+    const doc = dom.window.document;
+
+    const headerText = doc.querySelector('table thead tr')?.textContent || '';
+    expect(headerText).toContain('输入Token(缓存/总输入)');
+    expect(headerText).toContain('输出Token');
+    // 不再有单独的 Token 列
+    expect(headerText).not.toContain('>Token<');
+  });
+
+  it('输入Token 列应显示缓存+总输入格式', () => {
+    const html = renderHtml();
+    const dom = new JSDOM(html);
+    const doc = dom.window.document;
+
+    const rows = doc.querySelectorAll('table tbody tr');
+    // 第一行：prompt=150, cache=0 → "150"（cache=0 只显示总输入）
+    // 第二行：prompt=50, cache=20 → "20+50"
+    const firstRowCells = rows[0]?.querySelectorAll('td');
+    expect(firstRowCells).toBeDefined();
+    // 输入Token 在第 6 个 td（0-indexed: #=0, 时间=1, 模型=2, 状态码=3, 耗时=4, 输入Token=5, 输出Token=6）
+    if (firstRowCells) {
+      expect(firstRowCells[5].textContent).toBe('150');
+      expect(firstRowCells[6].textContent).toBe('60');
+    }
+    const secondRowCells = rows[1]?.querySelectorAll('td');
+    if (secondRowCells) {
+      expect(secondRowCells[5].textContent).toBe('20/50');
+      expect(secondRowCells[6].textContent).toBe('0');
+    }
   });
 });
 
