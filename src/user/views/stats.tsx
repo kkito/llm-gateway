@@ -1,9 +1,60 @@
 import { html } from 'hono/html';
-import type { Stats } from '../../lib/stats-core.js';
 
-interface StatsViewProps {
-  stats: Stats;
+export interface OverviewStats {
+  totalRequests: number;
+  totalTokens: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  avgDuration: number;
+}
+
+export interface ModelStatsEntry {
+  model: string;
+  requests: number;
+  successful: number;
+  failed: number;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  avgDuration: number;
+}
+
+export interface HourStatsEntry {
+  hour: string;
+  requests: number;
+  successful: number;
+  failed: number;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+}
+
+export interface RecentRequestEntry {
+  id: number;
+  requestId: string;
+  timestamp: string;
+  customModel: string;
+  realModel: string | null;
+  provider: string | null;
+  statusCode: number;
+  durationMs: number | null;
+  promptTokens: number | null;
+  completionTokens: number | null;
+  totalTokens: number | null;
+  isStreaming: number | null;
+  errorMessage: string | null;
+}
+
+export interface StatsViewProps {
+  overview: OverviewStats;
+  byModel: ModelStatsEntry[];
+  byHour: HourStatsEntry[];
+  recentRequests: RecentRequestEntry[];
   userName: string;
+  startDate: string;
+  endDate: string;
+  page: number;
+  totalPages: number;
 }
 
 export function StatsView(props: StatsViewProps) {
@@ -74,22 +125,27 @@ export function StatsView(props: StatsViewProps) {
       <a href="/user/logout">登出</a>
     </div>
     <h1>使用统计 - ${props.userName}</h1>
+    <p>日期范围: ${props.startDate} ~ ${props.endDate}</p>
     <div class="stats">
       <div class="stat-card">
         <h3>总请求数</h3>
-        <p>${props.stats.totalRequests || 0}</p>
+        <p>${props.overview.totalRequests || 0}</p>
       </div>
       <div class="stat-card">
         <h3>总 Token 数</h3>
-        <p>${props.stats.totalTokens || 0}</p>
+        <p>${props.overview.totalTokens || 0}</p>
       </div>
       <div class="stat-card">
         <h3>输入 Token</h3>
-        <p>${props.stats.totalInputTokens || 0}</p>
+        <p>${props.overview.totalInputTokens || 0}</p>
       </div>
       <div class="stat-card">
         <h3>输出 Token</h3>
-        <p>${props.stats.totalOutputTokens || 0}</p>
+        <p>${props.overview.totalOutputTokens || 0}</p>
+      </div>
+      <div class="stat-card">
+        <h3>平均延迟</h3>
+        <p>${(props.overview.avgDuration || 0).toFixed(0)}ms</p>
       </div>
     </div>
   </div>
