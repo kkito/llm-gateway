@@ -25,7 +25,7 @@ export interface UpstreamInterceptorContext {
   c: any
 
   /** 用户认证信息。未认证时为 null */
-  currentUser: { name: string } | null
+  currentUser: { name: string; apikey?: string; allowedModels?: string[] } | null
 
   /**
    * 客户端 IP 地址。

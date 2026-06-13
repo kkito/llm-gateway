@@ -404,13 +404,14 @@ describe('tryMessagesFallback', () => {
       vi.mocked(upstreamRequestModule.sendMessagesUpstreamRequest).mockResolvedValue(mockResponse);
       vi.mocked(msgResponseModule.processMessagesSuccess).mockResolvedValue(processedResponse as any);
 
-      const ctx = createContext({ stream: true });
+      const ctx = createContext({ stream: true, apiKeys: [] });
       await tryMessagesFallback(ctx);
 
       expect(upstreamRequestModule.buildMessagesUpstreamRequest).toHaveBeenCalledWith(
         expect.anything(),
         expect.anything(),
-        true
+        true,
+        expect.anything()
       );
       expect(msgResponseModule.processMessagesSuccess).toHaveBeenCalled();
       const procCall = vi.mocked(msgResponseModule.processMessagesSuccess).mock.calls[0];

@@ -21,8 +21,12 @@ export function createUsersRoute(configPath?: string) {
     try {
       const config = loadFullConfig(getConfig());
       const users = config.userApiKeys || [];
+      const models = config.models.map(m => ({
+        customModel: m.customModel,
+        desc: m.desc,
+      }));
       const authEnabled = config.userApiKeys && config.userApiKeys.length > 0;
-      return c.html(<UsersPage users={users} authEnabled={authEnabled} />);
+      return c.html(<UsersPage users={users} models={models} authEnabled={authEnabled} />);
     } catch (error: any) {
       console.error('用户列表页面错误:', error.message);
       return c.html(
@@ -44,17 +48,27 @@ export function createUsersRoute(configPath?: string) {
   app.get('/admin/users/api', (c) => {
     const config = loadFullConfig(getConfig());
     const users = config.userApiKeys || [];
-    return c.json({ users });
+    const models = config.models.map(m => ({
+      customModel: m.customModel,
+      desc: m.desc,
+    }));
+    return c.json({ users, models });
   });
 
   // 新增用户页面
   app.get('/admin/users/new', (c) => {
-    return c.html(<UserFormPage mode="new" />);
+    const config = loadFullConfig(getConfig());
+    const models = config.models.map(m => ({
+      customModel: m.customModel,
+      realModel: m.realModel,
+      desc: m.desc,
+    }));
+    return c.html(<UserFormPage mode="new" models={models} />);
   });
 
   // 新增用户
   app.post('/admin/users/new', async (c) => {
-    const body = await c.req.parseBody();
+    const body = await c.req.parseBody({ all: true });
     const name = body.name as string;
     const desc = body.desc as string;
 
@@ -69,10 +83,16 @@ export function createUsersRoute(configPath?: string) {
       return c.json({ error: '用户已存在' }, 400);
     }
 
+    const allowedModelsRaw = body.allowedModels;
+    const allowedModels: string[] | undefined = allowedModelsRaw
+      ? (Array.isArray(allowedModelsRaw) ? allowedModelsRaw.map(v => String(v)) : [String(allowedModelsRaw)])
+      : undefined;
+
     const newUser = {
       name,
       apikey: generateUserApiKey(),
-      desc: desc || undefined
+      desc: desc || undefined,
+      allowedModels: allowedModels && allowedModels.length > 0 ? allowedModels : undefined,
     };
 
     if (!config.userApiKeys) {
@@ -123,13 +143,18 @@ export function createUsersRoute(configPath?: string) {
       );
     }
 
-    return c.html(<UserFormPage mode="edit" user={user} />);
+    const models = config.models.map(m => ({
+      customModel: m.customModel,
+      realModel: m.realModel,
+      desc: m.desc,
+    }));
+    return c.html(<UserFormPage mode="edit" user={user} models={models} />);
   });
 
   // 编辑用户
   app.post('/admin/users/edit/:name', async (c) => {
     const name = c.req.param('name');
-    const body = await c.req.parseBody();
+    const body = await c.req.parseBody({ all: true });
     const newName = body.name as string;
     const desc = body.desc as string;
 
@@ -149,6 +174,11 @@ export function createUsersRoute(configPath?: string) {
       return c.json({ error: '用户已存在' }, 400);
     }
 
+    const allowedModelsRaw = body.allowedModels;
+    const allowedModels: string[] | undefined = allowedModelsRaw
+      ? (Array.isArray(allowedModelsRaw) ? allowedModelsRaw.map(v => String(v)) : [String(allowedModelsRaw)])
+      : undefined;
+
     // 更新用户信息
     if (!config.userApiKeys) {
       config.userApiKeys = [];
@@ -156,7 +186,8 @@ export function createUsersRoute(configPath?: string) {
     config.userApiKeys[userIndex] = {
       ...config.userApiKeys[userIndex],
       name: newName,
-      desc: desc || undefined
+      desc: desc || undefined,
+      allowedModels: allowedModels && allowedModels.length > 0 ? allowedModels : undefined,
     };
 
     saveConfig(config, getConfig());

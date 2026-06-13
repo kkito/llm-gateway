@@ -6,6 +6,7 @@ import { createStreamConverterState, type StreamConverterState } from '../../con
 import { buildFullOpenAIResponse, parseAndConvertAnthropicSSE } from '../utils/sse-handlers.js';
 import { sanitizeSSEChunk } from '../../privacy/sanitizer.js';
 import { findFinalUsageFromChunks } from '../../lib/stream-usage.js';
+import { RequestLogger } from '../../lib/request-logger.js';
 
 export interface StreamHandlerOptions {
   response: Response;
@@ -20,6 +21,8 @@ export interface StreamHandlerOptions {
   detailLogger: DetailLogger;
   c: any;
   privacySettings?: any;
+  requestLogger?: RequestLogger;
+  currentUser?: { name: string } | null;
 }
 
 function isSilentError(err: any): boolean {
@@ -31,7 +34,7 @@ function isSilentError(err: any): boolean {
 }
 
 export function handleStream(options: StreamHandlerOptions): Response {
-  const { response, provider, model, actualModel, requestId, logEntry, rateLimiter, logger, detailLogger, c } = options;
+  const { response, provider, model, actualModel, requestId, logEntry, rateLimiter, logger, detailLogger, c, requestLogger, currentUser } = options;
 
   if (!response.body) {
     return c.json({ error: { message: 'No response body' } }, 500);
@@ -104,6 +107,27 @@ export function handleStream(options: StreamHandlerOptions): Response {
 
             detailLogger.logStreamResponse(requestId, chunks);
             detailLogger.logConvertedResponse(requestId, buildFullOpenAIResponse(chunks));
+            if (requestLogger && currentUser) {
+              requestLogger.log({
+                requestId: logEntry.requestId,
+                timestamp: logEntry.timestamp,
+                userName: currentUser.name,
+                customModel: logEntry.customModel,
+                realModel: logEntry.realModel,
+                provider: logEntry.provider,
+                endpoint: logEntry.endpoint,
+                statusCode: logEntry.statusCode,
+                durationMs: logEntry.durationMs,
+                isStreaming: true,
+                promptTokens: logEntry.promptTokens,
+                completionTokens: logEntry.completionTokens,
+                totalTokens: logEntry.totalTokens,
+                cachedTokens: logEntry.cachedTokens,
+                modelGroup: logEntry.modelGroup,
+                actualModel: logEntry.actualModel,
+                responseMetadata: logEntry.responseMetadata,
+              });
+            }
             logger.log(logEntry);
 
             const pricing =

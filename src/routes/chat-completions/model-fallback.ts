@@ -1,4 +1,4 @@
-import type { ProviderConfig, PrivacySettings } from '../../config.js';
+import type { ProviderConfig, PrivacySettings, ApiKey } from '../../config.js';
 import type { Logger } from '../../logger.js';
 import type { DetailLogger } from '../../detail-logger.js';
 import type { RateLimiter } from '../../lib/rate-limiter.js';
@@ -29,6 +29,7 @@ export interface FallbackContext {
   timeoutMs: number;
   logDir: string;
   privacySettings?: PrivacySettings;
+  apiKeys?: ApiKey[];
 }
 
 export async function tryModelGroupWithFallback(ctx: FallbackContext): Promise<FallbackResult> {
@@ -53,7 +54,7 @@ export async function tryModelGroupWithFallback(ctx: FallbackContext): Promise<F
     }
 
     // 3. Build and send upstream request
-    const upstream = await buildUpstreamRequest(provider, body, stream);
+    const upstream = await buildUpstreamRequest(provider, body, stream, ctx.apiKeys);
 
     // 执行注册的拦截器，允许对 upstream request 进行自定义修改（如添加缓存 header/body 字段）
     const intercepted = await interceptors.execute(upstream, {

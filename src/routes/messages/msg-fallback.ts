@@ -1,4 +1,4 @@
-import type { ProviderConfig, PrivacySettings } from '../../config.js';
+import type { ProviderConfig, PrivacySettings, ApiKey } from '../../config.js';
 import type { Logger } from '../../logger.js';
 import type { DetailLogger } from '../../detail-logger.js';
 import type { RateLimiter } from '../../lib/rate-limiter.js';
@@ -28,6 +28,7 @@ export interface MsgFallbackContext {
   timeoutMs: number;
   logDir: string;
   privacySettings?: PrivacySettings;
+  apiKeys?: ApiKey[];
 }
 
 export async function tryMessagesFallback(ctx: MsgFallbackContext): Promise<MsgFallbackResult> {
@@ -52,7 +53,7 @@ export async function tryMessagesFallback(ctx: MsgFallbackContext): Promise<MsgF
     }
 
     // 3. Build and send upstream request
-    const upstream = await buildMessagesUpstreamRequest(provider, body, stream);
+    const upstream = await buildMessagesUpstreamRequest(provider, body, stream, ctx.apiKeys);
 
     // 执行注册的拦截器，允许对 upstream request 进行自定义修改（如添加缓存 header/body 字段）
     const intercepted = await interceptors.execute(upstream, {

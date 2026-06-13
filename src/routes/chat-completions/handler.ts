@@ -12,6 +12,8 @@ import { tryModelGroupWithFallback } from './model-fallback.js';
 import { applyPrivacyProtection } from '../../privacy/apply.js';
 import { restorePaths } from '../../privacy/sanitizer.js';
 import { interceptors } from '../../interceptor/index.js';
+import { DatabaseManager } from '../../lib/db.js';
+import { RequestLogger } from '../../lib/request-logger.js';
 
 export function createChatCompletionsHandler(
   config: ProxyConfig | (() => ProxyConfig),
@@ -31,9 +33,13 @@ export function createChatCompletionsHandler(
     let triedModels: Array<{ model: string; exceeded: boolean; message?: string }> = [];
     let body: any = {};
     let provider: ProviderConfig | undefined = undefined;
+    let logEntry: any;
 
     // Get current user
     const currentUser = (c as any).currentUser || getCurrentUser(c);
+
+    const dm = DatabaseManager.getExistingInstance();
+    const requestLogger = dm ? RequestLogger.getInstance(dm) : undefined;
 
     try {
       body = await c.req.json();
@@ -81,7 +87,8 @@ export function createChatCompletionsHandler(
           c, modelNames, allProviders: currentConfig.models, body, stream,
           rateLimiter, logger, detailLogger, requestId, startTime,
           currentUser, modelGroupName: model_group, timeoutMs, logDir,
-          privacySettings: currentConfig.privacySettings
+          privacySettings: currentConfig.privacySettings,
+          apiKeys: currentConfig.apiKeys ?? [],
         };
         const fallbackResult = await tryModelGroupWithFallback(ctx);
         actualModel = fallbackResult.actualModel;
@@ -111,7 +118,8 @@ export function createChatCompletionsHandler(
               c, modelNames, allProviders: currentConfig.models, body, stream,
               rateLimiter, logger, detailLogger, requestId, startTime,
               currentUser, modelGroupName: model, timeoutMs, logDir,
-              privacySettings: currentConfig.privacySettings
+              privacySettings: currentConfig.privacySettings,
+              apiKeys: currentConfig.apiKeys ?? [],
             };
             const fallbackResult = await tryModelGroupWithFallback(ctx);
             actualModel = fallbackResult.actualModel;
@@ -137,6 +145,19 @@ export function createChatCompletionsHandler(
             userName: currentUser?.name,
             error: { message: 'Model not found' }
           });
+          if (requestLogger && currentUser) {
+            requestLogger.log({
+              requestId,
+              timestamp: new Date().toISOString(),
+              userName: currentUser.name,
+              customModel: model,
+              endpoint,
+              statusCode: 404,
+              durationMs: Date.now() - startTime,
+              isStreaming: !!stream,
+              errorMessage: 'Model not found',
+            });
+          }
           return c.json({ error: { message: 'Model not found' } }, 404);
         }
       }
@@ -157,7 +178,7 @@ export function createChatCompletionsHandler(
       }
 
       // Build and send upstream request
-      const upstream = await buildUpstreamRequest(provider, body, stream);
+      const upstream = await buildUpstreamRequest(provider, body, stream, currentConfig.apiKeys ?? []);
 
       // 执行注册的拦截器，允许对 upstream request 进行自定义修改（如添加缓存 header/body 字段）
       const intercepted = await interceptors.execute(upstream, {
@@ -174,7 +195,7 @@ export function createChatCompletionsHandler(
       const response = await sendUpstreamRequest(intercepted, detailLogger, requestId, timeoutMs);
 
       // Build log entry
-      const logEntry: any = {
+      logEntry = {
         timestamp: new Date().toISOString(),
         requestId,
         customModel: model_group ? actualModel! : model,
@@ -206,6 +227,27 @@ export function createChatCompletionsHandler(
           userName: currentUser?.name,
           error: { message: 'Authentication required' }
         });
+        if (requestLogger && currentUser) {
+          requestLogger.log({
+            requestId: logEntry.requestId,
+            timestamp: logEntry.timestamp,
+            userName: currentUser.name,
+            customModel: logEntry.customModel,
+            realModel: logEntry.realModel,
+            provider: logEntry.provider,
+            endpoint: logEntry.endpoint,
+            statusCode: 401,
+            durationMs: logEntry.durationMs,
+            isStreaming: logEntry.isStreaming,
+            promptTokens: logEntry.promptTokens,
+            completionTokens: logEntry.completionTokens,
+            totalTokens: logEntry.totalTokens,
+            cachedTokens: logEntry.cachedTokens,
+            modelGroup: logEntry.modelGroup,
+            actualModel: logEntry.actualModel,
+            errorMessage: 'Authentication required',
+          });
+        }
         return c.json({ error: { message: 'Authentication required' } }, 401);
       }
 
@@ -218,6 +260,27 @@ export function createChatCompletionsHandler(
             restorePaths(result.responseData, requestId);
           }
           logger.log(result.logEntry);
+          if (requestLogger && currentUser) {
+            requestLogger.log({
+              requestId: result.logEntry.requestId,
+              timestamp: result.logEntry.timestamp,
+              userName: currentUser.name,
+              customModel: result.logEntry.customModel,
+              realModel: result.logEntry.realModel,
+              provider: result.logEntry.provider,
+              endpoint: result.logEntry.endpoint,
+              statusCode: result.logEntry.statusCode,
+              durationMs: result.logEntry.durationMs,
+              isStreaming: result.logEntry.isStreaming,
+              promptTokens: result.logEntry.promptTokens,
+              completionTokens: result.logEntry.completionTokens,
+              totalTokens: result.logEntry.totalTokens,
+              cachedTokens: result.logEntry.cachedTokens,
+              modelGroup: result.logEntry.modelGroup,
+              actualModel: result.logEntry.actualModel,
+              responseMetadata: result.logEntry.responseMetadata,
+            });
+          }
           const pricing = provider.inputPricePer1M !== undefined && provider.outputPricePer1M !== undefined && provider.cachedPricePer1M !== undefined
             ? { inputPricePer1M: provider.inputPricePer1M, outputPricePer1M: provider.outputPricePer1M, cachedPricePer1M: provider.cachedPricePer1M }
             : undefined;
@@ -227,6 +290,29 @@ export function createChatCompletionsHandler(
       }
 
       logger.log(logEntry);
+      if (requestLogger && currentUser) {
+        requestLogger.log({
+          requestId: logEntry.requestId,
+          timestamp: logEntry.timestamp,
+          userName: currentUser.name,
+          customModel: logEntry.customModel,
+          realModel: logEntry.realModel,
+          provider: logEntry.provider,
+          endpoint: logEntry.endpoint,
+          statusCode: logEntry.statusCode,
+          durationMs: logEntry.durationMs,
+          isStreaming: logEntry.isStreaming,
+          promptTokens: logEntry.promptTokens,
+          completionTokens: logEntry.completionTokens,
+          totalTokens: logEntry.totalTokens,
+          cachedTokens: logEntry.cachedTokens,
+          modelGroup: logEntry.modelGroup,
+          actualModel: logEntry.actualModel,
+          errorMessage: logEntry.error?.message,
+          errorType: logEntry.error?.type,
+          responseMetadata: logEntry.responseMetadata,
+        });
+      }
 
       // Fallback for non-OK or empty body
       if (!response.body) {
@@ -239,7 +325,9 @@ export function createChatCompletionsHandler(
         return handleStream({
           response, provider, model, actualModel: actualModel || model,
           requestId, startTime, logEntry, rateLimiter, logger, detailLogger, c,
-          privacySettings: currentConfig.privacySettings
+          privacySettings: currentConfig.privacySettings,
+          requestLogger,
+          currentUser,
         });
       }
 
@@ -264,6 +352,28 @@ export function createChatCompletionsHandler(
         userName: currentUser?.name,
         error: { message: error.message || 'Internal error', type: error.name }
       });
+      if (requestLogger && currentUser) {
+        requestLogger.log({
+          requestId: logEntry?.requestId ?? requestId,
+          timestamp: logEntry?.timestamp ?? new Date().toISOString(),
+          userName: currentUser.name,
+          customModel: logEntry?.customModel,
+          realModel: logEntry?.realModel,
+          provider: logEntry?.provider,
+          endpoint: logEntry?.endpoint ?? endpoint,
+          statusCode: 500,
+          durationMs: logEntry?.durationMs ?? Date.now() - startTime,
+          isStreaming: false,
+          promptTokens: logEntry?.promptTokens,
+          completionTokens: logEntry?.completionTokens,
+          totalTokens: logEntry?.totalTokens,
+          cachedTokens: logEntry?.cachedTokens,
+          modelGroup: logEntry?.modelGroup,
+          actualModel: logEntry?.actualModel,
+          errorMessage: error.message || 'Internal error',
+          errorType: error.name,
+        });
+      }
 
       if (error.name === 'TimeoutError') {
         return c.json({
@@ -281,6 +391,12 @@ export function createChatCompletionsHandler(
         return c.json({
           error: { message: error.message, type: 'invalid_request_error' }
         }, 400);
+      }
+
+      if (error.name === 'PermissionError') {
+        return c.json({
+          error: { message: error.message, type: 'permission_error' }
+        }, 403);
       }
 
       return c.json({ error: { message: error.message || 'Internal error' } }, 500);

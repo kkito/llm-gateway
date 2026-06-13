@@ -5,11 +5,13 @@ interface UserApiKey {
   name: string;
   apikey: string;
   desc?: string;
+  allowedModels?: string[];
 }
 
 interface Props {
   mode: 'new' | 'edit';
   user?: UserApiKey;
+  models?: Array<{ customModel: string; realModel: string; desc?: string }>;
 }
 
 export const UserFormPage: FC<Props> = (props) => {
@@ -205,6 +207,27 @@ export const UserFormPage: FC<Props> = (props) => {
                   <p class="apikey-note">
                     API Key 不可修改，如需更换请删除后重新创建
                   </p>
+                </div>
+              )}
+
+              {props.models && props.models.length > 0 && (
+                <div class="form-group">
+                  <label class="form-label">模型权限</label>
+                  <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.3rem;">
+                    {props.models.map(m => (
+                      <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; cursor: pointer;">
+                        <input
+                          type="checkbox"
+                          name="allowedModels"
+                          value={m.customModel}
+                          checked={props.user?.allowedModels?.includes(m.customModel) || false}
+                        />
+                        <span style="font-weight: 500;">{m.customModel}</span>
+                        <span style="color: var(--text-secondary); font-size: 0.82rem;">→ {m.realModel}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <span class="form-hint">不选择任何模型表示不限制</span>
                 </div>
               )}
 
