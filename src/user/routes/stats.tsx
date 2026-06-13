@@ -3,6 +3,7 @@ import { StatsView } from '../views/stats.js';
 import { getCurrentUser } from '../middleware/auth.js';
 import { loadFullConfig } from '../../config.js';
 import { DatabaseManager } from '../../lib/db.js';
+import { localDateToUtcRange } from '../../lib/time-utils.js';
 
 export { StatsView };
 
@@ -29,13 +30,22 @@ export function createStatsRoute(configPath?: string) {
     }
     const db = dbManager.getDb();
 
-    // 解析日期参数
+    // 解析日期参数 — 使用客户端时区将本地日期转为 UTC 范围
+    // DB 中 timestamp 存的是 UTC ISO 字符串 (如 2026-06-14T10:00:00.000Z)
     const now = new Date();
-    const todayStart = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')} 00:00:00`;
-    const todayEnd = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')} 23:59:59`;
+    const localToday = now.getFullYear() + '-' +
+      String(now.getMonth() + 1).padStart(2, '0') + '-' +
+      String(now.getDate()).padStart(2, '0');
 
-    const queryStartDate = (c.req.query('startDate') || todayStart) as string;
-    const queryEndDate = (c.req.query('endDate') || todayEnd) as string;
+    const startDate = c.req.query('startDate') || localToday;
+    const endDate = c.req.query('endDate') || startDate;
+    // 如果客户端没传 tzOffset，用服务端时区
+    const tzOffset = c.req.query('tzOffset') !== undefined
+      ? parseInt(c.req.query('tzOffset')!, 10)
+      : new Date().getTimezoneOffset();
+
+    const [utcStart] = localDateToUtcRange(startDate, tzOffset);
+    const [, utcEnd] = localDateToUtcRange(endDate, tzOffset);
     const page = Math.max(1, parseInt(c.req.query('page') || '1', 10) || 1);
     const limit = 20;
     const offset = (page - 1) * limit;
@@ -51,7 +61,7 @@ export function createStatsRoute(configPath?: string) {
       FROM requests
       WHERE user_name = ?
         AND timestamp >= ? AND timestamp <= ?
-    `).get(userName, queryStartDate, queryEndDate) as {
+    `).get(userName, utcStart, utcEnd) as {
       totalRequests: number;
       totalTokens: number;
       totalInputTokens: number;
@@ -75,7 +85,7 @@ export function createStatsRoute(configPath?: string) {
         AND timestamp >= ? AND timestamp <= ?
       GROUP BY custom_model
       ORDER BY requests DESC
-    `).all(userName, queryStartDate, queryEndDate) as Array<{
+    `).all(userName, utcStart, utcEnd) as Array<{
       model: string;
       requests: number;
       successful: number;
@@ -101,7 +111,7 @@ export function createStatsRoute(configPath?: string) {
         AND timestamp >= ? AND timestamp <= ?
       GROUP BY hour
       ORDER BY hour ASC
-    `).all(userName, queryStartDate, queryEndDate) as Array<{
+    `).all(userName, utcStart, utcEnd) as Array<{
       hour: string;
       requests: number;
       successful: number;
@@ -132,7 +142,7 @@ export function createStatsRoute(configPath?: string) {
         AND timestamp >= ? AND timestamp <= ?
       ORDER BY timestamp DESC
       LIMIT ? OFFSET ?
-    `).all(userName, queryStartDate, queryEndDate, limit, offset) as Array<{
+    `).all(userName, utcStart, utcEnd, limit, offset) as Array<{
       id: number;
       requestId: string;
       timestamp: string;
@@ -154,9 +164,13 @@ export function createStatsRoute(configPath?: string) {
       FROM requests
       WHERE user_name = ?
         AND timestamp >= ? AND timestamp <= ?
-    `).get(userName, queryStartDate, queryEndDate) as { total: number };
+    `).get(userName, utcStart, utcEnd) as { total: number };
 
     const totalPages = Math.max(1, Math.ceil(totalRow.total / limit));
+
+    // Props 传给视图：用原始本地日期（用户友好），以及 tzOffset
+    const displayStart = startDate;
+    const displayEnd = endDate;
 
     return c.html(<StatsView
       overview={overview}
@@ -164,10 +178,11 @@ export function createStatsRoute(configPath?: string) {
       byHour={byHour}
       recentRequests={recentRequests}
       userName={userName}
-      startDate={queryStartDate}
-      endDate={queryEndDate}
+      startDate={displayStart}
+      endDate={displayEnd}
       page={page}
       totalPages={totalPages}
+      tzOffset={tzOffset}
     />);
   });
 

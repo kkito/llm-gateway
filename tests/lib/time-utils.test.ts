@@ -1,3 +1,6 @@
+/**
+ * @vitest-environment node
+ */
 import { describe, it, expect } from 'vitest';
 import { utcToLocalString, getLocalHour, localDateToUtcRange } from '../../src/lib/time-utils.js';
 
@@ -31,19 +34,36 @@ describe('localDateToUtcRange', () => {
     expect(end).toBe('2026-06-14T23:59:59.999Z');
   });
 
-  it('should convert local date to UTC range with tzOffset=480 (UTC+8)', () => {
+  it('should convert local date to UTC range with tzOffset=480 (UTC-8)', () => {
+    // 浏览器 Date.getTimezoneOffset() 对 UTC-8 返回 480
     const [start, end] = localDateToUtcRange('2026-06-14', 480);
-    // UTC+8 的 2026-06-14 00:00:00 = UTC 2026-06-13 16:00:00
+    // UTC-8 的 2026-06-14 00:00:00 = UTC 2026-06-14 08:00:00
+    expect(start).toBe('2026-06-14T08:00:00.000Z');
+    // UTC-8 的 2026-06-14 23:59:59.999 = UTC 2026-06-15 07:59:59.999
+    expect(end).toBe('2026-06-15T07:59:59.999Z');
+  });
+
+  it('should handle tzOffset=-300 as browser-style (UTC+5)', () => {
+    // 浏览器 Date.getTimezoneOffset() 对 UTC+5 返回 -300
+    const [start, end] = localDateToUtcRange('2026-06-14', -300);
+    // UTC+5 的 2026-06-14 00:00:00 = UTC 2026-06-13 19:00:00
+    expect(start).toBe('2026-06-13T19:00:00.000Z');
+    expect(end).toBe('2026-06-14T18:59:59.999Z');
+  });
+
+  it('should accept browser getTimezoneOffset() convention: UTC+8 → -480', () => {
+    // 浏览器 Date.getTimezoneOffset() 对 UTC+8 返回 -480
+    const [start, end] = localDateToUtcRange('2026-06-14', -480);
+    // UTC+8 本地 2026-06-14 00:00 = UTC 2026-06-13 16:00:00
     expect(start).toBe('2026-06-13T16:00:00.000Z');
-    // UTC+8 的 2026-06-14 23:59:59.999 = UTC 2026-06-14 15:59:59.999
     expect(end).toBe('2026-06-14T15:59:59.999Z');
   });
 
-  it('should handle negative tzOffset (UTC-5)', () => {
-    const [start, end] = localDateToUtcRange('2026-06-14', -300);
-    // UTC-5 的 2026-06-14 00:00:00 = UTC 2026-06-14 05:00:00
-    expect(start).toBe('2026-06-14T05:00:00.000Z');
-    // UTC-5 的 2026-06-14 23:59:59.999 = UTC 2026-06-15 04:59:59.999
-    expect(end).toBe('2026-06-15T04:59:59.999Z');
+  it('should handle full week range with browser-style tzOffset', () => {
+    // 浏览器传 tzOffset=-480，startDate='2026-06-07', endDate='2026-06-14'
+    const [sStart, sEnd] = localDateToUtcRange('2026-06-07', -480);
+    const [, eEnd] = localDateToUtcRange('2026-06-14', -480);
+    expect(sStart).toBe('2026-06-06T16:00:00.000Z');
+    expect(eEnd).toBe('2026-06-14T15:59:59.999Z');
   });
 });

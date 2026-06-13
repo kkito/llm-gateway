@@ -28,15 +28,15 @@ function insertTestData(db: ReturnType<DatabaseManager['getDb']>, userName: stri
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
-  // Today's data for user1
-  insert.run('req-1', '2026-06-14 10:00:00', Date.now(), userName, 'gpt-4', 'gpt-4-0613', 'openai', 200, 1500, 100, 50, 150);
-  insert.run('req-2', '2026-06-14 10:05:00', Date.now(), userName, 'gpt-4', 'gpt-4-0613', 'openai', 200, 2000, 200, 80, 280);
-  insert.run('req-3', '2026-06-14 11:00:00', Date.now(), userName, 'claude-3', 'claude-3-opus', 'anthropic', 200, 3000, 300, 150, 450);
-  insert.run('req-4', '2026-06-14 11:30:00', Date.now(), userName, 'gpt-4', 'gpt-4-0613', 'openai', 400, 500, 50, 0, 50);
-  insert.run('req-5', '2026-06-14 12:00:00', Date.now(), userName, 'claude-3', 'claude-3-opus', 'anthropic', 200, 1000, 150, 60, 210);
+  // Today's data for user1 — 使用 UTC ISO 格式 (与生产环境一致)
+  insert.run('req-1', '2026-06-14T02:00:00.000Z', Date.now(), userName, 'gpt-4', 'gpt-4-0613', 'openai', 200, 1500, 100, 50, 150);
+  insert.run('req-2', '2026-06-14T02:05:00.000Z', Date.now(), userName, 'gpt-4', 'gpt-4-0613', 'openai', 200, 2000, 200, 80, 280);
+  insert.run('req-3', '2026-06-14T03:00:00.000Z', Date.now(), userName, 'claude-3', 'claude-3-opus', 'anthropic', 200, 3000, 300, 150, 450);
+  insert.run('req-4', '2026-06-14T03:30:00.000Z', Date.now(), userName, 'gpt-4', 'gpt-4-0613', 'openai', 400, 500, 50, 0, 50);
+  insert.run('req-5', '2026-06-14T04:00:00.000Z', Date.now(), userName, 'claude-3', 'claude-3-opus', 'anthropic', 200, 1000, 150, 60, 210);
 
   // Data for other user (should be isolated)
-  insert.run('req-6', '2026-06-14 10:00:00', Date.now(), 'other-user', 'gpt-4', 'gpt-4-0613', 'openai', 200, 100, 10, 5, 15);
+  insert.run('req-6', '2026-06-14T02:00:00.000Z', Date.now(), 'other-user', 'gpt-4', 'gpt-4-0613', 'openai', 200, 100, 10, 5, 15);
 }
 
 describe('User Stats Route', () => {
@@ -159,6 +159,7 @@ describe('User Stats Route', () => {
       const app = createStatsRoute(configPath);
 
       // Directly query DB to verify SQL logic correctness (without going through Hono request)
+      // DB 中存的是 UTC ISO 字符串，所以查询也要用 UTC ISO 格式
       const overview = db.prepare(`
         SELECT
           COUNT(*) AS totalRequests,
@@ -168,8 +169,8 @@ describe('User Stats Route', () => {
           COALESCE(AVG(duration_ms), 0) AS avgDuration
         FROM requests
         WHERE user_name = ?
-          AND timestamp >= '2026-06-14 00:00:00' AND timestamp <= '2026-06-14 23:59:59'
-      `).get('test-user') as any;
+          AND timestamp >= ? AND timestamp <= ?
+      `).get('test-user', '2026-06-14T00:00:00.000Z', '2026-06-14T23:59:59.999Z') as any;
 
       expect(overview.totalRequests).toBe(5);
       expect(overview.totalTokens).toBe(150 + 280 + 450 + 50 + 210);
@@ -181,8 +182,8 @@ describe('User Stats Route', () => {
         SELECT COUNT(*) AS totalRequests
         FROM requests
         WHERE user_name = ?
-          AND timestamp >= '2026-06-14 00:00:00' AND timestamp <= '2026-06-14 23:59:59'
-      `).get('other-user') as any;
+          AND timestamp >= ? AND timestamp <= ?
+      `).get('other-user', '2026-06-14T00:00:00.000Z', '2026-06-14T23:59:59.999Z') as any;
       expect(otherOverview.totalRequests).toBe(1);
     });
 
@@ -208,10 +209,10 @@ describe('User Stats Route', () => {
           COALESCE(SUM(total_tokens), 0) AS totalTokens
         FROM requests
         WHERE user_name = ?
-          AND timestamp >= '2026-06-14 00:00:00' AND timestamp <= '2026-06-14 23:59:59'
+          AND timestamp >= ? AND timestamp <= ?
         GROUP BY custom_model
         ORDER BY requests DESC
-      `).all('test-user') as any[];
+      `).all('test-user', '2026-06-14T00:00:00.000Z', '2026-06-14T23:59:59.999Z') as any[];
 
       expect(byModel).toHaveLength(2);
 
@@ -245,17 +246,17 @@ describe('User Stats Route', () => {
           COUNT(*) AS requests
         FROM requests
         WHERE user_name = ?
-          AND timestamp >= '2026-06-14 00:00:00' AND timestamp <= '2026-06-14 23:59:59'
+          AND timestamp >= ? AND timestamp <= ?
         GROUP BY hour
         ORDER BY hour ASC
-      `).all('test-user') as any[];
+      `).all('test-user', '2026-06-14T00:00:00.000Z', '2026-06-14T23:59:59.999Z') as any[];
 
       expect(byHour).toHaveLength(3);
-      expect(byHour[0].hour).toBe('2026-06-14 10:00');
+      expect(byHour[0].hour).toBe('2026-06-14 02:00');
       expect(byHour[0].requests).toBe(2); // req-1, req-2
-      expect(byHour[1].hour).toBe('2026-06-14 11:00');
+      expect(byHour[1].hour).toBe('2026-06-14 03:00');
       expect(byHour[1].requests).toBe(2); // req-3, req-4
-      expect(byHour[2].hour).toBe('2026-06-14 12:00');
+      expect(byHour[2].hour).toBe('2026-06-14 04:00');
       expect(byHour[2].requests).toBe(1); // req-5
     });
 
@@ -276,10 +277,10 @@ describe('User Stats Route', () => {
         SELECT id, request_id AS requestId, custom_model AS customModel
         FROM requests
         WHERE user_name = ?
-          AND timestamp >= '2026-06-14 00:00:00' AND timestamp <= '2026-06-14 23:59:59'
+          AND timestamp >= ? AND timestamp <= ?
         ORDER BY timestamp DESC
         LIMIT ? OFFSET ?
-      `).all('test-user', limit, 0) as any[];
+      `).all('test-user', '2026-06-14T00:00:00.000Z', '2026-06-14T23:59:59.999Z', limit, 0) as any[];
 
       expect(page1).toHaveLength(2);
 
@@ -288,8 +289,8 @@ describe('User Stats Route', () => {
         SELECT COUNT(*) AS total
         FROM requests
         WHERE user_name = ?
-          AND timestamp >= '2026-06-14 00:00:00' AND timestamp <= '2026-06-14 23:59:59'
-      `).get('test-user') as any;
+          AND timestamp >= ? AND timestamp <= ?
+      `).get('test-user', '2026-06-14T00:00:00.000Z', '2026-06-14T23:59:59.999Z') as any;
 
       expect(totalRow.total).toBe(5);
       expect(Math.max(1, Math.ceil(totalRow.total / limit))).toBe(3); // totalPages
@@ -315,8 +316,8 @@ describe('User Stats Route', () => {
           COALESCE(AVG(duration_ms), 0) AS avgDuration
         FROM requests
         WHERE user_name = ?
-          AND timestamp >= '2026-06-14 00:00:00' AND timestamp <= '2026-06-14 23:59:59'
-      `).get('no-data-user') as any;
+          AND timestamp >= ? AND timestamp <= ?
+      `).get('no-data-user', '2026-06-14T00:00:00.000Z', '2026-06-14T23:59:59.999Z') as any;
 
       expect(overview.totalRequests).toBe(0);
       expect(overview.totalTokens).toBe(0);
@@ -326,9 +327,9 @@ describe('User Stats Route', () => {
         SELECT custom_model AS model, COUNT(*) AS requests
         FROM requests
         WHERE user_name = ?
-          AND timestamp >= '2026-06-14 00:00:00' AND timestamp <= '2026-06-14 23:59:59'
+          AND timestamp >= ? AND timestamp <= ?
         GROUP BY custom_model
-      `).all('no-data-user') as any[];
+      `).all('no-data-user', '2026-06-14T00:00:00.000Z', '2026-06-14T23:59:59.999Z') as any[];
 
       expect(byModel).toHaveLength(0);
 
@@ -336,8 +337,8 @@ describe('User Stats Route', () => {
         SELECT COUNT(*) AS total
         FROM requests
         WHERE user_name = ?
-          AND timestamp >= '2026-06-14 00:00:00' AND timestamp <= '2026-06-14 23:59:59'
-      `).get('no-data-user') as any;
+          AND timestamp >= ? AND timestamp <= ?
+      `).get('no-data-user', '2026-06-14T00:00:00.000Z', '2026-06-14T23:59:59.999Z') as any;
 
       expect(totalRow.total).toBe(0);
     });
@@ -354,40 +355,40 @@ describe('User Stats Route', () => {
       dbManager.initialize();
       const db = dbManager.getDb();
 
-      // Insert data across 2 days
+      // Insert data across 2 days (UTC ISO format)
       const insert = db.prepare(`
         INSERT INTO requests (request_id, timestamp, created_at, user_name, custom_model, real_model, provider, status_code, duration_ms, prompt_tokens, completion_tokens, total_tokens)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
-      insert.run('req-day1-1', '2026-06-13 10:00:00', Date.now(), 'test-user', 'gpt-4', 'gpt-4-0613', 'openai', 200, 100, 10, 5, 15);
-      insert.run('req-day1-2', '2026-06-13 11:00:00', Date.now(), 'test-user', 'claude-3', 'claude-3-opus', 'anthropic', 200, 200, 20, 10, 30);
-      insert.run('req-day2-1', '2026-06-14 10:00:00', Date.now(), 'test-user', 'gpt-4', 'gpt-4-0613', 'openai', 200, 150, 15, 8, 23);
+      insert.run('req-day1-1', '2026-06-13T02:00:00.000Z', Date.now(), 'test-user', 'gpt-4', 'gpt-4-0613', 'openai', 200, 100, 10, 5, 15);
+      insert.run('req-day1-2', '2026-06-13T03:00:00.000Z', Date.now(), 'test-user', 'claude-3', 'claude-3-opus', 'anthropic', 200, 200, 20, 10, 30);
+      insert.run('req-day2-1', '2026-06-14T02:00:00.000Z', Date.now(), 'test-user', 'gpt-4', 'gpt-4-0613', 'openai', 200, 150, 15, 8, 23);
 
-      // Filter: only June 13
+      // Filter: only June 13 in UTC
       const overviewDay1 = db.prepare(`
         SELECT COUNT(*) AS totalRequests
         FROM requests
         WHERE user_name = ?
-          AND timestamp >= '2026-06-13 00:00:00' AND timestamp <= '2026-06-13 23:59:59'
-      `).get('test-user') as any;
+          AND timestamp >= ? AND timestamp <= ?
+      `).get('test-user', '2026-06-13T00:00:00.000Z', '2026-06-13T23:59:59.999Z') as any;
       expect(overviewDay1.totalRequests).toBe(2);
 
-      // Filter: only June 14
+      // Filter: only June 14 in UTC
       const overviewDay2 = db.prepare(`
         SELECT COUNT(*) AS totalRequests
         FROM requests
         WHERE user_name = ?
-          AND timestamp >= '2026-06-14 00:00:00' AND timestamp <= '2026-06-14 23:59:59'
-      `).get('test-user') as any;
+          AND timestamp >= ? AND timestamp <= ?
+      `).get('test-user', '2026-06-14T00:00:00.000Z', '2026-06-14T23:59:59.999Z') as any;
       expect(overviewDay2.totalRequests).toBe(1);
 
-      // Filter: both days
+      // Filter: both days in UTC
       const overviewBoth = db.prepare(`
         SELECT COUNT(*) AS totalRequests
         FROM requests
         WHERE user_name = ?
-          AND timestamp >= '2026-06-13 00:00:00' AND timestamp <= '2026-06-14 23:59:59'
-      `).get('test-user') as any;
+          AND timestamp >= ? AND timestamp <= ?
+      `).get('test-user', '2026-06-13T00:00:00.000Z', '2026-06-14T23:59:59.999Z') as any;
       expect(overviewBoth.totalRequests).toBe(3);
     });
   });

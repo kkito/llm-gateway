@@ -1,6 +1,6 @@
 import type { FC } from 'hono/jsx';
 import { UserLayout } from '../components/Layout.js';
-import { formatNumber, formatDuration, formatPct } from '../../lib/format.js';
+import { formatNumber, formatDuration } from '../../lib/format.js';
 
 // ---- Props 接口定义 ----
 
@@ -59,6 +59,7 @@ export interface StatsViewProps {
   endDate: string;
   page: number;
   totalPages: number;
+  tzOffset: number;
 }
 
 // ---- 样式 ----
@@ -474,28 +475,13 @@ const styles = `
 }
 `;
 
-// ---- 辅助：解析 page 参数并重命名 ----
-
-function parsePage(props: StatsViewProps) {
-  return {
-    ...props,
-    currentPage: props.page,
-  };
-}
-
 // ---- 组件 ----
 
 export const StatsView: FC<StatsViewProps> = (props) => {
-  const { overview, byModel, byHour, recentRequests, userName, startDate, endDate, totalPages } = props;
+  const { overview, byModel, byHour, recentRequests, userName, startDate, endDate, totalPages, tzOffset } = props;
   const currentPage = props.page;
 
-  // 成功率
-  const successRate = overview.totalRequests > 0
-    ? (overview.totalRequests - byModel.reduce((sum, m) => sum + m.failed, 0)) / overview.totalRequests * 100
-    : 0;
-  const successCount = overview.totalRequests - byModel.reduce((sum, m) => sum + m.failed, 0);
-  // 用 byModel 数据计算成功/失败可能更准，但 overview 中无直接字段，用查询值
-  // 实际上我们传入了 byModel，用汇总
+  // 用 byModel 数据计算成功/失败
   const totalFailed = byModel.reduce((sum, m) => sum + m.failed, 0);
   const totalSuccessful = byModel.reduce((sum, m) => sum + m.successful, 0);
   const successPct = overview.totalRequests > 0 ? (totalSuccessful / overview.totalRequests) * 100 : 0;
@@ -516,8 +502,6 @@ export const StatsView: FC<StatsViewProps> = (props) => {
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   const thirtyDaysAgoStr = `${thirtyDaysAgo.getFullYear()}-${(thirtyDaysAgo.getMonth() + 1).toString().padStart(2, '0')}-${thirtyDaysAgo.getDate().toString().padStart(2, '0')}`;
 
-  const isToday = startDate.startsWith(todayStr);
-
   return (
     <UserLayout title={`使用统计 — ${userName}`} currentUser={{ name: userName, apikey: '' }}>
       <style>{styles}</style>
@@ -528,7 +512,7 @@ export const StatsView: FC<StatsViewProps> = (props) => {
 
       {/* 日期筛选栏 */}
       <div class="filter-bar">
-        <form method="get" action="/user/stats" class="filter-form">
+        <form method="get" action="/user/stats" class="filter-form" id="stats-filter-form">
           <div class="filter-group">
             <label for="start">开始日期</label>
             <input type="date" id="start" name="startDate" value={startDate.split(' ')[0]} />
@@ -537,16 +521,17 @@ export const StatsView: FC<StatsViewProps> = (props) => {
             <label for="end">结束日期</label>
             <input type="date" id="end" name="endDate" value={endDate.split(' ')[0]} />
           </div>
+          <input type="hidden" name="tzOffset" value={tzOffset} />
           <button type="submit" class="filter-submit">查询</button>
         </form>
         <div class="filter-shortcuts">
-          <a href={`/user/stats`}>今天</a>
+          <a href={`/user/stats?startDate=${todayStr}&endDate=${todayStr}`}>今天</a>
           <a href={`/user/stats?startDate=${sevenDaysAgoStr}&endDate=${todayStr}`}>最近 7 天</a>
           <a href={`/user/stats?startDate=${thirtyDaysAgoStr}&endDate=${todayStr}`}>最近 30 天</a>
         </div>
         <div class="filter-current">
           📅 当前范围：{startDate} ~ {endDate}
-          {isToday ? '（今日）' : ''}
+          {endDate === startDate ? '（当日）' : ''}
         </div>
       </div>
 
@@ -636,34 +621,39 @@ export const StatsView: FC<StatsViewProps> = (props) => {
             {byHour.length === 0 ? (
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>暂无数据</p>
             ) : (
-              byHour.map((h) => {
-                const barWidth = (h.requests / maxHourRequests) * 100;
-                const barColor = barWidth > 70
-                  ? 'linear-gradient(90deg, #f59e0b, #d97706)'
-                  : barWidth > 40
-                    ? 'linear-gradient(135deg, #10b981, #059669)'
-                    : 'var(--blue-gradient)';
-                return (
-                  <div class="hour-item">
-                    <div class="hour-label">{h.hour}</div>
-                    <div class="hour-bar-bg">
-                      <div class="hour-bar-fill" style={{ width: `${barWidth}%`, background: barColor }} />
-                      <span
-                        class="hour-bar-value"
-                        style={{
-                          color: barWidth > 50 ? '#fff' : 'var(--text-primary)',
-                          textShadow: barWidth > 50 ? '0 1px 2px rgba(0,0,0,0.15)' : 'none',
-                        }}
-                      >
-                        {h.requests} 次
-                      </span>
+              <div id="hour-distribution-container">
+                {byHour.map((h) => {
+                  // 为每个小时的起始时刻构造 UTC ISO 字符串用于客户端转本地
+                  // h.hour 格式是 "2026-06-14 02:00"，补上 ":00.000Z"
+                  const utcHourStr = h.hour.replace(' ', 'T') + ':00.000Z';
+                  const barWidth = (h.requests / maxHourRequests) * 100;
+                  const barColor = barWidth > 70
+                    ? 'linear-gradient(90deg, #f59e0b, #d97706)'
+                    : barWidth > 40
+                      ? 'linear-gradient(135deg, #10b981, #059669)'
+                      : 'var(--blue-gradient)';
+                  return (
+                    <div class="hour-item" data-hour-utc={utcHourStr} data-requests={h.requests} data-tokens={h.totalTokens}>
+                      <div class="hour-label">{h.hour}</div>
+                      <div class="hour-bar-bg">
+                        <div class="hour-bar-fill" style={{ width: `${barWidth}%`, background: barColor }} />
+                        <span
+                          class="hour-bar-value"
+                          style={{
+                            color: barWidth > 50 ? '#fff' : 'var(--text-primary)',
+                            textShadow: barWidth > 50 ? '0 1px 2px rgba(0,0,0,0.15)' : 'none',
+                          }}
+                        >
+                          {h.requests} 次
+                        </span>
+                      </div>
+                      <div class="hour-meta">
+                        {formatNumber(h.totalTokens)} Token
+                      </div>
                     </div>
-                    <div class="hour-meta">
-                      {formatNumber(h.totalTokens)} Token
-                    </div>
-                  </div>
-                );
-              })
+                  );
+                })}
+              </div>
             )}
           </div>
 
@@ -691,7 +681,7 @@ export const StatsView: FC<StatsViewProps> = (props) => {
                       {recentRequests.map((r) => (
                         <tr>
                           <td style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{r.id}</td>
-                          <td style={{ whiteSpace: 'nowrap', fontSize: '0.8rem' }}>{r.timestamp}</td>
+                          <td style={{ whiteSpace: 'nowrap', fontSize: '0.8rem' }} data-utc={r.timestamp}>{r.timestamp}</td>
                           <td style={{ fontWeight: 500 }}>{r.customModel}</td>
                           <td>
                             <span class={r.statusCode >= 200 && r.statusCode < 300 ? 'status-success' : 'status-fail'}>
@@ -734,6 +724,80 @@ export const StatsView: FC<StatsViewProps> = (props) => {
           </div>
         </>
       )}
+      <script>{`
+;(function() {
+  // ─── 1. Form submit: update tzOffset from browser ───
+  var form = document.getElementById('stats-filter-form');
+  if (form) {
+    form.addEventListener('submit', function() {
+      var tzInput = form.querySelector('input[name="tzOffset"]');
+      if (tzInput) tzInput.value = new Date().getTimezoneOffset();
+    });
+  }
+
+  // ─── 2. Convert UTC timestamps to local time ───
+  var tzCells = document.querySelectorAll('[data-utc]');
+  tzCells.forEach(function(el) {
+    var utc = el.getAttribute('data-utc');
+    if (!utc) return;
+    var d = new Date(utc);
+    if (isNaN(d.getTime())) return;
+    var pad = function(n) { return String(n).padStart(2, '0'); };
+    el.textContent = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+  });
+
+  // ─── 3. Re-aggregate hour distribution by local hour ───
+  var hourBars = document.querySelectorAll('[data-hour-utc]');
+  if (hourBars.length > 0) {
+    var localBuckets = {};
+    hourBars.forEach(function(el) {
+      var utc = el.getAttribute('data-hour-utc');
+      var requests = parseInt(el.getAttribute('data-requests') || '0', 10);
+      var tokens = parseInt(el.getAttribute('data-tokens') || '0', 10);
+      if (!utc) return;
+      var d = new Date(utc);
+      if (isNaN(d.getTime())) return;
+      var localKey = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':00';
+      if (!localBuckets[localKey]) localBuckets[localKey] = { requests: 0, tokens: 0 };
+      localBuckets[localKey].requests += requests;
+      localBuckets[localKey].tokens += tokens;
+    });
+    // Rebuild the hour list
+    var container = document.getElementById('hour-distribution-container');
+    if (container) {
+      var sortedKeys = Object.keys(localBuckets).sort();
+      var maxLocal = sortedKeys.length > 0 ? Math.max.apply(null, sortedKeys.map(function(k) { return localBuckets[k].requests; })) : 1;
+      var html = '';
+      sortedKeys.forEach(function(key) {
+        var bucket = localBuckets[key];
+        var pct = (bucket.requests / maxLocal) * 100;
+        var barColor = pct > 70
+          ? 'linear-gradient(90deg, #f59e0b, #d97706)'
+          : pct > 40
+            ? 'linear-gradient(135deg, #10b981, #059669)'
+            : 'linear-gradient(135deg, #3b82f6, #2563eb)';
+        var textColor = pct > 50 ? '#fff' : '#1f2937';
+        var textShadow = pct > 50 ? '0 1px 2px rgba(0,0,0,0.15)' : 'none';
+        html += '<div class="hour-item">' +
+          '<div class="hour-label">' + key + '</div>' +
+          '<div class="hour-bar-bg">' +
+            '<div class="hour-bar-fill" style="width:' + pct + '%;background:' + barColor + '"></div>' +
+            '<span class="hour-bar-value" style="color:' + textColor + ';text-shadow:' + textShadow + '">' + bucket.requests + ' 次</span>' +
+          '</div>' +
+          '<div class="hour-meta">' + formatTokenDisplay(bucket.tokens) + ' Token</div>' +
+        '</div>';
+      });
+      container.innerHTML = html || '<p style="color:#6b7280;font-size:0.9rem">暂无数据</p>';
+    }
+  }
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function formatTokenDisplay(n) {
+    if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+    if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+    return String(n);
+  }
+})();
+`}</script>
     </UserLayout>
   );
 };
