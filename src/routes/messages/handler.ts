@@ -85,6 +85,7 @@ export function createMessagesHandler(
           currentUser, modelGroupName: model_group, timeoutMs, logDir,
           privacySettings: currentConfig.privacySettings,
           apiKeys: currentConfig.apiKeys ?? [],
+          requestLogger,
         });
         actualModel = fallbackResult.actualModel;
         triedModels = fallbackResult.triedModels;
@@ -115,6 +116,7 @@ export function createMessagesHandler(
               currentUser, modelGroupName: model, timeoutMs, logDir,
               privacySettings: currentConfig.privacySettings,
               apiKeys: currentConfig.apiKeys ?? [],
+              requestLogger,
             });
             actualModel = fallbackResult.actualModel;
             triedModels = fallbackResult.triedModels;

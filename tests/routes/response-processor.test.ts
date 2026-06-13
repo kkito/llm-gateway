@@ -264,6 +264,32 @@ describe('processSuccessfulResponse', () => {
       expect(handleStream).toHaveBeenCalled();
       expect(result).toEqual({ error: { message: 'No response body' } });
     });
+
+    it('should pass requestLogger and currentUser to handleStream when provided', async () => {
+      const streamResponse = makeMockStreamResponse();
+      const mockStreamResult = { _streamed: true };
+      vi.mocked(handleStream).mockReturnValue(mockStreamResult as unknown as Response);
+
+      const c = makeMockC();
+      const logger = { log: vi.fn() };
+      const provider = makeMockProvider();
+      const requestLogger = { log: vi.fn() };
+      const currentUser = { name: 'test-user' };
+
+      const result = await processSuccessfulResponse(
+        c, streamResponse, provider, 'test-model', true,
+        {}, { recordUsage: vi.fn() } as any, logger,
+        { logStreamResponse: vi.fn() } as any,
+        'req-123', Date.now() - 100, currentUser, undefined, [],
+        undefined, requestLogger
+      );
+
+      expect(handleStream).toHaveBeenCalled();
+      const streamCall = vi.mocked(handleStream).mock.calls[0][0];
+      expect(streamCall.requestLogger).toBe(requestLogger);
+      expect(streamCall.currentUser).toBe(currentUser);
+      expect(result).toBe(mockStreamResult);
+    });
   });
 
   describe('logEntry construction', () => {

@@ -2,6 +2,7 @@ import type { ProviderConfig, PrivacySettings } from '../../config.js';
 import type { Logger } from '../../logger.js';
 import type { DetailLogger } from '../../detail-logger.js';
 import type { RateLimiter } from '../../lib/rate-limiter.js';
+import type { RequestLogger } from '../../lib/request-logger.js';
 import { handleMessagesNonStream } from './non-stream-handler.js';
 import { handleStream as handleMessagesStream } from './stream-handler.js';
 import { restorePaths } from '../../privacy/sanitizer.js';
@@ -23,6 +24,7 @@ export interface ProcessMsgResponseOptions {
   modelGroup: string | undefined;
   triedModels: Array<{ model: string; exceeded: boolean; message?: string }>;
   privacySettings?: PrivacySettings;
+  requestLogger?: RequestLogger;
 }
 
 export async function processMessagesSuccess(options: ProcessMsgResponseOptions): Promise<Response> {
@@ -40,7 +42,8 @@ export async function processMessagesSuccess(options: ProcessMsgResponseOptions)
     currentUser,
     modelGroup,
     triedModels,
-    privacySettings
+    privacySettings,
+    requestLogger
   } = options;
 
   const logEntry: any = {
@@ -111,6 +114,8 @@ export async function processMessagesSuccess(options: ProcessMsgResponseOptions)
       logger,
       detailLogger,
       c,
+      requestLogger,
+      currentUser,
       privacySettings
     });
   }

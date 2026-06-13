@@ -89,6 +89,7 @@ export function createChatCompletionsHandler(
           currentUser, modelGroupName: model_group, timeoutMs, logDir,
           privacySettings: currentConfig.privacySettings,
           apiKeys: currentConfig.apiKeys ?? [],
+          requestLogger,
         };
         const fallbackResult = await tryModelGroupWithFallback(ctx);
         actualModel = fallbackResult.actualModel;
@@ -120,6 +121,7 @@ export function createChatCompletionsHandler(
               currentUser, modelGroupName: model, timeoutMs, logDir,
               privacySettings: currentConfig.privacySettings,
               apiKeys: currentConfig.apiKeys ?? [],
+              requestLogger,
             };
             const fallbackResult = await tryModelGroupWithFallback(ctx);
             actualModel = fallbackResult.actualModel;

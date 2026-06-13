@@ -2,6 +2,7 @@ import type { ProviderConfig, PrivacySettings, ApiKey } from '../../config.js';
 import type { Logger } from '../../logger.js';
 import type { DetailLogger } from '../../detail-logger.js';
 import type { RateLimiter } from '../../lib/rate-limiter.js';
+import type { RequestLogger } from '../../lib/request-logger.js';
 import { interceptors } from '../../interceptor/index.js';
 import { buildUpstreamRequest, sendUpstreamRequest } from './upstream-request.js';
 import { processSuccessfulResponse } from './response-processor.js';
@@ -30,10 +31,11 @@ export interface FallbackContext {
   logDir: string;
   privacySettings?: PrivacySettings;
   apiKeys?: ApiKey[];
+  requestLogger?: RequestLogger;
 }
 
 export async function tryModelGroupWithFallback(ctx: FallbackContext): Promise<FallbackResult> {
-  const { c, modelNames, allProviders, body, stream, rateLimiter, logger, detailLogger, requestId, startTime, currentUser, modelGroupName, timeoutMs, logDir, privacySettings } = ctx;
+  const { c, modelNames, allProviders, body, stream, rateLimiter, logger, detailLogger, requestId, startTime, currentUser, modelGroupName, timeoutMs, logDir, privacySettings, requestLogger } = ctx;
   const triedModels: Array<{ model: string; exceeded: boolean; message?: string }> = [];
   let lastErrorBody: any = null;
   let lastErrorStatus = 500;
@@ -89,7 +91,7 @@ export async function tryModelGroupWithFallback(ctx: FallbackContext): Promise<F
       c, response, provider, modelName, stream, body,
       rateLimiter, logger, detailLogger, requestId,
       startTime, currentUser, modelGroupName, triedModels,
-      privacySettings
+      privacySettings, requestLogger
     );
 
     return {
