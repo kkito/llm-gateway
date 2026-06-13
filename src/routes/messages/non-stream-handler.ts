@@ -33,6 +33,7 @@ export async function handleMessagesNonStream(
     const converted = convertOpenAIResponseToAnthropic(responseData, model);
     responseData = converted;
 
+    logEntry.responseMetadata = JSON.stringify(responseData.usage ?? {});
     console.log('   🔄 [OpenAI→Anthropic 转换]');
     logger.log({ ...logEntry, message: 'Converted OpenAI response to Anthropic format' });
   } else {
@@ -41,6 +42,7 @@ export async function handleMessagesNonStream(
     logEntry.completionTokens = usage?.output_tokens;
     logEntry.totalTokens = (usage?.input_tokens ?? 0) + (usage?.output_tokens ?? 0);
     logEntry.cachedTokens = usage?.input_tokens_details?.cached_tokens;
+    logEntry.responseMetadata = JSON.stringify(responseData.usage ?? {});
 
     logger.log({ ...logEntry, message: 'Anthropic non-streaming response' });
   }
