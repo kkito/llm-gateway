@@ -1,5 +1,7 @@
 import { Hono } from 'hono';
 import { loadFullConfig, saveConfig, addApiKey, updateApiKey, deleteApiKey, getApiKey, getApiKeyOptions, type ApiKey } from '../../config.js';
+import { renameApiKeyRefInConfig, removeApiKeyRefFromConfig } from '../../config-operations.js';
+import type { ProxyConfig } from '../../config.js';
 import { ApiKeysPage } from '../views/api-keys.js';
 import { isPasswordConfigured, sessions } from '../middleware/auth.js';
 
@@ -120,13 +122,22 @@ export function createApiKeysRoute(deps: RouteDeps) {
         return c.html(<ApiKeysPage apiKeys={apiKeys} error="请填写所有必填字段" />);
       }
 
+      const oldName = currentApiKey?.name;
+
       const updates: Partial<ApiKey> = { name };
       if (key) {
         updates.key = key;
       }
 
       const apiKeys = updateApiKey(proxyConfig.apiKeys || [], id, updates);
-      saveConfig({ ...proxyConfig, apiKeys }, configPath);
+      let updatedConfig: ProxyConfig = { ...proxyConfig, apiKeys };
+
+      // 如果 API Key 名称变了，更新所有模型的 $$oldName$$ -> $$newName$$
+      if (oldName && oldName !== name) {
+        updatedConfig = renameApiKeyRefInConfig(updatedConfig, oldName, name);
+      }
+
+      saveConfig(updatedConfig, configPath);
 
       const updatedApiKeys = getApiKeyOptions(apiKeys);
       return c.html(<ApiKeysPage apiKeys={updatedApiKeys} success="API Key 更新成功" />);
@@ -143,8 +154,19 @@ export function createApiKeysRoute(deps: RouteDeps) {
       const id = c.req.param('id');
       const proxyConfig = loadFullConfig(configPath);
 
+      // 获取要删除的 key 的名称，用于清理模型的引用
+      const keyToDelete = getApiKey(proxyConfig.apiKeys || [], id);
+      const keyName = keyToDelete?.name;
+
       const apiKeys = deleteApiKey(proxyConfig.apiKeys || [], id);
-      saveConfig({ ...proxyConfig, apiKeys }, configPath);
+      let updatedConfig: ProxyConfig = { ...proxyConfig, apiKeys };
+
+      // 清理所有模型中对该 key 的 $$name$$ 引用
+      if (keyName) {
+        updatedConfig = removeApiKeyRefFromConfig(updatedConfig, keyName);
+      }
+
+      saveConfig(updatedConfig, configPath);
 
       const updatedApiKeys = getApiKeyOptions(apiKeys);
       return c.html(<ApiKeysPage apiKeys={updatedApiKeys} success="API Key 已删除" />);

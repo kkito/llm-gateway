@@ -166,7 +166,7 @@ describe('Admin Models Form E2E', () => {
       const savedConfig = JSON.parse(readFileSync(testConfigPath, 'utf-8'));
       const newModel = savedConfig.models.find((m: any) => m.customModel === 'new-model');
       expect(newModel).toBeDefined();
-      expect(newModel.apiKey).toBe('sk-openai-123'); // 应该使用选中的 API Key
+      expect(newModel.apiKey).toBe('$$My OpenAI Key$$'); // 应该使用选中的 API Key
     });
 
     it('应该允许手动输入 API Key 来创建模型', async () => {
@@ -283,7 +283,7 @@ describe('Admin Models Form E2E', () => {
       const savedConfig = JSON.parse(readFileSync(testConfigPath, 'utf-8'));
       const updatedModel = savedConfig.models.find((m: any) => m.customModel === 'test-gpt4');
       expect(updatedModel).toBeDefined();
-      expect(updatedModel.apiKey).toBe('sk-openai-123'); // 应该使用选中的 API Key
+      expect(updatedModel.apiKey).toBe('$$My OpenAI Key$$'); // 应该使用选中的 API Key
     });
 
     it('编辑时留空 apiKeySource 和 apiKey 应保持原值', async () => {
@@ -308,7 +308,7 @@ describe('Admin Models Form E2E', () => {
       const savedConfig = JSON.parse(readFileSync(testConfigPath, 'utf-8'));
       const updatedModel = savedConfig.models.find((m: any) => m.customModel === 'test-gpt4');
       expect(updatedModel).toBeDefined();
-      expect(updatedModel.apiKey).toBe('sk-openai-123'); // 保持上一次更新的值
+      expect(updatedModel.apiKey).toBe('$$My OpenAI Key$$'); // 保持上一次更新的值
     });
   });
 

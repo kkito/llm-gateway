@@ -8,6 +8,7 @@ interface Props {
   model?: ProviderConfig;
   error?: string;
   apiKeyOptions?: { id: string; name: string }[];
+  selectedApiKeyRef?: string | null;
 }
 
 // HTML 转义函数，防止 XSS 攻击
@@ -266,9 +267,9 @@ export const ModelFormPage: FC<Props> = (props) => {
                       name="apiKeySource"
                       onchange="const manualInput = document.getElementById('apiKeyManual'); if (this.value === 'manual') { manualInput.disabled = false; manualInput.required = true; manualInput.focus(); } else { manualInput.disabled = true; manualInput.value = ''; manualInput.required = false; }"
                     >
-                      <option value="manual">手动输入...</option>
+                      <option value="manual" selected={!props.selectedApiKeyRef}>手动输入...</option>
                       {props.apiKeyOptions?.map((opt) => (
-                        <option value={opt.id}>{opt.name}</option>
+                        <option value={opt.id} selected={props.selectedApiKeyRef === opt.name}>{opt.name}</option>
                       ))}
                     </select>
                     <input
@@ -276,11 +277,16 @@ export const ModelFormPage: FC<Props> = (props) => {
                       id="apiKeyManual"
                       name="apiKey"
                       type="password"
-                      placeholder={isEdit ? '留空则保持原密钥不变' : '请输入 API Key'}
+                      disabled={!!props.selectedApiKeyRef}
+                      placeholder={props.selectedApiKeyRef ? `使用引用：$$${escapeHtml(props.selectedApiKeyRef) || ''}$$` : (isEdit ? '留空则保持原密钥不变' : '请输入 API Key')}
                       value={isEdit ? '' : safeValue(props.model?.apiKey)}
-                      required={!isEdit}
+                      required={!isEdit && !props.selectedApiKeyRef}
                     />
-                    <span class="form-hint">可以选择已保存的 API Key，或手动输入</span>
+                    <span class="form-hint">
+                      {props.selectedApiKeyRef
+                        ? `引用 API Key「${escapeHtml(props.selectedApiKeyRef)}」，修改后将全局生效`
+                        : '可以选择已保存的 API Key，或手动输入'}
+                    </span>
                   </div>
                   {isEdit && <span class="form-hint">留空则保持原密钥不变</span>}
                 </label>

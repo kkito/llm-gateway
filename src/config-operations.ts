@@ -112,3 +112,30 @@ export function removeModelGroupFromConfig(
     modelGroups: config.modelGroups.filter(g => g.name !== groupName),
   };
 }
+
+export function renameApiKeyRefInConfig(
+  config: ProxyConfig,
+  oldName: string,
+  newName: string
+): ProxyConfig {
+  if (oldName === newName) return config;
+
+  return {
+    ...config,
+    models: config.models.map(m =>
+      m.apiKey === `$$${oldName}$$`
+        ? { ...m, apiKey: `$$${newName}$$` }
+        : m
+    ),
+  };
+}
+
+export function removeApiKeyRefFromConfig(
+  config: ProxyConfig,
+  _keyName: string
+): ProxyConfig {
+  // Don't clear model refs — keep the $$name$$ ref so resolveApiKey
+  // produces a clear error at request time. If the key is re-added
+  // with the same name, models automatically recover.
+  return config;
+}
