@@ -137,7 +137,7 @@ export const UserLayout: FC<Props> = (props) => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <div class="navbar-menu">
               <a href="/user/main" class="navbar-link">首页</a>
-              <a href="/user/stats" class="navbar-link">统计</a>
+              {hasUser && <a href="/user/stats" class="navbar-link">统计</a>}
             </div>
             {hasUser ? (
               <div class="user-info">
