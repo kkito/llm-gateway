@@ -724,7 +724,7 @@ export const StatsView: FC<StatsViewProps> = (props) => {
           </div>
         </>
       )}
-      <script>{`
+      <script dangerouslySetInnerHTML={{ __html: `
 ;(function() {
   // ─── 1. Form submit: update tzOffset from browser ───
   var form = document.getElementById('stats-filter-form');
@@ -797,7 +797,7 @@ export const StatsView: FC<StatsViewProps> = (props) => {
     return String(n);
   }
 })();
-`}</script>
+` }}></script>
     </UserLayout>
   );
 };
