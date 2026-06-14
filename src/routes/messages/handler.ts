@@ -141,10 +141,10 @@ export function createMessagesHandler(
             userName: currentUser?.name,
             error: { message: 'Model not found' }
           });
-          if (requestLogger && currentUser) {
+          if (requestLogger) {
             requestLogger.log({
               requestId, timestamp: new Date().toISOString(),
-              userName: currentUser.name,
+              userName: currentUser?.name ?? null,
               customModel: model, endpoint, statusCode: 404,
               durationMs: Date.now() - startTime, isStreaming: !!stream,
               errorMessage: 'Model not found',
@@ -219,10 +219,10 @@ export function createMessagesHandler(
           userName: currentUser?.name,
           error: { message: 'Authentication required' }
         });
-        if (requestLogger && currentUser) {
+        if (requestLogger) {
           requestLogger.log({
             requestId, timestamp: new Date().toISOString(),
-            userName: currentUser.name,
+            userName: currentUser?.name ?? null,
             customModel: model_group ? actualModel! : model, endpoint,
             statusCode: 401, durationMs: Date.now() - startTime,
             isStreaming: !!stream, errorMessage: 'Authentication required',
@@ -240,11 +240,11 @@ export function createMessagesHandler(
             restorePaths(result.responseData, requestId);
           }
           logger.log(result.logEntry);
-          if (requestLogger && currentUser) {
+          if (requestLogger) {
             requestLogger.log({
               requestId: result.logEntry.requestId,
               timestamp: result.logEntry.timestamp,
-              userName: currentUser.name,
+              userName: currentUser?.name ?? null,
               customModel: result.logEntry.customModel,
               realModel: result.logEntry.realModel,
               provider: result.logEntry.provider,
@@ -272,11 +272,11 @@ export function createMessagesHandler(
       }
 
       logger.log(logEntry);
-      if (requestLogger && currentUser) {
+      if (requestLogger) {
         requestLogger.log({
           requestId: logEntry.requestId,
           timestamp: logEntry.timestamp,
-          userName: currentUser.name,
+          userName: currentUser?.name ?? null,
           customModel: logEntry.customModel,
           realModel: logEntry.realModel,
           provider: logEntry.provider,
@@ -334,10 +334,10 @@ export function createMessagesHandler(
         userName: currentUser?.name,
         error: { message: error.message || 'Internal error', type: error.name }
       });
-      if (requestLogger && currentUser) {
+      if (requestLogger) {
         requestLogger.log({
           requestId, timestamp: new Date().toISOString(),
-          userName: currentUser.name,
+          userName: currentUser?.name ?? null,
           customModel: modelGroup ? actualModel! : (body.model as string),
           endpoint, statusCode: 500,
           durationMs: Date.now() - startTime, isStreaming: false,

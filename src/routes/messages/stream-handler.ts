@@ -91,11 +91,11 @@ export function handleStream(options: StreamHandlerOptions): Response {
             }
 
             detailLogger.logStreamResponse(requestId, chunks);
-            if (requestLogger && currentUser) {
+            if (requestLogger) {
               requestLogger.log({
                 requestId: logEntry.requestId,
                 timestamp: logEntry.timestamp,
-                userName: currentUser.name,
+                userName: currentUser?.name ?? undefined,
                 customModel: logEntry.customModel,
                 realModel: logEntry.realModel,
                 provider: logEntry.provider,
