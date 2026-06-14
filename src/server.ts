@@ -14,7 +14,7 @@ import { createModelLimitsRoute } from './admin/routes/model-limits.js';
 import { createModelGroupsRoute } from './admin/routes/model-groups.js';
 import { createModelGroupFormRoute } from './admin/routes/model-group-form.js';
 import { createStatsRoute } from './admin/routes/stats.js';
-import { createStatsApiRoute, initStatsProvider, resetStatsProvider } from './admin/routes/stats-api.js';
+import { createStatsApiRoute } from './admin/routes/stats-api.js';
 import { createUsageApiRoute, initUsageApiTracker, resetUsageApiTracker } from './admin/routes/usage-api.js';
 import { createHomeRoute } from './user/routes/home.js';
 import { createLoginRoute as createUserLoginRoute } from './user/routes/login.js';
@@ -90,7 +90,6 @@ export function resetServerGlobalState(): void {
     sigtermHandler = null;
   }
   // 重置模块级全局变量（用于测试隔离）
-  resetStatsProvider();
   resetUsageApiTracker();
   DatabaseManager.resetInstance();
   RequestLogger.resetInstance();
@@ -120,7 +119,6 @@ export function createServer(
     process.removeListener('SIGTERM', sigtermHandler);
     sigtermHandler = null;
   }
-  resetStatsProvider();
   resetUsageApiTracker();
 
   const app = new Hono();

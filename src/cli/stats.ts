@@ -2,16 +2,8 @@
 
 import { Command } from 'commander';
 import { createConfigContext } from '../lib/config-context.js';
-import {
-  loadStats,
-  formatDateRange,
-  getLogFilesForRange,
-  parseLogFile,
-  createEmptyModelStats,
-  type StatsOptions,
-  type Stats,
-  type ModelStats
-} from '../lib/stats-core.js';
+import { DatabaseManager } from '../lib/db.js';
+import { localDateToUtcRange } from '../lib/time-utils.js';
 
 interface CliStatsOptions {
   configDir?: string;
@@ -19,12 +11,35 @@ interface CliStatsOptions {
   week?: string;
   month?: string;
   byHour?: boolean;
-  byModel?: boolean;
   json?: boolean;
 }
 
-function resolveLogDir(options: CliStatsOptions): string {
-  return createConfigContext(options.configDir).logDir;
+interface ModelStats {
+  requests: number;
+  successful: number;
+  failed: number;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  cachedTokens: number;
+}
+
+interface Stats {
+  totalRequests: number;
+  successfulRequests: number;
+  failedRequests: number;
+  byModel: Record<string, ModelStats>;
+  byProvider: Record<string, ModelStats>;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalTokens: number;
+  totalCachedTokens: number;
+  byHour?: Record<string, ModelStats>;
+  byDate?: Record<string, ModelStats>;
+}
+
+function resolveConfigDir(options: CliStatsOptions): string {
+  return createConfigContext(options.configDir).configDir;
 }
 
 function formatModelStats(model: string, stats: ModelStats, indent = 2): string[] {
@@ -120,6 +135,316 @@ function formatStats(stats: Stats, options: CliStatsOptions): string {
   return lines.join('\n');
 }
 
+function getSystemTimezoneOffset(): number {
+  return new Date().getTimezoneOffset();
+}
+
+function parseDateRange(options: CliStatsOptions): { start: string; end: string } {
+  const tzOffset = getSystemTimezoneOffset();
+  const today = new Date();
+  const localToday = today.getFullYear() + '-' +
+    String(today.getMonth() + 1).padStart(2, '0') + '-' +
+    String(today.getDate()).padStart(2, '0');
+
+  if (options.date) {
+    const [utcStart, utcEnd] = localDateToUtcRange(options.date, tzOffset);
+    return { start: utcStart, end: utcEnd };
+  }
+  
+  if (options.week) {
+    // 解析 YYYY-Www 格式
+    const [year, week] = options.week.split('-W');
+    const y = parseInt(year);
+    const w = parseInt(week);
+    
+    // ISO 周的第一周是包含 1 月 4 日的那一周
+    const jan1 = new Date(y, 0, 4);
+    const dayOfWeek = jan1.getDay() || 7; // 周日转为 7
+    const firstMonday = new Date(jan1);
+    firstMonday.setDate(jan1.getDate() - dayOfWeek + 1 + (w - 1) * 7);
+    
+    const startDate = firstMonday;
+    const endDate = new Date(startDate);
+    endDate.setDate(startDate.getDate() + 6);
+    
+    const startLocal = startDate.getFullYear() + '-' +
+      String(startDate.getMonth() + 1).padStart(2, '0') + '-' +
+      String(startDate.getDate()).padStart(2, '0');
+    const endLocal = endDate.getFullYear() + '-' +
+      String(endDate.getMonth() + 1).padStart(2, '0') + '-' +
+      String(endDate.getDate()).padStart(2, '0');
+    
+    const [utcStart] = localDateToUtcRange(startLocal, tzOffset);
+    const [, utcEnd] = localDateToUtcRange(endLocal, tzOffset);
+    return { start: utcStart, end: utcEnd };
+  }
+  
+  if (options.month) {
+    const [year, month] = options.month.split('-');
+    const y = parseInt(year, 10);
+    const m = parseInt(month, 10);
+    
+    const startLocal = `${year}-${month}-01`;
+    
+    // 计算下个月
+    const nextMonth = m === 12 ? 1 : m + 1;
+    const nextYear = m === 12 ? y + 1 : y;
+    
+    // 使用 UTC 时间避免时区问题：下个月第 0 天 = 本月最后一天
+    const endDate = new Date(Date.UTC(nextYear, nextMonth - 1, 0));
+    const endDay = endDate.getUTCDate();
+    const endMonth = endDate.getUTCMonth() + 1;
+    const endMonthStr = endMonth.toString().padStart(2, '0');
+    const endYear = endDate.getUTCFullYear();
+    const endLocal = `${endYear}-${endMonthStr}-${endDay.toString().padStart(2, '0')}`;
+    
+    const [utcStart] = localDateToUtcRange(startLocal, tzOffset);
+    const [, utcEnd] = localDateToUtcRange(endLocal, tzOffset);
+    return { start: utcStart, end: utcEnd };
+  }
+  
+  // 默认今日
+  const [utcStart, utcEnd] = localDateToUtcRange(localToday, tzOffset);
+  return { start: utcStart, end: utcEnd };
+}
+
+function formatDateRange(options: CliStatsOptions): string {
+  if (options.date) {
+    return options.date;
+  }
+  if (options.week) {
+    const { start, end } = parseDateRange(options);
+    const startLocal = start.split('T')[0];
+    const endLocal = end.split('T')[0];
+    return `${options.week} (${startLocal} ~ ${endLocal})`;
+  }
+  if (options.month) {
+    const { start, end } = parseDateRange(options);
+    const startLocal = start.split('T')[0];
+    const endLocal = end.split('T')[0];
+    return `${options.month} (${startLocal} ~ ${endLocal})`;
+  }
+  return '今日';
+}
+
+function getStatsFromDatabase(configDir: string, options: CliStatsOptions): Stats {
+  const dbManager = DatabaseManager.getExistingInstance();
+  if (!dbManager) {
+    // 尝试初始化
+    const manager = DatabaseManager.getInstance(configDir);
+    manager.initialize();
+    return queryStats(manager.getDb(), options);
+  }
+  return queryStats(dbManager.getDb(), options);
+}
+
+function queryStats(db: any, options: CliStatsOptions): Stats {
+  const { start, end } = parseDateRange(options);
+  
+  const conditions: string[] = ['timestamp >= ?', 'timestamp <= ?'];
+  const params: any[] = [start, end];
+  
+  const whereClause = conditions.join(' AND ');
+  
+  // 概览聚合
+  const overview = db.prepare(`
+    SELECT
+      COUNT(*) AS totalRequests,
+      COALESCE(SUM(CASE WHEN status_code >= 200 AND status_code < 300 THEN 1 ELSE 0 END), 0) AS successfulRequests,
+      COALESCE(SUM(CASE WHEN status_code >= 400 THEN 1 ELSE 0 END), 0) AS failedRequests,
+      COALESCE(SUM(prompt_tokens), 0) AS totalInputTokens,
+      COALESCE(SUM(completion_tokens), 0) AS totalOutputTokens,
+      COALESCE(SUM(total_tokens), 0) AS totalTokens,
+      COALESCE(SUM(cached_tokens), 0) AS totalCachedTokens
+    FROM requests
+    WHERE ${whereClause}
+  `).get(...params) as {
+    totalRequests: number;
+    successfulRequests: number;
+    failedRequests: number;
+    totalInputTokens: number;
+    totalOutputTokens: number;
+    totalTokens: number;
+    totalCachedTokens: number;
+  };
+  
+  // 按模型分组
+  const byModelRows = db.prepare(`
+    SELECT
+      custom_model AS model,
+      COUNT(*) AS requests,
+      COALESCE(SUM(CASE WHEN status_code >= 200 AND status_code < 300 THEN 1 ELSE 0 END), 0) AS successful,
+      COALESCE(SUM(CASE WHEN status_code >= 400 THEN 1 ELSE 0 END), 0) AS failed,
+      COALESCE(SUM(prompt_tokens), 0) AS inputTokens,
+      COALESCE(SUM(completion_tokens), 0) AS outputTokens,
+      COALESCE(SUM(total_tokens), 0) AS totalTokens,
+      COALESCE(SUM(cached_tokens), 0) AS cachedTokens
+    FROM requests
+    WHERE ${whereClause}
+    GROUP BY custom_model
+    ORDER BY requests DESC
+  `).all(...params) as Array<{
+    model: string;
+    requests: number;
+    successful: number;
+    failed: number;
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+    cachedTokens: number;
+  }>;
+  
+  const byModel: Record<string, ModelStats> = {};
+  for (const row of byModelRows) {
+    byModel[row.model] = {
+      requests: row.requests,
+      successful: row.successful,
+      failed: row.failed,
+      inputTokens: row.inputTokens,
+      outputTokens: row.outputTokens,
+      totalTokens: row.totalTokens,
+      cachedTokens: row.cachedTokens,
+    };
+  }
+  
+  // 按 Provider 分组
+  const byProviderRows = db.prepare(`
+    SELECT
+      COALESCE(provider, 'unknown') AS provider,
+      COUNT(*) AS requests,
+      COALESCE(SUM(CASE WHEN status_code >= 200 AND status_code < 300 THEN 1 ELSE 0 END), 0) AS successful,
+      COALESCE(SUM(CASE WHEN status_code >= 400 THEN 1 ELSE 0 END), 0) AS failed,
+      COALESCE(SUM(prompt_tokens), 0) AS inputTokens,
+      COALESCE(SUM(completion_tokens), 0) AS outputTokens,
+      COALESCE(SUM(total_tokens), 0) AS totalTokens,
+      COALESCE(SUM(cached_tokens), 0) AS cachedTokens
+    FROM requests
+    WHERE ${whereClause}
+    GROUP BY provider
+    ORDER BY requests DESC
+  `).all(...params) as Array<{
+    provider: string;
+    requests: number;
+    successful: number;
+    failed: number;
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+    cachedTokens: number;
+  }>;
+  
+  const byProvider: Record<string, ModelStats> = {};
+  for (const row of byProviderRows) {
+    byProvider[row.provider] = {
+      requests: row.requests,
+      successful: row.successful,
+      failed: row.failed,
+      inputTokens: row.inputTokens,
+      outputTokens: row.outputTokens,
+      totalTokens: row.totalTokens,
+      cachedTokens: row.cachedTokens,
+    };
+  }
+  
+  // 按小时分布
+  let byHour: Record<string, ModelStats> | undefined;
+  if (options.byHour) {
+    const byHourRows = db.prepare(`
+      SELECT
+        strftime('%Y-%m-%d %H:00', timestamp) AS hour,
+        COUNT(*) AS requests,
+        COALESCE(SUM(CASE WHEN status_code >= 200 AND status_code < 300 THEN 1 ELSE 0 END), 0) AS successful,
+        COALESCE(SUM(CASE WHEN status_code >= 400 THEN 1 ELSE 0 END), 0) AS failed,
+        COALESCE(SUM(prompt_tokens), 0) AS inputTokens,
+        COALESCE(SUM(completion_tokens), 0) AS outputTokens,
+        COALESCE(SUM(total_tokens), 0) AS totalTokens,
+        COALESCE(SUM(cached_tokens), 0) AS cachedTokens
+      FROM requests
+      WHERE ${whereClause}
+      GROUP BY hour
+      ORDER BY hour ASC
+    `).all(...params) as Array<{
+      hour: string;
+      requests: number;
+      successful: number;
+      failed: number;
+      inputTokens: number;
+      outputTokens: number;
+      totalTokens: number;
+      cachedTokens: number;
+    }>;
+    
+    byHour = {};
+    for (const row of byHourRows) {
+      byHour[row.hour] = {
+        requests: row.requests,
+        successful: row.successful,
+        failed: row.failed,
+        inputTokens: row.inputTokens,
+        outputTokens: row.outputTokens,
+        totalTokens: row.totalTokens,
+        cachedTokens: row.cachedTokens,
+      };
+    }
+  }
+  
+  // 按日期分布（用于周/月视图）
+  let byDate: Record<string, ModelStats> | undefined;
+  if (options.week || options.month) {
+    const byDateRows = db.prepare(`
+      SELECT
+        strftime('%Y-%m-%d', timestamp) AS date,
+        COUNT(*) AS requests,
+        COALESCE(SUM(CASE WHEN status_code >= 200 AND status_code < 300 THEN 1 ELSE 0 END), 0) AS successful,
+        COALESCE(SUM(CASE WHEN status_code >= 400 THEN 1 ELSE 0 END), 0) AS failed,
+        COALESCE(SUM(prompt_tokens), 0) AS inputTokens,
+        COALESCE(SUM(completion_tokens), 0) AS outputTokens,
+        COALESCE(SUM(total_tokens), 0) AS totalTokens,
+        COALESCE(SUM(cached_tokens), 0) AS cachedTokens
+      FROM requests
+      WHERE ${whereClause}
+      GROUP BY date
+      ORDER BY date ASC
+    `).all(...params) as Array<{
+      date: string;
+      requests: number;
+      successful: number;
+      failed: number;
+      inputTokens: number;
+      outputTokens: number;
+      totalTokens: number;
+      cachedTokens: number;
+    }>;
+    
+    byDate = {};
+    for (const row of byDateRows) {
+      byDate[row.date] = {
+        requests: row.requests,
+        successful: row.successful,
+        failed: row.failed,
+        inputTokens: row.inputTokens,
+        outputTokens: row.outputTokens,
+        totalTokens: row.totalTokens,
+        cachedTokens: row.cachedTokens,
+      };
+    }
+  }
+  
+  return {
+    totalRequests: overview.totalRequests,
+    successfulRequests: overview.successfulRequests,
+    failedRequests: overview.failedRequests,
+    byModel,
+    byProvider,
+    totalInputTokens: overview.totalInputTokens,
+    totalOutputTokens: overview.totalOutputTokens,
+    totalTokens: overview.totalTokens,
+    totalCachedTokens: overview.totalCachedTokens,
+    byHour,
+    byDate,
+  };
+}
+
 function main() {
   const program = new Command();
 
@@ -131,45 +456,19 @@ function main() {
     .option('--week <week>', '指定周 (YYYY-Www，如 2026-W13)')
     .option('--month <month>', '指定月份 (YYYY-MM，如 2026-03)')
     .option('--by-hour', '按小时分布统计')
-    .option('--by-model', '按模型细分显示（默认开启）')
     .option('--json', '输出 JSON 格式')
     .action((options: CliStatsOptions) => {
       try {
-        const logDir = resolveLogDir(options);
+        const configDir = resolveConfigDir(options);
         
-        // 构建核心库的选项
-        const coreOptions: StatsOptions = {};
-        if (options.date) coreOptions.date = options.date;
-        if (options.week) coreOptions.week = options.week;
-        if (options.month) coreOptions.month = options.month;
-        if (options.byHour) coreOptions.byHour = true;
-        
-        // 获取日志文件列表
-        const logFiles = getLogFilesForRange(logDir, coreOptions);
-        
-        if (logFiles.length === 0) {
-          const dateRange = formatDateRange(coreOptions);
-          console.log(`📁 日志目录：${logDir}`);
-          console.log(`❌ ${dateRange} 暂无日志文件`);
-          return;
-        }
+        // 从数据库获取统计数据
+        const stats = getStatsFromDatabase(configDir, options);
 
-        // 解析所有日志文件
-        let entries: any[] = [];
-        for (const file of logFiles) {
-          entries = entries.concat(parseLogFile(file));
-        }
-
-        if (entries.length === 0) {
-          const dateRange = formatDateRange(coreOptions);
-          console.log(`📁 日志目录：${logDir}`);
-          console.log(`📄 日志文件：${logFiles.length} 个`);
+        if (stats.totalRequests === 0) {
+          const dateRange = formatDateRange(options);
           console.log(`❌ ${dateRange} 暂无请求记录`);
           return;
         }
-
-        // 计算统计
-        const stats = loadStats(logDir, coreOptions);
 
         if (options.json) {
           console.log(JSON.stringify(stats, null, 2));
