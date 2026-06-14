@@ -27,8 +27,8 @@ const mockProps: StatsViewProps = {
     { hour: '2026-06-14 04:00', requests: 1, successful: 1, failed: 0, inputTokens: 150, outputTokens: 60, totalTokens: 210 },
   ],
   recentRequests: [
-    { id: 5, requestId: 'req-5', timestamp: '2026-06-14T04:00:00.000Z', customModel: 'claude-3', realModel: 'claude-3-opus', provider: 'anthropic', statusCode: 200, durationMs: 1000, promptTokens: 150, completionTokens: 60, totalTokens: 210, cachedTokens: 0, isStreaming: 1, errorMessage: null },
-    { id: 4, requestId: 'req-4', timestamp: '2026-06-14T03:30:00.000Z', customModel: 'gpt-4', realModel: 'gpt-4-0613', provider: 'openai', statusCode: 400, durationMs: 500, promptTokens: 50, completionTokens: 0, totalTokens: 50, cachedTokens: 20, isStreaming: 0, errorMessage: 'Rate limit exceeded' },
+    { id: 5, requestId: 'req-5', timestamp: '2026-06-14T04:00:00.000Z', userName: 'test-user', customModel: 'claude-3', modelGroup: null, realModel: 'claude-3-opus', provider: 'anthropic', statusCode: 200, durationMs: 1000, promptTokens: 150, completionTokens: 60, totalTokens: 210, cachedTokens: 0, isStreaming: 1, errorMessage: null },
+    { id: 4, requestId: 'req-4', timestamp: '2026-06-14T03:30:00.000Z', userName: 'test-user', customModel: 'gpt-4', modelGroup: 'openai-group', realModel: 'gpt-4-0613', provider: 'openai', statusCode: 400, durationMs: 500, promptTokens: 50, completionTokens: 0, totalTokens: 50, cachedTokens: 20, isStreaming: 0, errorMessage: 'Rate limit exceeded' },
   ],
   userName: 'test-user',
   startDate: '2026-06-14',
@@ -36,6 +36,7 @@ const mockProps: StatsViewProps = {
   page: 1,
   totalPages: 1,
   tzOffset: -480, // UTC+8
+  selectedModel: '',
 };
 
 function renderHtml(): string {
@@ -129,19 +130,19 @@ describe('StatsView - 表格列', () => {
     const doc = dom.window.document;
 
     const rows = doc.querySelectorAll('table tbody tr');
+    // 列顺序：时间=0, 用户=1, 模型=2, 模型组=3, 状态码=4, 耗时=5, 输入Token=6, 输出Token=7
     // 第一行：prompt=150, cache=0 → "150"（cache=0 只显示总输入）
-    // 第二行：prompt=50, cache=20 → "20+50"
+    // 第二行：prompt=50, cache=20 → "20/50 (40%)"
     const firstRowCells = rows[0]?.querySelectorAll('td');
     expect(firstRowCells).toBeDefined();
-    // 输入Token 在第 6 个 td（0-indexed: #=0, 时间=1, 模型=2, 状态码=3, 耗时=4, 输入Token=5, 输出Token=6）
     if (firstRowCells) {
-      expect(firstRowCells[5].textContent).toBe('150');
-      expect(firstRowCells[6].textContent).toBe('60');
+      expect(firstRowCells[6].textContent).toBe('150');
+      expect(firstRowCells[7].textContent).toBe('60');
     }
     const secondRowCells = rows[1]?.querySelectorAll('td');
     if (secondRowCells) {
-      expect(secondRowCells[5].textContent).toBe('20/50');
-      expect(secondRowCells[6].textContent).toBe('0');
+      expect(secondRowCells[6].textContent).toBe('20/50 (40.00%)');
+      expect(secondRowCells[7].textContent).toBe('0');
     }
   });
 });
@@ -162,7 +163,7 @@ describe('StatsView - 执行客户端 JS 后的行为', () => {
     // 验证 UTC 时间已转为本地时间（UTC+8 时，04:00 UTC = 12:00 本地）
     const cells = doc.querySelectorAll('[data-utc]');
     expect(cells.length).toBeGreaterThanOrEqual(2);
-    // 第一个 data-utc 的文本应为本地时间格式
-    expect(cells[0].textContent).toBe('2026-06-14 12:00:00');
+    // 第一个 data-utc 的文本应为本地时间格式（不含年份）
+    expect(cells[0].textContent).toBe('06-14 12:00:00');
   });
 });

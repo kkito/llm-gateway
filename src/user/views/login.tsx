@@ -18,7 +18,7 @@ function escapeHtml(str: string): string {
 
 export function LoginView(props: LoginViewProps) {
   const escapedError = props.error ? escapeHtml(props.error) : '';
-  
+
   return html`
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -99,7 +99,7 @@ export function LoginView(props: LoginViewProps) {
 <body>
   <div class="container">
     <h1>用户登录</h1>
-    ${escapedError ? `<div class="error">${escapedError}</div>` : ''}
+    ${escapedError ? html`<div class="error">${escapedError}</div>` : ''}
     <form method="POST" action="/user/login">
       <div class="form-group">
         <label for="apikey">API Key</label>

@@ -9,6 +9,7 @@ export interface OverviewStats {
   totalTokens: number;
   totalInputTokens: number;
   totalOutputTokens: number;
+  totalCachedTokens: number;
   avgDuration: number;
 }
 
@@ -37,7 +38,9 @@ export interface RecentRequestEntry {
   id: number;
   requestId: string;
   timestamp: string;
+  userName: string | null;
   customModel: string;
+  modelGroup: string | null;
   realModel: string | null;
   provider: string | null;
   statusCode: number;
@@ -61,12 +64,14 @@ export interface StatsViewProps {
   page: number;
   totalPages: number;
   tzOffset: number;
+  selectedModel: string;
 }
 
 export function formatTokenCacheSum(prompt: number | null | undefined, cache: number | null | undefined): string {
   if (prompt === null || prompt === undefined) return '—';
   if (!cache) return formatNumber(prompt);
-  return formatNumber(cache) + '/' + formatNumber(prompt);
+  const pct = prompt > 0 ? ((cache / prompt) * 100).toFixed(2) : '0';
+  return `${formatNumber(cache)}/${formatNumber(prompt)} (${pct}%)`;
 }
 
 const styles = `
@@ -313,6 +318,35 @@ const styles = `
   color: var(--text-primary);
 }
 
+/* ───── 模型筛选栏 ───── */
+.model-filter-bar {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.model-filter-btn {
+  padding: 0.4rem 0.9rem;
+  background: var(--bg-page);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: all 0.2s;
+}
+.model-filter-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: #eef2ff;
+}
+.model-filter-btn.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
 /* ───── 模型小卡片 ───── */
 .model-cards {
   display: grid;
@@ -483,7 +517,7 @@ const styles = `
 // ---- 组件 ----
 
 export const StatsView: FC<StatsViewProps> = (props) => {
-  const { overview, byModel, byHour, recentRequests, userName, startDate, endDate, totalPages, tzOffset } = props;
+  const { overview, byModel, byHour, recentRequests, userName, startDate, endDate, totalPages, tzOffset, selectedModel } = props;
   const currentPage = props.page;
 
   // 用 byModel 数据计算成功/失败
@@ -495,7 +529,8 @@ export const StatsView: FC<StatsViewProps> = (props) => {
   const maxHourRequests = byHour.length > 0 ? Math.max(...byHour.map((h) => h.requests)) : 1;
 
   // 分页链接
-  const baseLink = `/user/stats?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`;
+  const modelParam = selectedModel ? `&model=${encodeURIComponent(selectedModel)}` : '';
+  const baseLink = `/user/stats?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}${modelParam}`;
 
   // 快捷链接
   const today = new Date();
@@ -585,12 +620,12 @@ export const StatsView: FC<StatsViewProps> = (props) => {
                 <div class="token-item-label">输入</div>
               </div>
               <div>
-                <div class="token-item-value">{formatNumber(overview.totalOutputTokens)}</div>
-                <div class="token-item-label">输出</div>
+                <div class="token-item-value">{formatNumber(overview.totalCachedTokens)}</div>
+                <div class="token-item-label">输入缓存{overview.totalInputTokens > 0 && <span class="cache-pct"> ({(overview.totalCachedTokens / overview.totalInputTokens * 100).toFixed(2)}%)</span>}</div>
               </div>
               <div>
-                <div class="token-item-value">{formatNumber(overview.totalTokens)}</div>
-                <div class="token-item-label">总计</div>
+                <div class="token-item-value">{formatNumber(overview.totalOutputTokens)}</div>
+                <div class="token-item-label">输出</div>
               </div>
             </div>
           </div>
@@ -601,22 +636,30 @@ export const StatsView: FC<StatsViewProps> = (props) => {
             {byModel.length === 0 ? (
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>暂无数据</p>
             ) : (
-              <div class="model-cards">
-                {byModel.map((m) => (
-                  <div class="model-card">
-                    <div class="model-card-name">{m.model}</div>
-                    <div class="model-card-requests">{formatNumber(m.requests)}</div>
-                    <div class="model-card-meta">
-                      <span class="model-card-success">✓ {formatNumber(m.successful)}</span>
-                      <span class="model-card-failed">✗ {formatNumber(m.failed)}</span>
+              <>
+                <div class="model-filter-bar">
+                  <a href={`/user/stats?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`} class={`model-filter-btn${selectedModel ? '' : ' active'}`}>全部</a>
+                  {byModel.map((m) => (
+                    <a href={`/user/stats?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}&model=${encodeURIComponent(m.model)}`} class={`model-filter-btn${selectedModel === m.model ? ' active' : ''}`}>{m.model}</a>
+                  ))}
+                </div>
+                <div class="model-cards">
+                  {byModel.map((m) => (
+                    <div class="model-card">
+                      <div class="model-card-name">{m.model}</div>
+                      <div class="model-card-requests">{formatNumber(m.requests)}</div>
+                      <div class="model-card-meta">
+                        <span class="model-card-success">✓ {formatNumber(m.successful)}</span>
+                        <span class="model-card-failed">✗ {formatNumber(m.failed)}</span>
+                      </div>
+                      <div class="model-card-meta">
+                        <span class="model-card-tokens">Token: {formatNumber(m.totalTokens)}</span>
+                        <span class="model-card-tokens">{formatDuration(m.avgDuration)}</span>
+                      </div>
                     </div>
-                    <div class="model-card-meta">
-                      <span class="model-card-tokens">Token: {formatNumber(m.totalTokens)}</span>
-                      <span class="model-card-tokens">{formatDuration(m.avgDuration)}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              </>
             )}
           </div>
 
@@ -673,9 +716,10 @@ export const StatsView: FC<StatsViewProps> = (props) => {
                   <table class="stats-table">
                     <thead>
                       <tr>
-                        <th>#</th>
                         <th>时间</th>
+                        <th>用户</th>
                         <th>模型</th>
+                        <th>模型组</th>
                         <th>状态码</th>
                         <th>耗时</th>
                         <th>输入Token(缓存/总输入)</th>
@@ -686,9 +730,10 @@ export const StatsView: FC<StatsViewProps> = (props) => {
                     <tbody>
                       {recentRequests.map((r) => (
                         <tr>
-                          <td style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{r.id}</td>
                           <td style={{ whiteSpace: 'nowrap', fontSize: '0.8rem' }} data-utc={r.timestamp}>{r.timestamp}</td>
+                          <td style={{ fontSize: '0.8rem' }}>{r.userName || '—'}</td>
                           <td style={{ fontWeight: 500 }}>{r.customModel}</td>
+                          <td style={{ fontSize: '0.8rem' }}>{r.modelGroup || '—'}</td>
                           <td>
                             <span class={r.statusCode >= 200 && r.statusCode < 300 ? 'status-success' : 'status-fail'}>
                               {r.statusCode}
@@ -750,7 +795,7 @@ export const StatsView: FC<StatsViewProps> = (props) => {
     var d = new Date(utc);
     if (isNaN(d.getTime())) return;
     var pad = function(n) { return String(n).padStart(2, '0'); };
-    el.textContent = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+    el.textContent = pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
   });
 
   // ─── 3. Re-aggregate hour distribution by local hour ───

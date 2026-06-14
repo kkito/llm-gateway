@@ -39,6 +39,7 @@ export function createStatsRoute(configPath?: string) {
 
     const startDate = c.req.query('startDate') || localToday;
     const endDate = c.req.query('endDate') || startDate;
+    const selectedModel = c.req.query('model') || '';
     // 如果客户端没传 tzOffset，用服务端时区
     const tzOffset = c.req.query('tzOffset') !== undefined
       ? parseInt(c.req.query('tzOffset')!, 10)
@@ -50,6 +51,12 @@ export function createStatsRoute(configPath?: string) {
     const limit = 20;
     const offset = (page - 1) * limit;
 
+    // 构建可选的 model 过滤条件
+    const modelCondition = selectedModel ? 'AND custom_model = ?' : '';
+    const baseParams = selectedModel
+      ? [userName, utcStart, utcEnd, selectedModel]
+      : [userName, utcStart, utcEnd];
+
     // 1. 概览聚合
     const overview = db.prepare(`
       SELECT
@@ -57,15 +64,18 @@ export function createStatsRoute(configPath?: string) {
         COALESCE(SUM(total_tokens), 0) AS totalTokens,
         COALESCE(SUM(prompt_tokens), 0) AS totalInputTokens,
         COALESCE(SUM(completion_tokens), 0) AS totalOutputTokens,
+        COALESCE(SUM(cached_tokens), 0) AS totalCachedTokens,
         COALESCE(AVG(duration_ms), 0) AS avgDuration
       FROM requests
       WHERE user_name = ?
         AND timestamp >= ? AND timestamp <= ?
-    `).get(userName, utcStart, utcEnd) as {
+        ${modelCondition}
+    `).get(...baseParams) as {
       totalRequests: number;
       totalTokens: number;
       totalInputTokens: number;
       totalOutputTokens: number;
+      totalCachedTokens: number;
       avgDuration: number;
     };
 
@@ -83,9 +93,10 @@ export function createStatsRoute(configPath?: string) {
       FROM requests
       WHERE user_name = ?
         AND timestamp >= ? AND timestamp <= ?
+        ${modelCondition}
       GROUP BY custom_model
       ORDER BY requests DESC
-    `).all(userName, utcStart, utcEnd) as Array<{
+    `).all(...baseParams) as Array<{
       model: string;
       requests: number;
       successful: number;
@@ -109,9 +120,10 @@ export function createStatsRoute(configPath?: string) {
       FROM requests
       WHERE user_name = ?
         AND timestamp >= ? AND timestamp <= ?
+        ${modelCondition}
       GROUP BY hour
       ORDER BY hour ASC
-    `).all(userName, utcStart, utcEnd) as Array<{
+    `).all(...baseParams) as Array<{
       hour: string;
       requests: number;
       successful: number;
@@ -127,7 +139,9 @@ export function createStatsRoute(configPath?: string) {
         id,
         request_id AS requestId,
         timestamp,
+        user_name AS userName,
         custom_model AS customModel,
+        model_group AS modelGroup,
         real_model AS realModel,
         provider,
         status_code AS statusCode,
@@ -141,13 +155,16 @@ export function createStatsRoute(configPath?: string) {
       FROM requests
       WHERE user_name = ?
         AND timestamp >= ? AND timestamp <= ?
+        ${modelCondition}
       ORDER BY timestamp DESC
       LIMIT ? OFFSET ?
-    `).all(userName, utcStart, utcEnd, limit, offset) as Array<{
+    `).all(...baseParams, limit, offset) as Array<{
       id: number;
       requestId: string;
       timestamp: string;
+      userName: string | null;
       customModel: string;
+      modelGroup: string | null;
       realModel: string | null;
       provider: string | null;
       statusCode: number;
@@ -166,7 +183,8 @@ export function createStatsRoute(configPath?: string) {
       FROM requests
       WHERE user_name = ?
         AND timestamp >= ? AND timestamp <= ?
-    `).get(userName, utcStart, utcEnd) as { total: number };
+        ${modelCondition}
+    `).get(...baseParams) as { total: number };
 
     const totalPages = Math.max(1, Math.ceil(totalRow.total / limit));
 
@@ -185,6 +203,7 @@ export function createStatsRoute(configPath?: string) {
       page={page}
       totalPages={totalPages}
       tzOffset={tzOffset}
+      selectedModel={selectedModel}
     />);
   });
 

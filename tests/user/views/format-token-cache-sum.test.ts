@@ -18,8 +18,8 @@ describe('formatTokenCacheSum', () => {
     expect(formatTokenCacheSum(100, null)).toBe('100');
   });
 
-  it('prompt=69100, cache=2100 → "2.1K/69.1K"', () => {
-    expect(formatTokenCacheSum(69100, 2100)).toBe('2.1K/69.1K');
+  it('prompt=69100, cache=2100 → "2.1K/69.1K (3.04%)"', () => {
+    expect(formatTokenCacheSum(69100, 2100)).toBe('2.1K/69.1K (3.04%)');
   });
 
   it('prompt=1500, cache=0 → "1.5K"', () => {
