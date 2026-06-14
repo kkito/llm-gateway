@@ -35,7 +35,8 @@ const mockProps: StatsViewProps = {
   endDate: '2026-06-14',
   page: 1,
   totalPages: 1,
-  tzOffset: -480, // UTC+8
+  tzOffset: -480, // 保留兼容
+  timezone: 'Asia/Shanghai',
   selectedModel: '',
 };
 
@@ -150,7 +151,10 @@ describe('StatsView - 表格列', () => {
 describe('StatsView - 执行客户端 JS 后的行为', () => {
   it('执行 script 后 UTC 时间戳应转为本地时间', () => {
     const html = renderHtml();
-    const dom = new JSDOM(html, { runScripts: 'dangerously' });
+    const dom = new JSDOM(html, {
+      runScripts: 'dangerously',
+      url: 'http://localhost/user/stats?timezone=Asia/Shanghai',
+    });
     const doc = dom.window.document;
 
     // 执行内联 script

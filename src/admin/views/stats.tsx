@@ -68,26 +68,22 @@ interface Props {
   startDate?: string;
   endDate?: string;
   tzOffset?: number;
+  timezone?: string;
 }
 
-function buildBaseUrl(startDate: string, endDate: string, tzOffset: number, selectedUser: string, selectedModel: string): string {
-  let url = `/admin/stats?startDate=${startDate}&endDate=${endDate}&tzOffset=${tzOffset}`;
+function buildBaseUrl(startDate: string, endDate: string, timezone: string, selectedUser: string, selectedModel: string): string {
+  let url = `/admin/stats?startDate=${startDate}&endDate=${endDate}&timezone=${encodeURIComponent(timezone)}`;
   if (selectedUser) url += `&userName=${selectedUser}`;
   if (selectedModel) url += `&model=${selectedModel}`;
   return url;
 }
-
-const now = new Date();
-const localToday = now.getFullYear() + '-' +
-  String(now.getMonth() + 1).padStart(2, '0') + '-' +
-  String(now.getDate()).padStart(2, '0');
 
 export const StatsPage: FC<Props> = (props) => {
   const {
     stats, dateRange, currentType, currentValue,
     recentRequests = [], page = 1, totalPages = 1, totalItems = 0,
     userNames = [], modelNames = [], selectedUser = '', selectedModel = '',
-    startDate = '', endDate = '', tzOffset = 0,
+    startDate = '', endDate = '', tzOffset = 0, timezone = 'UTC',
   } = props;
 
   const successRate = stats.totalRequests > 0
@@ -754,23 +750,15 @@ export const StatsPage: FC<Props> = (props) => {
                   <label for="end">结束日期</label>
                   <input type="date" id="end" name="endDate" value={endDate} />
                 </div>
-                <input type="hidden" name="tzOffset" value={String(tzOffset)} />
+                <input type="hidden" name="timezone" value={timezone} />
                 {selectedUser && <input type="hidden" name="userName" value={selectedUser} />}
                 {selectedModel && <input type="hidden" name="model" value={selectedModel} />}
                 <button type="submit" class="filter-submit">查询</button>
               </form>
-              <div class="filter-shortcuts">
-                <a href={buildBaseUrl(localToday, localToday, tzOffset, selectedUser, selectedModel)}>今天</a>
-                {(() => {
-                  const d = new Date(); d.setDate(d.getDate() - 7);
-                  const s = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
-                  return <a href={buildBaseUrl(s, localToday, tzOffset, selectedUser, selectedModel)}>最近 7 天</a>;
-                })()}
-                {(() => {
-                  const d = new Date(); d.setDate(d.getDate() - 30);
-                  const s = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
-                  return <a href={buildBaseUrl(s, localToday, tzOffset, selectedUser, selectedModel)}>最近 30 天</a>;
-                })()}
+              <div class="filter-shortcuts" id="filter-shortcuts">
+                <a href="#" data-range="today" onclick="return setDateRange('today')">今天</a>
+                <a href="#" data-range="7days" onclick="return setDateRange('7days')">最近 7 天</a>
+                <a href="#" data-range="30days" onclick="return setDateRange('30days')">最近 30 天</a>
               </div>
               <div class="filter-current">
                 📅 当前范围：{startDate} ~ {endDate}
@@ -781,9 +769,9 @@ export const StatsPage: FC<Props> = (props) => {
             {/* 用户筛选按钮 */}
             {userNames.length > 0 && (
               <div class="model-filter-bar">
-                <a href={`${buildBaseUrl(startDate, endDate, tzOffset, '', selectedModel)}`} class={`model-filter-btn ${!selectedUser ? 'active' : ''}`}>全部用户</a>
+                <a href={`${buildBaseUrl(startDate, endDate, timezone, '', selectedModel)}`} class={`model-filter-btn ${!selectedUser ? 'active' : ''}`}>全部用户</a>
                 {userNames.map(u => (
-                  <a href={`${buildBaseUrl(startDate, endDate, tzOffset, u, selectedModel)}`} class={`model-filter-btn ${u === selectedUser ? 'active' : ''}`}>{u}</a>
+                  <a href={`${buildBaseUrl(startDate, endDate, timezone, u, selectedModel)}`} class={`model-filter-btn ${u === selectedUser ? 'active' : ''}`}>{u}</a>
                 ))}
               </div>
             )}
@@ -791,9 +779,9 @@ export const StatsPage: FC<Props> = (props) => {
             {/* 模型筛选按钮 */}
             {modelNames.length > 0 && (
               <div class="model-filter-bar">
-                <a href={`${buildBaseUrl(startDate, endDate, tzOffset, selectedUser, '')}`} class={`model-filter-btn ${!selectedModel ? 'active' : ''}`}>全部模型</a>
+                <a href={`${buildBaseUrl(startDate, endDate, timezone, selectedUser, '')}`} class={`model-filter-btn ${!selectedModel ? 'active' : ''}`}>全部模型</a>
                 {modelNames.map(m => (
-                  <a href={`${buildBaseUrl(startDate, endDate, tzOffset, selectedUser, m)}`} class={`model-filter-btn ${m === selectedModel ? 'active' : ''}`}>{m}</a>
+                  <a href={`${buildBaseUrl(startDate, endDate, timezone, selectedUser, m)}`} class={`model-filter-btn ${m === selectedModel ? 'active' : ''}`}>{m}</a>
                 ))}
               </div>
             )}
@@ -921,39 +909,44 @@ export const StatsPage: FC<Props> = (props) => {
           {sortedHours.length > 0 && (
             <div class="stats-section-card">
               <h2 class="stats-section-title">🕐 按小时分布</h2>
-              {sortedHours.map(([hour, hourStats]) => {
-                const barWidth = maxHourRequests > 0 ? (hourStats.requests / maxHourRequests) * 100 : 0;
-                return (
-                  <div class="hour-item">
-                    <div class="hour-label">{hour}</div>
-                    <div class="hour-bar-bg">
-                      <div
-                        class="hour-bar-fill"
-                        style={{
-                          width: `${barWidth}%`,
-                          background: barWidth > 70
-                            ? 'linear-gradient(90deg, #fb923c, #f97316)'
-                            : barWidth > 40
-                              ? 'var(--green-gradient)'
-                              : 'var(--blue-gradient)'
-                        }}
-                      />
-                      <span
-                        class="hour-bar-value"
-                        style={{
-                          color: barWidth > 50 ? '#fff' : 'var(--text-primary)',
-                          textShadow: barWidth > 50 ? '0 1px 2px rgba(0,0,0,0.15)' : 'none'
-                        }}
-                      >
-                        {hourStats.requests} 次
-                      </span>
+              <div id="hour-distribution-container">
+                {sortedHours.map(([hour, hourStats]) => {
+                  // hour 来自 SQL strftime('%Y-%m-%d %H:00', timestamp) — UTC 时间
+                  // 补上 ":00.000Z" 转为 ISO 字符串，供客户端 JS 转本地
+                  const utcHourStr = hour.replace(' ', 'T') + ':00.000Z';
+                  const barWidth = maxHourRequests > 0 ? (hourStats.requests / maxHourRequests) * 100 : 0;
+                  return (
+                    <div class="hour-item" data-hour-utc={utcHourStr} data-requests={hourStats.requests} data-tokens={hourStats.totalTokens}>
+                      <div class="hour-label">{hour}</div>
+                      <div class="hour-bar-bg">
+                        <div
+                          class="hour-bar-fill"
+                          style={{
+                            width: `${barWidth}%`,
+                            background: barWidth > 70
+                              ? 'linear-gradient(90deg, #fb923c, #f97316)'
+                              : barWidth > 40
+                                ? 'var(--green-gradient)'
+                                : 'var(--blue-gradient)'
+                          }}
+                        />
+                        <span
+                          class="hour-bar-value"
+                          style={{
+                            color: barWidth > 50 ? '#fff' : 'var(--text-primary)',
+                            textShadow: barWidth > 50 ? '0 1px 2px rgba(0,0,0,0.15)' : 'none'
+                          }}
+                        >
+                          {hourStats.requests} 次
+                        </span>
+                      </div>
+                      <div class="hour-meta">
+                        输入: {formatNumber(hourStats.inputTokens)} | 输出: {formatNumber(hourStats.outputTokens)} | 缓存: {hourStats.inputTokens > 0 ? (hourStats.cachedTokens / hourStats.inputTokens * 100).toFixed(1) : '0'}%
+                      </div>
                     </div>
-                    <div class="hour-meta">
-                      输入: {formatNumber(hourStats.inputTokens)} | 输出: {formatNumber(hourStats.outputTokens)} | 缓存: {hourStats.inputTokens > 0 ? (hourStats.cachedTokens / hourStats.inputTokens * 100).toFixed(1) : '0'}%
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           )}
 
@@ -997,13 +990,13 @@ export const StatsPage: FC<Props> = (props) => {
               {totalPages > 1 && (
                 <div class="pagination">
                   {page > 1 && (
-                    <a href={`?startDate=${startDate}&endDate=${endDate}&tzOffset=${tzOffset}${selectedUser ? '&userName=' + selectedUser : ''}${selectedModel ? '&model=' + selectedModel : ''}&page=${page - 1}`}>上一页</a>
+                    <a href={`?startDate=${startDate}&endDate=${endDate}&timezone=${encodeURIComponent(timezone)}${selectedUser ? '&userName=' + selectedUser : ''}${selectedModel ? '&model=' + selectedModel : ''}&page=${page - 1}`}>上一页</a>
                   )}
                   {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
                     const p = i + 1;
                     return (
                       <a
-                        href={`?startDate=${startDate}&endDate=${endDate}&tzOffset=${tzOffset}${selectedUser ? '&userName=' + selectedUser : ''}${selectedModel ? '&model=' + selectedModel : ''}&page=${p}`}
+                        href={`?startDate=${startDate}&endDate=${endDate}&timezone=${encodeURIComponent(timezone)}${selectedUser ? '&userName=' + selectedUser : ''}${selectedModel ? '&model=' + selectedModel : ''}&page=${p}`}
                         class={p === page ? 'active' : ''}
                       >
                         {p}
@@ -1011,7 +1004,7 @@ export const StatsPage: FC<Props> = (props) => {
                     );
                   })}
                   {page < totalPages && (
-                    <a href={`?startDate=${startDate}&endDate=${endDate}&tzOffset=${tzOffset}${selectedUser ? '&userName=' + selectedUser : ''}${selectedModel ? '&model=' + selectedModel : ''}&page=${page + 1}`}>下一页</a>
+                    <a href={`?startDate=${startDate}&endDate=${endDate}&timezone=${encodeURIComponent(timezone)}${selectedUser ? '&userName=' + selectedUser : ''}${selectedModel ? '&model=' + selectedModel : ''}&page=${page + 1}`}>下一页</a>
                   )}
                 </div>
               )}
@@ -1022,6 +1015,104 @@ export const StatsPage: FC<Props> = (props) => {
           <div class="refresh-wrapper">
             <a href="/admin/stats" class="refresh-btn" onclick="location.reload()">🔄 刷新数据</a>
           </div>
+          <script dangerouslySetInnerHTML={{ __html: `
+(function() {
+  var browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+  // ─── 0. 首次访问：没有 timezone 参数时自动 redirect 补上 ───
+  var url = new URL(window.location.href);
+  if (!url.searchParams.has('timezone')) {
+    url.searchParams.set('timezone', browserTimezone);
+    window.location.replace(url.toString());
+    return;
+  }
+
+  // ─── 1. 表单提交：注入当前时区 ───
+  var form = document.getElementById('stats-filter-form');
+  if (form) {
+    var tzInput = form.querySelector('input[name="timezone"]');
+    if (!tzInput) {
+      tzInput = document.createElement('input');
+      tzInput.type = 'hidden';
+      tzInput.name = 'timezone';
+      form.appendChild(tzInput);
+    }
+    form.addEventListener('submit', function() {
+      tzInput.value = browserTimezone;
+    });
+  }
+
+  // ─── 2. 快捷日期链接：客户端生成 ───
+  var pad = function(n) { return String(n).padStart(2, '0'); };
+  function localDateStr(d) {
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  }
+  function buildDateRangeUrl(rangeType) {
+    var today = localDateStr(new Date());
+    var baseUrl = new URL(window.location.href);
+    baseUrl.searchParams.set('startDate', today);
+    baseUrl.searchParams.set('endDate', today);
+    if (rangeType === '7days') {
+      var d = new Date(); d.setDate(d.getDate() - 7);
+      baseUrl.searchParams.set('startDate', localDateStr(d));
+    } else if (rangeType === '30days') {
+      var d = new Date(); d.setDate(d.getDate() - 30);
+      baseUrl.searchParams.set('startDate', localDateStr(d));
+    }
+    baseUrl.searchParams.set('timezone', browserTimezone);
+    baseUrl.searchParams.delete('page');
+    return baseUrl.toString();
+  }
+  window.setDateRange = function(rangeType) {
+    window.location.href = buildDateRangeUrl(rangeType);
+    return false;
+  };
+
+  // ─── 3. 将按小时分布的 UTC 时间重新聚合为本地时间 ───
+  var hourBars = document.querySelectorAll('[data-hour-utc]');
+  if (hourBars.length > 0) {
+    var localBuckets = {};
+    hourBars.forEach(function(el) {
+      var utc = el.getAttribute('data-hour-utc');
+      var requests = parseInt(el.getAttribute('data-requests') || '0', 10);
+      var tokens = parseInt(el.getAttribute('data-tokens') || '0', 10);
+      if (!utc) return;
+      var d = new Date(utc);
+      if (isNaN(d.getTime())) return;
+      var localKey = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':00';
+      if (!localBuckets[localKey]) localBuckets[localKey] = { requests: 0, tokens: 0 };
+      localBuckets[localKey].requests += requests;
+      localBuckets[localKey].tokens += tokens;
+    });
+    var container = document.getElementById('hour-distribution-container');
+    if (container) {
+      var sortedKeys = Object.keys(localBuckets).sort();
+      var maxLocal = sortedKeys.length > 0 ? Math.max.apply(null, sortedKeys.map(function(k) { return localBuckets[k].requests; })) : 1;
+      var html = '';
+      sortedKeys.forEach(function(key) {
+        var bucket = localBuckets[key];
+        var pct = (bucket.requests / maxLocal) * 100;
+        var barColor = pct > 70
+          ? 'linear-gradient(90deg, #f59e0b, #d97706)'
+          : pct > 40
+            ? 'linear-gradient(135deg, #10b981, #059669)'
+            : 'linear-gradient(135deg, #3b82f6, #2563eb)';
+        var textColor = pct > 50 ? '#fff' : '#1f2937';
+        var textShadow = pct > 50 ? '0 1px 2px rgba(0,0,0,0.15)' : 'none';
+        html += '<div class="hour-item">' +
+          '<div class="hour-label">' + key + '</div>' +
+          '<div class="hour-bar-bg">' +
+            '<div class="hour-bar-fill" style="width:' + pct + '%;background:' + barColor + '"></div>' +
+            '<span class="hour-bar-value" style="color:' + textColor + ';text-shadow:' + textShadow + '">' + bucket.requests + ' 次</span>' +
+          '</div>' +
+          '<div class="hour-meta">' + bucket.tokens + ' Token</div>' +
+        '</div>';
+      });
+      container.innerHTML = html;
+    }
+  }
+})();
+` }}></script>
           </div>
         </TopbarNav>
       </body>

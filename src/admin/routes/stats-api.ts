@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { DatabaseManager } from '../../lib/db.js';
-import { localDateToUtcRange } from '../../lib/time-utils.js';
+import { localDateToUtcRangeTz, getLocalToday } from '../../lib/time-utils.js';
 
 /**
  * 重置 StatsProvider 实例（保留导出以兼容调用方）
@@ -31,21 +31,16 @@ export function createStatsApiRoute() {
       }
       const db = dbManager.getDb();
 
-      const now = new Date();
-      const localToday = now.getFullYear() + '-' +
-        String(now.getMonth() + 1).padStart(2, '0') + '-' +
-        String(now.getDate()).padStart(2, '0');
+      const timezone = c.req.query('timezone') || 'UTC';
+      const localToday = getLocalToday(timezone);
 
       const startDate = c.req.query('startDate') || localToday;
       const endDate = c.req.query('endDate') || startDate;
       const selectedUser = c.req.query('userName') || '';
       const selectedModel = c.req.query('model') || '';
-      const tzOffset = c.req.query('tzOffset') !== undefined
-        ? parseInt(c.req.query('tzOffset')!, 10)
-        : new Date().getTimezoneOffset();
 
-      const [utcStart] = localDateToUtcRange(startDate, tzOffset);
-      const [, utcEnd] = localDateToUtcRange(endDate, tzOffset);
+      const [utcStart] = localDateToUtcRangeTz(startDate, timezone);
+      const [, utcEnd] = localDateToUtcRangeTz(endDate, timezone);
 
       const conditions: string[] = ['timestamp >= ?', 'timestamp <= ?'];
       const params: any[] = [utcStart, utcEnd];

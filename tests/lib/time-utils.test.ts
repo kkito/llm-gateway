@@ -2,7 +2,7 @@
  * @vitest-environment node
  */
 import { describe, it, expect } from 'vitest';
-import { utcToLocalString, getLocalHour, localDateToUtcRange } from '../../src/lib/time-utils.js';
+import { utcToLocalString, getLocalHour, localDateToUtcRange, getLocalToday, isValidTimeZone, localDateToUtcMs, localDateToUtcRangeTz } from '../../src/lib/time-utils.js';
 
 describe('utcToLocalString', () => {
   it('should produce "YYYY-MM-DD HH:mm:ss" format', () => {
@@ -65,5 +65,100 @@ describe('localDateToUtcRange', () => {
     const [, eEnd] = localDateToUtcRange('2026-06-14', -480);
     expect(sStart).toBe('2026-06-06T16:00:00.000Z');
     expect(eEnd).toBe('2026-06-14T15:59:59.999Z');
+  });
+});
+
+describe('isValidTimeZone', () => {
+  it('should return true for valid IANA timezone names', () => {
+    expect(isValidTimeZone('Asia/Shanghai')).toBe(true);
+    expect(isValidTimeZone('America/New_York')).toBe(true);
+    expect(isValidTimeZone('UTC')).toBe(true);
+    expect(isValidTimeZone('Europe/London')).toBe(true);
+  });
+
+  it('should return false for invalid timezone names', () => {
+    expect(isValidTimeZone('Invalid/Zone')).toBe(false);
+    expect(isValidTimeZone('')).toBe(false);
+    expect(isValidTimeZone('UTC+8')).toBe(false);
+  });
+});
+
+describe('localDateToUtcMs', () => {
+  it('Asia/Shanghai (UTC+8): 2026-06-14 → UTC 2026-06-13T16:00:00Z', () => {
+    const ms = localDateToUtcMs('2026-06-14', 'Asia/Shanghai');
+    expect(new Date(ms).toISOString()).toBe('2026-06-13T16:00:00.000Z');
+  });
+
+  it('UTC: 2026-06-14 → UTC 2026-06-14T00:00:00Z', () => {
+    const ms = localDateToUtcMs('2026-06-14', 'UTC');
+    expect(new Date(ms).toISOString()).toBe('2026-06-14T00:00:00.000Z');
+  });
+
+  it('America/New_York (UTC-5 winter): 2026-01-14 → UTC 2026-01-14T05:00:00Z', () => {
+    const ms = localDateToUtcMs('2026-01-14', 'America/New_York');
+    expect(new Date(ms).toISOString()).toBe('2026-01-14T05:00:00.000Z');
+  });
+
+  it('America/New_York (UTC-4 summer/DST): 2026-07-14 → UTC 2026-07-14T04:00:00Z', () => {
+    const ms = localDateToUtcMs('2026-07-14', 'America/New_York');
+    expect(new Date(ms).toISOString()).toBe('2026-07-14T04:00:00.000Z');
+  });
+
+  it('Europe/London (BST summer): 2026-07-14 → UTC 2026-07-13T23:00:00Z', () => {
+    const ms = localDateToUtcMs('2026-07-14', 'Europe/London');
+    expect(new Date(ms).toISOString()).toBe('2026-07-13T23:00:00.000Z');
+  });
+
+  it('Europe/London (GMT winter): 2026-01-14 → UTC 2026-01-14T00:00:00Z', () => {
+    const ms = localDateToUtcMs('2026-01-14', 'Europe/London');
+    expect(new Date(ms).toISOString()).toBe('2026-01-14T00:00:00.000Z');
+  });
+});
+
+describe('localDateToUtcRangeTz', () => {
+  it('Asia/Shanghai: 2026-06-14 → UTC 2026-06-13T16:00 ~ 2026-06-14T15:59', () => {
+    const [start, end] = localDateToUtcRangeTz('2026-06-14', 'Asia/Shanghai');
+    expect(start).toBe('2026-06-13T16:00:00.000Z');
+    expect(end).toBe('2026-06-14T15:59:59.999Z');
+  });
+
+  it('UTC: 2026-06-14 → UTC 2026-06-14T00:00 ~ 2026-06-14T23:59', () => {
+    const [start, end] = localDateToUtcRangeTz('2026-06-14', 'UTC');
+    expect(start).toBe('2026-06-14T00:00:00.000Z');
+    expect(end).toBe('2026-06-14T23:59:59.999Z');
+  });
+
+  it('America/New_York winter: 2026-01-14 → UTC 2026-01-14T05:00 ~ 2026-01-15T04:59', () => {
+    const [start, end] = localDateToUtcRangeTz('2026-01-14', 'America/New_York');
+    expect(start).toBe('2026-01-14T05:00:00.000Z');
+    expect(end).toBe('2026-01-15T04:59:59.999Z');
+  });
+
+  it('America/New_York summer DST: 2026-07-14 → UTC 2026-07-14T04:00 ~ 2026-07-15T03:59', () => {
+    const [start, end] = localDateToUtcRangeTz('2026-07-14', 'America/New_York');
+    expect(start).toBe('2026-07-14T04:00:00.000Z');
+    expect(end).toBe('2026-07-15T03:59:59.999Z');
+  });
+
+  it('无效时区退回到 UTC', () => {
+    const [start, end] = localDateToUtcRangeTz('2026-06-14', 'Invalid/Zone');
+    expect(start).toBe('2026-06-14T00:00:00.000Z');
+    expect(end).toBe('2026-06-14T23:59:59.999Z');
+  });
+});
+
+describe('getLocalToday', () => {
+  it('should return "YYYY-MM-DD" format', () => {
+    const today = getLocalToday('Asia/Shanghai');
+    expect(today).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it('should return current date in UTC for UTC timezone', () => {
+    const today = getLocalToday('UTC');
+    const now = new Date();
+    const expected = now.getUTCFullYear() + '-' +
+      String(now.getUTCMonth() + 1).padStart(2, '0') + '-' +
+      String(now.getUTCDate()).padStart(2, '0');
+    expect(today).toBe(expected);
   });
 });

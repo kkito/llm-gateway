@@ -64,6 +64,7 @@ export interface StatsViewProps {
   page: number;
   totalPages: number;
   tzOffset: number;
+  timezone: string;
   selectedModel: string;
 }
 
@@ -517,7 +518,7 @@ const styles = `
 // ---- 组件 ----
 
 export const StatsView: FC<StatsViewProps> = (props) => {
-  const { overview, byModel, byHour, recentRequests, userName, startDate, endDate, totalPages, tzOffset, selectedModel } = props;
+  const { overview, byModel, byHour, recentRequests, userName, startDate, endDate, totalPages, tzOffset, timezone = 'UTC', selectedModel } = props;
   const currentPage = props.page;
 
   // 用 byModel 数据计算成功/失败
@@ -530,17 +531,7 @@ export const StatsView: FC<StatsViewProps> = (props) => {
 
   // 分页链接
   const modelParam = selectedModel ? `&model=${encodeURIComponent(selectedModel)}` : '';
-  const baseLink = `/user/stats?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}${modelParam}`;
-
-  // 快捷链接
-  const today = new Date();
-  const todayStr = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getDate().toString().padStart(2, '0')}`;
-  const sevenDaysAgo = new Date(today);
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-  const sevenDaysAgoStr = `${sevenDaysAgo.getFullYear()}-${(sevenDaysAgo.getMonth() + 1).toString().padStart(2, '0')}-${sevenDaysAgo.getDate().toString().padStart(2, '0')}`;
-  const thirtyDaysAgo = new Date(today);
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  const thirtyDaysAgoStr = `${thirtyDaysAgo.getFullYear()}-${(thirtyDaysAgo.getMonth() + 1).toString().padStart(2, '0')}-${thirtyDaysAgo.getDate().toString().padStart(2, '0')}`;
+  const baseLink = `/user/stats?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}&timezone=${encodeURIComponent(timezone)}${modelParam}`;
 
   return (
     <UserLayout title={`使用统计 — ${userName}`} currentUser={{ name: userName, apikey: '' }}>
@@ -561,13 +552,13 @@ export const StatsView: FC<StatsViewProps> = (props) => {
             <label for="end">结束日期</label>
             <input type="date" id="end" name="endDate" value={endDate.split(' ')[0]} />
           </div>
-          <input type="hidden" name="tzOffset" value={tzOffset} />
+          <input type="hidden" name="timezone" value={timezone} />
           <button type="submit" class="filter-submit">查询</button>
         </form>
-        <div class="filter-shortcuts">
-          <a href={`/user/stats?startDate=${todayStr}&endDate=${todayStr}`}>今天</a>
-          <a href={`/user/stats?startDate=${sevenDaysAgoStr}&endDate=${todayStr}`}>最近 7 天</a>
-          <a href={`/user/stats?startDate=${thirtyDaysAgoStr}&endDate=${todayStr}`}>最近 30 天</a>
+        <div class="filter-shortcuts" id="filter-shortcuts">
+          <a href="#" data-range="today" onclick="return setDateRange('today')">今天</a>
+          <a href="#" data-range="7days" onclick="return setDateRange('7days')">最近 7 天</a>
+          <a href="#" data-range="30days" onclick="return setDateRange('30days')">最近 30 天</a>
         </div>
         <div class="filter-current">
           📅 当前范围：{startDate} ~ {endDate}
@@ -638,9 +629,9 @@ export const StatsView: FC<StatsViewProps> = (props) => {
             ) : (
               <>
                 <div class="model-filter-bar">
-                  <a href={`/user/stats?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`} class={`model-filter-btn${selectedModel ? '' : ' active'}`}>全部</a>
+                  <a href={`/user/stats?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}&timezone=${encodeURIComponent(timezone)}`} class={`model-filter-btn${selectedModel ? '' : ' active'}`}>全部</a>
                   {byModel.map((m) => (
-                    <a href={`/user/stats?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}&model=${encodeURIComponent(m.model)}`} class={`model-filter-btn${selectedModel === m.model ? ' active' : ''}`}>{m.model}</a>
+                    <a href={`/user/stats?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}&timezone=${encodeURIComponent(timezone)}&model=${encodeURIComponent(m.model)}`} class={`model-filter-btn${selectedModel === m.model ? ' active' : ''}`}>{m.model}</a>
                   ))}
                 </div>
                 <div class="model-cards">
@@ -778,27 +769,68 @@ export const StatsView: FC<StatsViewProps> = (props) => {
       )}
       <script dangerouslySetInnerHTML={{ __html: `
 ;(function() {
-  // ─── 1. Form submit: update tzOffset from browser ───
+  var browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+  // ─── 0. 首次访问：没有 timezone 参数时自动 redirect 补上 ───
+  var url = new URL(window.location.href);
+  if (!url.searchParams.has('timezone')) {
+    url.searchParams.set('timezone', browserTimezone);
+    window.location.replace(url.toString());
+    return;
+  }
+
+  // ─── 1. Form submit: 注入当前时区 ───
   var form = document.getElementById('stats-filter-form');
   if (form) {
+    var tzInput = form.querySelector('input[name="timezone"]');
+    if (!tzInput) {
+      tzInput = document.createElement('input');
+      tzInput.type = 'hidden';
+      tzInput.name = 'timezone';
+      form.appendChild(tzInput);
+    }
     form.addEventListener('submit', function() {
-      var tzInput = form.querySelector('input[name="tzOffset"]');
-      if (tzInput) tzInput.value = new Date().getTimezoneOffset();
+      tzInput.value = browserTimezone;
     });
   }
 
-  // ─── 2. Convert UTC timestamps to local time ───
+  // ─── 2. 快捷日期链接：客户端生成 ───
+  var pad = function(n) { return String(n).padStart(2, '0'); };
+  function localDateStr(d) {
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  }
+  function buildDateRangeUrl(rangeType) {
+    var today = localDateStr(new Date());
+    var baseUrl = new URL(window.location.href);
+    baseUrl.searchParams.set('startDate', today);
+    baseUrl.searchParams.set('endDate', today);
+    if (rangeType === '7days') {
+      var d = new Date(); d.setDate(d.getDate() - 7);
+      baseUrl.searchParams.set('startDate', localDateStr(d));
+    } else if (rangeType === '30days') {
+      var d = new Date(); d.setDate(d.getDate() - 30);
+      baseUrl.searchParams.set('startDate', localDateStr(d));
+    }
+    baseUrl.searchParams.set('timezone', browserTimezone);
+    baseUrl.searchParams.delete('page');
+    return baseUrl.toString();
+  }
+  window.setDateRange = function(rangeType) {
+    window.location.href = buildDateRangeUrl(rangeType);
+    return false;
+  };
+
+  // ─── 3. Convert UTC timestamps to local time ───
   var tzCells = document.querySelectorAll('[data-utc]');
   tzCells.forEach(function(el) {
     var utc = el.getAttribute('data-utc');
     if (!utc) return;
     var d = new Date(utc);
     if (isNaN(d.getTime())) return;
-    var pad = function(n) { return String(n).padStart(2, '0'); };
     el.textContent = pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
   });
 
-  // ─── 3. Re-aggregate hour distribution by local hour ───
+  // ─── 4. Re-aggregate hour distribution by local hour ───
   var hourBars = document.querySelectorAll('[data-hour-utc]');
   if (hourBars.length > 0) {
     var localBuckets = {};
@@ -842,7 +874,6 @@ export const StatsView: FC<StatsViewProps> = (props) => {
       container.innerHTML = html || '<p style="color:#6b7280;font-size:0.9rem">暂无数据</p>';
     }
   }
-  function pad(n) { return String(n).padStart(2, '0'); }
   function formatTokenDisplay(n) {
     if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
     if (n >= 1000) return (n / 1000).toFixed(1) + 'K';

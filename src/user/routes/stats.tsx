@@ -3,7 +3,7 @@ import { StatsView } from '../views/stats.js';
 import { getCurrentUser } from '../middleware/auth.js';
 import { loadFullConfig } from '../../config.js';
 import { DatabaseManager } from '../../lib/db.js';
-import { localDateToUtcRange } from '../../lib/time-utils.js';
+import { localDateToUtcRangeTz, getLocalToday } from '../../lib/time-utils.js';
 
 export { StatsView };
 
@@ -30,23 +30,17 @@ export function createStatsRoute(configPath?: string) {
     }
     const db = dbManager.getDb();
 
-    // 解析日期参数 — 使用客户端时区将本地日期转为 UTC 范围
+    // 解析日期参数 — 使用客户端的 IANA 时区将本地日期转为 UTC 范围
     // DB 中 timestamp 存的是 UTC ISO 字符串 (如 2026-06-14T10:00:00.000Z)
-    const now = new Date();
-    const localToday = now.getFullYear() + '-' +
-      String(now.getMonth() + 1).padStart(2, '0') + '-' +
-      String(now.getDate()).padStart(2, '0');
+    const timezone = c.req.query('timezone') || 'UTC';
+    const localToday = getLocalToday(timezone);
 
     const startDate = c.req.query('startDate') || localToday;
     const endDate = c.req.query('endDate') || startDate;
     const selectedModel = c.req.query('model') || '';
-    // 如果客户端没传 tzOffset，用服务端时区
-    const tzOffset = c.req.query('tzOffset') !== undefined
-      ? parseInt(c.req.query('tzOffset')!, 10)
-      : new Date().getTimezoneOffset();
 
-    const [utcStart] = localDateToUtcRange(startDate, tzOffset);
-    const [, utcEnd] = localDateToUtcRange(endDate, tzOffset);
+    const [utcStart] = localDateToUtcRangeTz(startDate, timezone);
+    const [, utcEnd] = localDateToUtcRangeTz(endDate, timezone);
     const page = Math.max(1, parseInt(c.req.query('page') || '1', 10) || 1);
     const limit = 20;
     const offset = (page - 1) * limit;
@@ -202,7 +196,8 @@ export function createStatsRoute(configPath?: string) {
       endDate={displayEnd}
       page={page}
       totalPages={totalPages}
-      tzOffset={tzOffset}
+      tzOffset={0} // 不再使用，保留兼容；视图已改用 timezone
+      timezone={timezone}
       selectedModel={selectedModel}
     />);
   });
