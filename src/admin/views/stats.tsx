@@ -25,15 +25,62 @@ interface Stats {
   byDate?: Record<string, ModelStats>;
 }
 
+interface RecentRequestEntry {
+  id: number;
+  requestId: string;
+  timestamp: string;
+  userName: string | null;
+  customModel: string;
+  modelGroup: string | null;
+  realModel: string | null;
+  provider: string | null;
+  statusCode: number;
+  durationMs: number | null;
+  promptTokens: number | null;
+  completionTokens: number | null;
+  totalTokens: number | null;
+  cachedTokens: number | null;
+  isStreaming: number | null;
+  errorMessage: string | null;
+}
+
 interface Props {
   stats: Stats;
   dateRange: string;
   currentType: 'today' | 'date' | 'week' | 'month';
   currentValue: string;
+  recentRequests?: RecentRequestEntry[];
+  page?: number;
+  totalPages?: number;
+  totalItems?: number;
+  userNames?: string[];
+  modelNames?: string[];
+  selectedUser?: string;
+  selectedModel?: string;
+  startDate?: string;
+  endDate?: string;
+  tzOffset?: number;
 }
 
+function buildBaseUrl(startDate: string, endDate: string, tzOffset: number, selectedUser: string, selectedModel: string): string {
+  let url = `/admin/stats?startDate=${startDate}&endDate=${endDate}&tzOffset=${tzOffset}`;
+  if (selectedUser) url += `&userName=${selectedUser}`;
+  if (selectedModel) url += `&model=${selectedModel}`;
+  return url;
+}
+
+const now = new Date();
+const localToday = now.getFullYear() + '-' +
+  String(now.getMonth() + 1).padStart(2, '0') + '-' +
+  String(now.getDate()).padStart(2, '0');
+
 export const StatsPage: FC<Props> = (props) => {
-  const { stats, dateRange, currentType, currentValue } = props;
+  const {
+    stats, dateRange, currentType, currentValue,
+    recentRequests = [], page = 1, totalPages = 1, totalItems = 0,
+    userNames = [], modelNames = [], selectedUser = '', selectedModel = '',
+    startDate = '', endDate = '', tzOffset = 0,
+  } = props;
 
   const successRate = stats.totalRequests > 0
     ? ((stats.successfulRequests / stats.totalRequests) * 100).toFixed(1)
@@ -575,11 +622,166 @@ export const StatsPage: FC<Props> = (props) => {
             transform: translateY(-2px);
           }
 
+          /* ───── 筛选栏 ───── */
+          .filter-bar {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding: 1rem 1.25rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-sm);
+          }
+          .filter-bar label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+          }
+          .filter-bar select {
+            padding: 0.5rem 0.8rem;
+            border: 1.5px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            font-size: 0.88rem;
+            background: var(--bg-card);
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: border-color 0.2s;
+          }
+          .filter-bar select:focus {
+            border-color: var(--accent-color);
+            outline: none;
+          }
+          .filter-bar .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+          }
+
+          /* ───── 模型筛选按钮 ───── */
+          .model-filter-bar {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin-bottom: 1.5rem;
+          }
+          .model-filter-btn {
+            padding: 0.45rem 0.9rem;
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            font-size: 0.82rem;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            color: var(--text-secondary);
+            background: var(--bg-card);
+            transition: all 0.2s;
+          }
+          .model-filter-btn:hover {
+            border-color: var(--accent-color);
+            color: var(--accent-color);
+          }
+          .model-filter-btn.active {
+            background: var(--accent-gradient);
+            color: #fff;
+            border-color: transparent;
+          }
+
+          /* ───── 请求列表 ───── */
+          .request-list-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 2rem;
+            margin-bottom: 1.5rem;
+            box-shadow: var(--shadow-sm);
+            overflow: hidden;
+          }
+          .request-list-title {
+            font-weight: 700;
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+          }
+          .request-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.82rem;
+          }
+          .request-table th {
+            text-align: left;
+            padding: 0.6rem 0.5rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            font-size: 0.78rem;
+            border-bottom: 2px solid var(--border-color);
+            white-space: nowrap;
+          }
+          .request-table td {
+            padding: 0.55rem 0.5rem;
+            border-bottom: 1px solid #f3f4f6;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+          .request-table tr:hover td {
+            background: var(--bg-page);
+          }
+          .status-badge {
+            display: inline-block;
+            padding: 0.15rem 0.5rem;
+            border-radius: 10px;
+            font-size: 0.75rem;
+            font-weight: 600;
+          }
+          .status-ok { background: #dcfce7; color: #166534; }
+          .status-err { background: #fee2e2; color: #991b1b; }
+
+          /* ───── 分页 ───── */
+          .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 1.5rem;
+          }
+          .pagination a, .pagination span {
+            padding: 0.4rem 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            background: var(--bg-card);
+            transition: all 0.2s;
+          }
+          .pagination a:hover {
+            border-color: var(--accent-color);
+            color: var(--accent-color);
+          }
+          .pagination .active {
+            background: var(--accent-gradient);
+            color: #fff;
+            border-color: transparent;
+          }
+          .pagination .disabled {
+            opacity: 0.4;
+            pointer-events: none;
+          }
+
           @media (max-width: 768px) {
             .main-content { padding: 1.5rem 1rem 3rem; }
             .page-title { font-size: 1.5rem; }
             .date-grid { grid-template-columns: 1fr; }
             .stat-meta { font-size: 0.75rem; }
+            .filter-bar { flex-direction: column; }
+            .request-table { font-size: 0.75rem; }
           }
         `}</style>
       </head>
@@ -601,36 +803,68 @@ export const StatsPage: FC<Props> = (props) => {
                 <div class="date-picker-panel">
                   <div class="date-grid">
                     <div class="date-form-group">
-                      <label>按日期</label>
+                      <label>开始日期</label>
                       <form method="get" action="/admin/stats" class="date-form-row">
-                        <input type="date" name="date" value={currentType === 'date' ? currentValue : ''} />
+                        <input type="date" name="startDate" value={startDate} />
+                        <input type="hidden" name="endDate" value={endDate} />
+                        {selectedUser && <input type="hidden" name="userName" value={selectedUser} />}
+                        {selectedModel && <input type="hidden" name="model" value={selectedModel} />}
+                        <input type="hidden" name="tzOffset" value={String(tzOffset)} />
                         <button type="submit">查询</button>
                       </form>
                     </div>
                     <div class="date-form-group">
-                      <label>按周</label>
+                      <label>结束日期</label>
                       <form method="get" action="/admin/stats" class="date-form-row">
-                        <input type="week" name="week" value={currentType === 'week' ? currentValue : ''} />
-                        <button type="submit">查询</button>
-                      </form>
-                    </div>
-                    <div class="date-form-group">
-                      <label>按月份</label>
-                      <form method="get" action="/admin/stats" class="date-form-row">
-                        <input type="month" name="month" value={currentType === 'month' ? currentValue : ''} />
+                        <input type="date" name="endDate" value={endDate} />
+                        <input type="hidden" name="startDate" value={startDate} />
+                        {selectedUser && <input type="hidden" name="userName" value={selectedUser} />}
+                        {selectedModel && <input type="hidden" name="model" value={selectedModel} />}
+                        <input type="hidden" name="tzOffset" value={String(tzOffset)} />
                         <button type="submit">查询</button>
                       </form>
                     </div>
                     <div class="date-form-group">
                       <label>快捷选项</label>
                       <div class="shortcut-links">
-                        <a href="/admin/stats" class="shortcut-btn">今日</a>
+                        <a href={buildBaseUrl(localToday, localToday, tzOffset, selectedUser, selectedModel)} class="shortcut-btn">今日</a>
                       </div>
                     </div>
                   </div>
                 </div>
               </details>
             </div>
+
+            {/* 用户/模型筛选栏 */}
+            {userNames.length > 0 && (
+              <div class="filter-bar">
+                <div class="filter-group">
+                  <label>用户:</label>
+                  <form method="get" action="/admin/stats" style="display:inline">
+                    <input type="hidden" name="startDate" value={startDate} />
+                    <input type="hidden" name="endDate" value={endDate} />
+                    <input type="hidden" name="tzOffset" value={String(tzOffset)} />
+                    {selectedModel && <input type="hidden" name="model" value={selectedModel} />}
+                    <select name="userName" onchange="this.form.submit()">
+                      <option value="">全部用户</option>
+                      {userNames.map(u => (
+                        <option value={u} selected={u === selectedUser}>{u}</option>
+                      ))}
+                    </select>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {/* 模型筛选按钮 */}
+            {modelNames.length > 0 && (
+              <div class="model-filter-bar">
+                <a href={`${buildBaseUrl(startDate, endDate, tzOffset, selectedUser, '')}`} class={`model-filter-btn ${!selectedModel ? 'active' : ''}`}>全部模型</a>
+                {modelNames.map(m => (
+                  <a href={`${buildBaseUrl(startDate, endDate, tzOffset, selectedUser, m)}`} class={`model-filter-btn ${m === selectedModel ? 'active' : ''}`}>{m}</a>
+                ))}
+              </div>
+            )}
 
           {/* 概览卡片 */}
           <div class="overview-grid">
@@ -821,6 +1055,71 @@ export const StatsPage: FC<Props> = (props) => {
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {/* 请求列表 */}
+          {recentRequests.length > 0 && (
+            <div class="request-list-card">
+              <h2 class="request-list-title">📋 请求列表 (共 {totalItems.toLocaleString()} 条)</h2>
+              <div class="stats-table-wrapper">
+                <table class="request-table">
+                  <thead>
+                    <tr>
+                      <th>时间</th>
+                      <th>用户</th>
+                      <th>模型</th>
+                      <th>Provider</th>
+                      <th>状态</th>
+                      <th>耗时</th>
+                      <th>输入</th>
+                      <th>输出</th>
+                      <th>缓存</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentRequests.map(req => (
+                      <tr>
+                        <td>{new Date(req.timestamp).toLocaleString()}</td>
+                        <td>{req.userName || '-'}</td>
+                        <td title={req.customModel}>{req.customModel}</td>
+                        <td>{req.provider || '-'}</td>
+                        <td>
+                          <span class={`status-badge ${req.statusCode >= 200 && req.statusCode < 300 ? 'status-ok' : 'status-err'}`}>
+                            {req.statusCode}
+                          </span>
+                        </td>
+                        <td>{req.durationMs != null ? `${req.durationMs}ms` : '-'}</td>
+                        <td>{req.promptTokens != null ? req.promptTokens.toLocaleString() : '-'}</td>
+                        <td>{req.completionTokens != null ? req.completionTokens.toLocaleString() : '-'}</td>
+                        <td>{req.cachedTokens != null && req.cachedTokens > 0 ? req.cachedTokens.toLocaleString() : '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {/* 分页 */}
+              {totalPages > 1 && (
+                <div class="pagination">
+                  {page > 1 && (
+                    <a href={`?startDate=${startDate}&endDate=${endDate}&tzOffset=${tzOffset}${selectedUser ? '&userName=' + selectedUser : ''}${selectedModel ? '&model=' + selectedModel : ''}&page=${page - 1}`}>上一页</a>
+                  )}
+                  {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+                    const p = i + 1;
+                    return (
+                      <a
+                        href={`?startDate=${startDate}&endDate=${endDate}&tzOffset=${tzOffset}${selectedUser ? '&userName=' + selectedUser : ''}${selectedModel ? '&model=' + selectedModel : ''}&page=${p}`}
+                        class={p === page ? 'active' : ''}
+                      >
+                        {p}
+                      </a>
+                    );
+                  })}
+                  {page < totalPages && (
+                    <a href={`?startDate=${startDate}&endDate=${endDate}&tzOffset=${tzOffset}${selectedUser ? '&userName=' + selectedUser : ''}${selectedModel ? '&model=' + selectedModel : ''}&page=${page + 1}`}>下一页</a>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

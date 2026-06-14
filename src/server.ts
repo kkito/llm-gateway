@@ -30,7 +30,7 @@ import { authMiddleware, isPasswordConfigured, sessions } from './admin/middlewa
 import { createUserAuthMiddleware } from './user/middleware/auth.js';
 import { loadFullConfig } from './config.js';
 import { UsageTracker } from './lib/usage-tracker.js';
-import { StatsProvider } from './lib/stats-provider.js';
+
 import { createConfigContext } from './lib/config-context.js';
 import { interceptors } from './interceptor/index.js'
 import { anthropicBillingCleaner } from './interceptor/anthropic-billing-cleaner.js'
@@ -135,10 +135,6 @@ export function createServer(
   // 初始化 UsageTracker API
   initUsageApiTracker(usageTracker);
 
-  // 创建统计提供者（共享 usageTracker 实例）
-  const statsProvider = new StatsProvider(usageTracker, logDir);
-  initStatsProvider(statsProvider);
-
   // Initialize SQLite database for request logging (only in non-test mode)
   if (!isTestEnv) {
     const dbManager = DatabaseManager.getInstance(ctx.logDir);
@@ -151,7 +147,6 @@ export function createServer(
     // 定期清理过期的滑动窗口数据（每小时清理一次）
     if (!cleanupInterval) {
       cleanupInterval = setInterval(() => {
-        statsProvider.cleanup();
         dbManager.cleanupOldRequests(90);
         console.log('🧹 已清理过期数据');
       }, 60 * 60 * 1000); // 1 小时
