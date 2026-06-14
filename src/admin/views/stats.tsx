@@ -1,5 +1,13 @@
 import { FC } from 'hono/jsx';
 import { TopbarNav } from '../components/TopbarNav.js';
+import { formatNumber, formatDuration } from '../../lib/format.js';
+
+function formatTokenCacheSum(prompt: number | null | undefined, cache: number | null | undefined): string {
+  if (prompt === null || prompt === undefined) return '—';
+  if (!cache) return formatNumber(prompt);
+  const pct = prompt > 0 ? ((cache / prompt) * 100).toFixed(1) : '0';
+  return `${formatNumber(cache)}/${formatNumber(prompt)} (${pct}%)`;
+}
 
 interface ModelStats {
   requests: number;
@@ -87,7 +95,6 @@ export const StatsPage: FC<Props> = (props) => {
     : '0';
 
   const sortedModels = Object.entries(stats.byModel).sort((a, b) => b[1].requests - a[1].requests);
-  const sortedProviders = Object.entries(stats.byProvider).sort((a, b) => b[1].requests - a[1].requests);
   const sortedHours = stats.byHour ? Object.entries(stats.byHour).sort((a, b) => a[0].localeCompare(b[0])) : [];
   const sortedDates = stats.byDate ? Object.entries(stats.byDate).sort((a, b) => a[0].localeCompare(b[0])) : [];
 
@@ -196,109 +203,82 @@ export const StatsPage: FC<Props> = (props) => {
             border: 1px solid var(--border-color);
           }
 
-          /* Date picker */
-          .date-picker-container {
-            margin-bottom: 2rem;
-          }
-          .date-picker-toggle {
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.7rem 1.3rem;
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-sm);
-            font-weight: 600;
-            font-size: 0.88rem;
-            color: var(--text-secondary);
-            list-style: none;
-            transition: all 0.2s ease;
-            box-shadow: var(--shadow-sm);
-          }
-          .date-picker-toggle:hover {
-            color: var(--accent-color);
-            box-shadow: var(--shadow-md);
-          }
-          .date-picker-toggle::marker {
-            display: none;
-          }
-          .date-picker-toggle::before {
-            content: '▼';
-            font-size: 0.7rem;
-            transition: transform 0.2s ease;
-          }
-          .date-picker-toggle[open]::before {
-            transform: rotate(180deg);
-          }
-          .date-picker-panel {
-            margin-top: 1rem;
+          /* ───── 日期筛选栏 ───── */
+          .filter-bar {
             background: var(--bg-card);
             border: 1px solid var(--border-color);
             border-radius: var(--radius);
-            padding: 1.5rem;
-            box-shadow: var(--shadow-md);
+            padding: 1.25rem 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: var(--shadow-sm);
           }
-          .date-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1.25rem;
+          .filter-form {
+            display: flex;
+            align-items: flex-end;
+            gap: 1rem;
+            flex-wrap: wrap;
           }
-          .date-form-group label {
-            display: block;
-            font-size: 0.85rem;
+          .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+          }
+          .filter-group label {
+            font-size: 0.8rem;
             font-weight: 600;
             color: var(--text-secondary);
-            margin-bottom: 0.5rem;
           }
-          .date-form-row {
-            display: flex;
-            gap: 0.5rem;
-          }
-          .date-form-row input, .date-form-row button {
-            font-size: 0.9rem;
-          }
-          .date-form-row input {
-            flex: 1;
-            padding: 0.6rem 0.8rem;
+          .filter-group input[type="date"] {
+            padding: 0.5rem 0.75rem;
             border: 1.5px solid var(--border-color);
             border-radius: var(--radius-sm);
-            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+            font-size: 0.88rem;
             outline: none;
+            transition: border-color 0.2s;
           }
-          .date-form-row input:focus {
+          .filter-group input[type="date"]:focus {
             border-color: var(--accent-color);
             box-shadow: 0 0 0 3px hsl(245 80% 58% / 0.12);
           }
-          .date-form-row button {
-            padding: 0.6rem 1rem;
+          .filter-submit {
+            padding: 0.5rem 1.25rem;
             background: var(--accent-gradient);
             color: #fff;
             border: none;
             border-radius: var(--radius-sm);
             font-weight: 600;
+            font-size: 0.88rem;
             cursor: pointer;
           }
-          .shortcut-links {
-            display: flex;
-            gap: 0.5rem;
-            flex-wrap: wrap;
+          .filter-submit:hover {
+            opacity: 0.9;
           }
-          .shortcut-btn {
-            padding: 0.6rem 1rem;
+          .filter-shortcuts {
+            display: flex;
+            gap: 0.4rem;
+            flex-wrap: wrap;
+            margin-top: 0.75rem;
+          }
+          .filter-shortcuts a {
+            padding: 0.35rem 0.75rem;
             background: var(--bg-page);
-            color: var(--text-primary);
             border: 1px solid var(--border-color);
             border-radius: var(--radius-sm);
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--text-secondary);
             text-decoration: none;
-            font-weight: 600;
-            font-size: 0.85rem;
-            transition: all 0.2s ease;
+            transition: all 0.2s;
           }
-          .shortcut-btn:hover {
-            color: var(--accent-color);
+          .filter-shortcuts a:hover {
             border-color: var(--accent-color);
+            color: var(--accent-color);
             background: hsl(245 80% 96%);
+          }
+          .filter-current {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-top: 0.6rem;
           }
 
           /* ───── 概览卡片 ───── */
@@ -418,19 +398,22 @@ export const StatsPage: FC<Props> = (props) => {
           }
           .token-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-            gap: 1.5rem;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.25rem;
+          }
+          @media (max-width: 600px) {
+            .token-grid { grid-template-columns: repeat(2, 1fr); }
           }
           .token-item-value {
             font-family: system-ui, -apple-system, sans-serif;
-            font-size: 1.5rem;
+            font-size: 1.4rem;
             font-weight: 700;
             color: var(--accent-color);
           }
           .token-item-label {
-            font-size: 0.82rem;
+            font-size: 0.8rem;
             color: var(--text-secondary);
-            margin-top: 0.2rem;
+            margin-top: 0.15rem;
           }
 
           /* ───── 统计表格卡片 ───── */
@@ -557,42 +540,45 @@ export const StatsPage: FC<Props> = (props) => {
           .hour-item {
             display: flex;
             align-items: center;
-            gap: 1rem;
-            margin-bottom: 0.75rem;
+            gap: 0.75rem;
+            margin-bottom: 0.5rem;
           }
           .hour-label {
-            width: 60px;
-            font-family: system-ui, -apple-system, sans-serif;
+            width: 130px;
+            font-size: 0.8rem;
             font-weight: 500;
-            font-size: 0.9rem;
             color: var(--text-secondary);
+            flex-shrink: 0;
           }
           .hour-bar-bg {
             flex: 1;
-            height: 28px;
+            height: 20px;
             background: var(--bg-page);
-            border-radius: 6px;
+            border-radius: 4px;
             position: relative;
             overflow: hidden;
           }
           .hour-bar-fill {
             height: 100%;
-            border-radius: 6px;
-            transition: width 0.5s ease;
+            border-radius: 4px;
+            transition: width 0.4s ease;
           }
           .hour-bar-value {
             position: absolute;
             left: 0.5rem;
             top: 50%;
             transform: translateY(-50%);
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             font-weight: 600;
+            white-space: nowrap;
           }
           .hour-meta {
-            width: 180px;
-            font-size: 0.8rem;
+            width: 280px;
+            font-size: 0.75rem;
             color: var(--text-secondary);
             flex-shrink: 0;
+            text-align: right;
+            white-space: nowrap;
           }
 
           /* Refresh button */
@@ -620,44 +606,6 @@ export const StatsPage: FC<Props> = (props) => {
             border-color: var(--accent-color);
             box-shadow: var(--shadow-md);
             transform: translateY(-2px);
-          }
-
-          /* ───── 筛选栏 ───── */
-          .filter-bar {
-            display: flex;
-            gap: 1rem;
-            flex-wrap: wrap;
-            align-items: center;
-            margin-bottom: 1.5rem;
-            padding: 1rem 1.25rem;
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius);
-            box-shadow: var(--shadow-sm);
-          }
-          .filter-bar label {
-            font-size: 0.85rem;
-            font-weight: 600;
-            color: var(--text-secondary);
-          }
-          .filter-bar select {
-            padding: 0.5rem 0.8rem;
-            border: 1.5px solid var(--border-color);
-            border-radius: var(--radius-sm);
-            font-size: 0.88rem;
-            background: var(--bg-card);
-            color: var(--text-primary);
-            cursor: pointer;
-            transition: border-color 0.2s;
-          }
-          .filter-bar select:focus {
-            border-color: var(--accent-color);
-            outline: none;
-          }
-          .filter-bar .filter-group {
-            display: flex;
-            align-items: center;
-            gap: 0.4rem;
           }
 
           /* ───── 模型筛选按钮 ───── */
@@ -792,67 +740,51 @@ export const StatsPage: FC<Props> = (props) => {
             <div class="page-header">
               <div>
                 <h1 class="page-title">统计 Dashboard</h1>
-                <p class="page-subtitle">{dateRange}</p>
               </div>
             </div>
 
-            {/* 日期选择器 */}
-            <div class="date-picker-container">
-              <details class="date-picker-toggle">
-                <summary class="date-picker-toggle">📅 选择日期范围</summary>
-                <div class="date-picker-panel">
-                  <div class="date-grid">
-                    <div class="date-form-group">
-                      <label>开始日期</label>
-                      <form method="get" action="/admin/stats" class="date-form-row">
-                        <input type="date" name="startDate" value={startDate} />
-                        <input type="hidden" name="endDate" value={endDate} />
-                        {selectedUser && <input type="hidden" name="userName" value={selectedUser} />}
-                        {selectedModel && <input type="hidden" name="model" value={selectedModel} />}
-                        <input type="hidden" name="tzOffset" value={String(tzOffset)} />
-                        <button type="submit">查询</button>
-                      </form>
-                    </div>
-                    <div class="date-form-group">
-                      <label>结束日期</label>
-                      <form method="get" action="/admin/stats" class="date-form-row">
-                        <input type="date" name="endDate" value={endDate} />
-                        <input type="hidden" name="startDate" value={startDate} />
-                        {selectedUser && <input type="hidden" name="userName" value={selectedUser} />}
-                        {selectedModel && <input type="hidden" name="model" value={selectedModel} />}
-                        <input type="hidden" name="tzOffset" value={String(tzOffset)} />
-                        <button type="submit">查询</button>
-                      </form>
-                    </div>
-                    <div class="date-form-group">
-                      <label>快捷选项</label>
-                      <div class="shortcut-links">
-                        <a href={buildBaseUrl(localToday, localToday, tzOffset, selectedUser, selectedModel)} class="shortcut-btn">今日</a>
-                      </div>
-                    </div>
-                  </div>
+            {/* 日期筛选栏 */}
+            <div class="filter-bar">
+              <form method="get" action="/admin/stats" class="filter-form" id="stats-filter-form">
+                <div class="filter-group">
+                  <label for="start">开始日期</label>
+                  <input type="date" id="start" name="startDate" value={startDate} />
                 </div>
-              </details>
+                <div class="filter-group">
+                  <label for="end">结束日期</label>
+                  <input type="date" id="end" name="endDate" value={endDate} />
+                </div>
+                <input type="hidden" name="tzOffset" value={String(tzOffset)} />
+                {selectedUser && <input type="hidden" name="userName" value={selectedUser} />}
+                {selectedModel && <input type="hidden" name="model" value={selectedModel} />}
+                <button type="submit" class="filter-submit">查询</button>
+              </form>
+              <div class="filter-shortcuts">
+                <a href={buildBaseUrl(localToday, localToday, tzOffset, selectedUser, selectedModel)}>今天</a>
+                {(() => {
+                  const d = new Date(); d.setDate(d.getDate() - 7);
+                  const s = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+                  return <a href={buildBaseUrl(s, localToday, tzOffset, selectedUser, selectedModel)}>最近 7 天</a>;
+                })()}
+                {(() => {
+                  const d = new Date(); d.setDate(d.getDate() - 30);
+                  const s = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+                  return <a href={buildBaseUrl(s, localToday, tzOffset, selectedUser, selectedModel)}>最近 30 天</a>;
+                })()}
+              </div>
+              <div class="filter-current">
+                📅 当前范围：{startDate} ~ {endDate}
+                {endDate === startDate ? '（当日）' : ''}
+              </div>
             </div>
 
-            {/* 用户/模型筛选栏 */}
+            {/* 用户筛选按钮 */}
             {userNames.length > 0 && (
-              <div class="filter-bar">
-                <div class="filter-group">
-                  <label>用户:</label>
-                  <form method="get" action="/admin/stats" style="display:inline">
-                    <input type="hidden" name="startDate" value={startDate} />
-                    <input type="hidden" name="endDate" value={endDate} />
-                    <input type="hidden" name="tzOffset" value={String(tzOffset)} />
-                    {selectedModel && <input type="hidden" name="model" value={selectedModel} />}
-                    <select name="userName" onchange="this.form.submit()">
-                      <option value="">全部用户</option>
-                      {userNames.map(u => (
-                        <option value={u} selected={u === selectedUser}>{u}</option>
-                      ))}
-                    </select>
-                  </form>
-                </div>
+              <div class="model-filter-bar">
+                <a href={`${buildBaseUrl(startDate, endDate, tzOffset, '', selectedModel)}`} class={`model-filter-btn ${!selectedUser ? 'active' : ''}`}>全部用户</a>
+                {userNames.map(u => (
+                  <a href={`${buildBaseUrl(startDate, endDate, tzOffset, u, selectedModel)}`} class={`model-filter-btn ${u === selectedUser ? 'active' : ''}`}>{u}</a>
+                ))}
               </div>
             )}
 
@@ -908,23 +840,21 @@ export const StatsPage: FC<Props> = (props) => {
             <h2 class="token-card-title">📈 Token 用量</h2>
             <div class="token-grid">
               <div>
-                <div class="token-item-value">{stats.totalInputTokens.toLocaleString()}</div>
+                <div class="token-item-value">{formatNumber(stats.totalInputTokens)}</div>
                 <div class="token-item-label">输入</div>
               </div>
               <div>
-                <div class="token-item-value">{stats.totalOutputTokens.toLocaleString()}</div>
+                <div class="token-item-value">{formatNumber(stats.totalCachedTokens)}</div>
+                <div class="token-item-label">输入缓存{stats.totalInputTokens > 0 && <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}> ({(stats.totalCachedTokens / stats.totalInputTokens * 100).toFixed(1)}%)</span>}</div>
+              </div>
+              <div>
+                <div class="token-item-value">{formatNumber(stats.totalOutputTokens)}</div>
                 <div class="token-item-label">输出</div>
               </div>
               <div>
-                <div class="token-item-value">{stats.totalTokens.toLocaleString()}</div>
+                <div class="token-item-value">{formatNumber(stats.totalTokens)}</div>
                 <div class="token-item-label">总计</div>
               </div>
-              {stats.totalCachedTokens > 0 && (
-                <div>
-                  <div class="token-item-value">{stats.totalCachedTokens.toLocaleString()}</div>
-                  <div class="token-item-label">缓存命中</div>
-                </div>
-              )}
             </div>
           </div>
 
@@ -938,49 +868,18 @@ export const StatsPage: FC<Props> = (props) => {
                 {sortedModels.map(([model, modelStats]) => (
                   <div class="stat-mini-card">
                     <div class="stat-mini-name">{model}</div>
-                    <div class="stat-mini-requests">{modelStats.requests.toLocaleString()}</div>
+                    <div class="stat-mini-requests">{formatNumber(modelStats.requests)}</div>
                     <div class="stat-mini-meta">
-                      <span class="stat-mini-success">✓ {modelStats.successful.toLocaleString()}</span>
-                      <span class="stat-mini-failed">✗ {modelStats.failed.toLocaleString()}</span>
+                      <span class="stat-mini-success">✓ {formatNumber(modelStats.successful)}</span>
+                      <span class="stat-mini-failed">✗ {formatNumber(modelStats.failed)}</span>
                     </div>
                     <div class="stat-mini-meta">
-                      <span>输入: {modelStats.inputTokens.toLocaleString()}</span>
-                      <span>输出: {modelStats.outputTokens.toLocaleString()}</span>
-                    </div>
-                    {modelStats.cachedTokens > 0 && (
-                      <div class="stat-mini-meta">
-                        <span>缓存: {modelStats.cachedTokens.toLocaleString()}</span>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* 按 Provider 统计 */}
-          <div class="stats-section-card">
-            <h2 class="stats-section-title">☁️ 按 Provider 统计</h2>
-            {sortedProviders.length === 0 ? (
-              <p class="empty-in-section">暂无数据</p>
-            ) : (
-              <div class="stat-mini-cards">
-                {sortedProviders.map(([provider, providerStats]) => (
-                  <div class="stat-mini-card">
-                    <div class="stat-mini-name">{provider}</div>
-                    <div class="stat-mini-requests">{providerStats.requests.toLocaleString()}</div>
-                    <div class="stat-mini-meta">
-                      <span class="stat-mini-success">✓ {providerStats.successful.toLocaleString()}</span>
-                      <span class="stat-mini-failed">✗ {providerStats.failed.toLocaleString()}</span>
+                      <span>输入: {formatNumber(modelStats.inputTokens)}</span>
+                      <span>输出: {formatNumber(modelStats.outputTokens)}</span>
                     </div>
                     <div class="stat-mini-meta">
-                      <span>Token: {providerStats.totalTokens.toLocaleString()}</span>
+                      <span>输入缓存: {formatNumber(modelStats.cachedTokens)}{modelStats.inputTokens > 0 && <span> ({(modelStats.cachedTokens / modelStats.inputTokens * 100).toFixed(1)}%)</span>}</span>
                     </div>
-                    {providerStats.cachedTokens > 0 && (
-                      <div class="stat-mini-meta">
-                        <span>缓存: {providerStats.cachedTokens.toLocaleString()}</span>
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>
@@ -1020,8 +919,8 @@ export const StatsPage: FC<Props> = (props) => {
 
           {/* 按小时分布 */}
           {sortedHours.length > 0 && (
-            <div class="hour-chart-card">
-              <h2 class="hour-chart-title">🕐 按小时分布</h2>
+            <div class="stats-section-card">
+              <h2 class="stats-section-title">🕐 按小时分布</h2>
               {sortedHours.map(([hour, hourStats]) => {
                 const barWidth = maxHourRequests > 0 ? (hourStats.requests / maxHourRequests) * 100 : 0;
                 return (
@@ -1050,7 +949,7 @@ export const StatsPage: FC<Props> = (props) => {
                       </span>
                     </div>
                     <div class="hour-meta">
-                      输入: {hourStats.inputTokens.toLocaleString()} | 输出: {hourStats.outputTokens.toLocaleString()}
+                      输入: {formatNumber(hourStats.inputTokens)} | 输出: {formatNumber(hourStats.outputTokens)} | 缓存: {hourStats.inputTokens > 0 ? (hourStats.cachedTokens / hourStats.inputTokens * 100).toFixed(1) : '0'}%
                     </div>
                   </div>
                 );
@@ -1069,12 +968,10 @@ export const StatsPage: FC<Props> = (props) => {
                       <th>时间</th>
                       <th>用户</th>
                       <th>模型</th>
-                      <th>Provider</th>
                       <th>状态</th>
                       <th>耗时</th>
-                      <th>输入</th>
                       <th>输出</th>
-                      <th>缓存</th>
+                      <th>缓存/输入 (占比)</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1083,16 +980,14 @@ export const StatsPage: FC<Props> = (props) => {
                         <td>{new Date(req.timestamp).toLocaleString()}</td>
                         <td>{req.userName || '-'}</td>
                         <td title={req.customModel}>{req.customModel}</td>
-                        <td>{req.provider || '-'}</td>
                         <td>
                           <span class={`status-badge ${req.statusCode >= 200 && req.statusCode < 300 ? 'status-ok' : 'status-err'}`}>
                             {req.statusCode}
                           </span>
                         </td>
                         <td>{req.durationMs != null ? `${req.durationMs}ms` : '-'}</td>
-                        <td>{req.promptTokens != null ? req.promptTokens.toLocaleString() : '-'}</td>
                         <td>{req.completionTokens != null ? req.completionTokens.toLocaleString() : '-'}</td>
-                        <td>{req.cachedTokens != null && req.cachedTokens > 0 ? req.cachedTokens.toLocaleString() : '-'}</td>
+                        <td>{formatTokenCacheSum(req.promptTokens, req.cachedTokens)}</td>
                       </tr>
                     ))}
                   </tbody>
