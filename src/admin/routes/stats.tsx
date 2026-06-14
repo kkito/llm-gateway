@@ -184,7 +184,7 @@ export function createStatsRoute() {
           inputTokens: row.inputTokens,
           outputTokens: row.outputTokens,
           totalTokens: row.totalTokens,
-          cachedTokens: 0,
+          cachedTokens: row.cachedTokens,
         };
       }
 
