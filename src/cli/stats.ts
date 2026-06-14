@@ -235,6 +235,8 @@ function getStatsFromDatabase(configDir: string, options: CliStatsOptions): Stat
     manager.initialize();
     return queryStats(manager.getDb(), options);
   }
+  // 确保已初始化
+  dbManager.initialize();
   return queryStats(dbManager.getDb(), options);
 }
 
