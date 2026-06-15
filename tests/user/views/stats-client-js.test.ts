@@ -2,6 +2,9 @@
  * @vitest-environment jsdom
  *
  * 验证 StatsView 渲染出的 HTML 包含可执行的客户端 JS。
+ *
+ * 注意：此文件末尾的时区测试依赖 Intl 支持，vitest jsdom 环境不保证
+ * 所有 IANA 时区名可用。因此在 CI 中设置 TZ 环境变量确保时区一致性。
  */
 
 import { describe, it, expect } from 'vitest';
@@ -150,24 +153,32 @@ describe('StatsView - 表格列', () => {
 
 describe('StatsView - 执行客户端 JS 后的行为', () => {
   it('执行 script 后 UTC 时间戳应转为本地时间', () => {
-    const html = renderHtml();
-    const dom = new JSDOM(html, {
-      runScripts: 'dangerously',
-      url: 'http://localhost/user/stats?timezone=Asia/Shanghai',
-    });
-    const doc = dom.window.document;
+    // 保存原始 TZ 并设置为 Asia/Shanghai，确保测试在 CI 和本地一致
+    const originalTz = process.env.TZ;
+    process.env.TZ = 'Asia/Shanghai';
 
-    // 执行内联 script
-    const scripts = doc.querySelectorAll('script');
-    scripts.forEach((script) => {
-      const fn = new dom.window.Function(script.textContent || '');
-      fn();
-    });
+    try {
+      const html = renderHtml();
+      const dom = new JSDOM(html, {
+        runScripts: 'dangerously',
+        url: 'http://localhost/user/stats?timezone=Asia/Shanghai',
+      });
+      const doc = dom.window.document;
 
-    // 验证 UTC 时间已转为本地时间（UTC+8 时，04:00 UTC = 12:00 本地）
-    const cells = doc.querySelectorAll('[data-utc]');
-    expect(cells.length).toBeGreaterThanOrEqual(2);
-    // 第一个 data-utc 的文本应为本地时间格式（不含年份）
-    expect(cells[0].textContent).toBe('06-14 12:00:00');
+      // 执行内联 script
+      const scripts = doc.querySelectorAll('script');
+      scripts.forEach((script) => {
+        const fn = new dom.window.Function(script.textContent || '');
+        fn();
+      });
+
+      // 验证 UTC 时间已转为本地时间（UTC+8 时，04:00 UTC = 12:00 本地）
+      const cells = doc.querySelectorAll('[data-utc]');
+      expect(cells.length).toBeGreaterThanOrEqual(2);
+      // 第一个 data-utc 的文本应为本地时间格式（不含年份）
+      expect(cells[0].textContent).toBe('06-14 12:00:00');
+    } finally {
+      process.env.TZ = originalTz;
+    }
   });
 });
