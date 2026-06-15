@@ -30,14 +30,8 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: 'pnpm'
 
-      - name: Install build dependencies for native modules
-        run: sudo apt-get update && sudo apt-get install -y build-essential python3
-
       - name: Install dependencies
         run: pnpm install
-
-      - name: Rebuild native modules
-        run: pnpm rebuild
 
       - name: Build
         run: pnpm build
@@ -69,14 +63,8 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
           cache: 'pnpm'
 
-      - name: Install build dependencies for native modules
-        run: sudo apt-get update && sudo apt-get install -y build-essential python3
-
       - name: Install dependencies
         run: pnpm install
-
-      - name: Rebuild native modules
-        run: pnpm rebuild
 
       - name: Build
         run: pnpm build
