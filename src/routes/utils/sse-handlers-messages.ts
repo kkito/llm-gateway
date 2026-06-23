@@ -7,12 +7,13 @@ import {
   formatAnthropicEventToSSE,
   type OpenAIToAnthropicStreamState
 } from '../../converters/openai-to-anthropic.js';
+import { SystemLogger, type SystemLogContext } from '../../lib/system-logger.js';
 
 /**
  * 解析 OpenAI SSE 数据行
  * OpenAI SSE 格式：data: {"id":"...","choices":[...]}\n\n
  */
-function parseOpenAISSELine(line: string): any | null {
+function parseOpenAISSELine(line: string, context?: SystemLogContext): any | null {
   const trimmedLine = line.trim();
   
   // 跳过空行和 event 行
@@ -32,7 +33,9 @@ function parseOpenAISSELine(line: string): any | null {
 
   try {
     return JSON.parse(data);
-  } catch {
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    SystemLogger.getInstance()?.logError('sse_parse_error', errMsg, data, context);
     return null;
   }
 }
@@ -50,7 +53,8 @@ function parseOpenAISSELine(line: string): any | null {
  */
 export function parseAndConvertOpenAISSE(
   sseBlock: string,
-  state: OpenAIToAnthropicStreamState
+  state: OpenAIToAnthropicStreamState,
+  context?: SystemLogContext
 ): string[] {
   const anthropicChunks: string[] = [];
 
@@ -60,7 +64,7 @@ export function parseAndConvertOpenAISSE(
   let emptyChoicesCount = 0;
 
   for (const line of lines) {
-    const parsedData = parseOpenAISSELine(line);
+    const parsedData = parseOpenAISSELine(line, context);
     if (!parsedData) continue;
 
     parsedDataCount++;
@@ -85,9 +89,9 @@ export function parseAndConvertOpenAISSE(
   if (parsedDataCount > 0 && emptyChoicesCount === parsedDataCount && sseBlock.trim()) {
     // 所有 chunk 都只有 usage，没有 choices，这是正常的
   } else if (parsedDataCount === 0 && sseBlock.trim() && !sseBlock.includes('[DONE]')) {
-    // 只有非 [DONE] 的情况下才记录警告
     console.log(`   ⚠️  [SSE 解析] 未能从 SSE 块中解析出任何 data 行`);
     console.log(`      SSE 块内容：${sseBlock.substring(0, 300)}${sseBlock.length > 300 ? '...' : ''}`);
+    SystemLogger.getInstance()?.logError('sse_no_data', 'No data lines parsed from SSE block', sseBlock, context);
   }
 
   return anthropicChunks;

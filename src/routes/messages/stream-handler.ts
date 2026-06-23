@@ -64,7 +64,7 @@ export function handleStream(options: StreamHandlerOptions): Response {
             if (buffer.trim()) {
               const part = buffer.trim();
               if (providerFormat === 'openai') {
-                const anthropicChunks = parseAndConvertOpenAISSE(part, streamState!);
+                const anthropicChunks = parseAndConvertOpenAISSE(part, streamState!, { requestId, provider: provider.provider });
                 for (const anthropicChunk of anthropicChunks) {
                   chunks.push(anthropicChunk);
                   controller.enqueue(new TextEncoder().encode(anthropicChunk));
@@ -80,7 +80,7 @@ export function handleStream(options: StreamHandlerOptions): Response {
             detailLogger.logStreamResponse(requestId + '_raw', rawChunks);
 
             // Extract usage using unified function (output is always Anthropic format)
-            const streamUsage = findFinalUsageFromChunks(chunks, 'anthropic');
+            const streamUsage = findFinalUsageFromChunks(chunks, 'anthropic', { requestId, provider: provider.provider });
             if (streamUsage) {
               logEntry.promptTokens = streamUsage.promptTokens;
               logEntry.completionTokens = streamUsage.completionTokens;
@@ -145,7 +145,7 @@ export function handleStream(options: StreamHandlerOptions): Response {
 
             if (providerFormat === 'openai') {
               // OpenAI → Anthropic 流式转换
-              const anthropicChunks = parseAndConvertOpenAISSE(part, streamState!);
+              const anthropicChunks = parseAndConvertOpenAISSE(part, streamState!, { requestId, provider: provider.provider });
               for (const anthropicChunk of anthropicChunks) {
                 chunks.push(anthropicChunk);
                 let chunk = anthropicChunk;

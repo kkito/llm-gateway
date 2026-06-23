@@ -78,7 +78,7 @@ export function handleStream(options: StreamHandlerOptions): Response {
             detailLogger.logStreamResponse(requestId + '_raw', rawChunks);
 
             // Extract usage using unified function (output is always OpenAI format)
-            const streamUsage = findFinalUsageFromChunks(chunks, 'openai');
+            const streamUsage = findFinalUsageFromChunks(chunks, 'openai', { requestId, provider: provider.provider });
             if (streamUsage) {
               logEntry.promptTokens = streamUsage.promptTokens;
               logEntry.completionTokens = streamUsage.completionTokens;
@@ -106,7 +106,7 @@ export function handleStream(options: StreamHandlerOptions): Response {
             }
 
             detailLogger.logStreamResponse(requestId, chunks);
-            detailLogger.logConvertedResponse(requestId, buildFullOpenAIResponse(chunks));
+            detailLogger.logConvertedResponse(requestId, buildFullOpenAIResponse(chunks, { requestId, provider: provider.provider }));
             if (requestLogger) {
               requestLogger.log({
                 requestId: logEntry.requestId,

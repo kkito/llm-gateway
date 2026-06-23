@@ -7,11 +7,12 @@ import {
   convertAnthropicStreamEventToOpenAI,
   type StreamConverterState
 } from '../../converters/anthropic-to-openai.js';
+import { SystemLogger, type SystemLogContext } from '../../lib/system-logger.js';
 
 /**
  * 从 SSE chunks 构建完整的 OpenAI 响应
  */
-export function buildFullOpenAIResponse(chunks: string[]): any {
+export function buildFullOpenAIResponse(chunks: string[], context?: SystemLogContext): any {
   const choices: any[] = [];
   let usage: any = null;
   let model = '';
@@ -78,8 +79,9 @@ export function buildFullOpenAIResponse(chunks: string[]): any {
       if (json.usage) {
         usage = json.usage;
       }
-    } catch {
-      // 忽略解析错误
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      SystemLogger.getInstance()?.logError('chunk_parse_error', errMsg, data, context);
     }
   }
 
@@ -103,7 +105,7 @@ export function parseAndConvertAnthropicSSE(
   state: StreamConverterState
 ): string[] {
   const openAIChunks: string[] = [];
-  const events = parseSSEBlock(sseBlock);
+  const events = parseSSEBlock(sseBlock, { requestId, provider: model });
 
   for (const { event, data } of events) {
     if (!data) continue;

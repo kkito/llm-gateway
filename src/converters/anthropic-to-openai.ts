@@ -19,6 +19,7 @@ import {
 
 import type { OpenAIStreamChunk, AnthropicStreamEvent, StreamConverterState } from './shared/types.js';
 import { mapAnthropicToOpenAIFinishReason, createStreamConverterState } from './shared/index.js';
+import { SystemLogger, type SystemLogContext } from '../lib/system-logger.js';
 export { createStreamConverterState, type StreamConverterState } from './shared/types.js';
 
 // ==================== 请求转换：Anthropic → OpenAI ====================
@@ -662,7 +663,7 @@ export function convertAnthropicStreamEventToOpenAI(
  * 参考 LiteLLM 实现：litellm/llms/anthropic/experimental_pass_through/adapters/streaming_iterator.py
  * 使用队列管理 SSE 事件，确保 event 和 data 正确配对
  */
-export function parseSSEBlock(sseBlock: string): Array<{ event?: string; data: any }> {
+export function parseSSEBlock(sseBlock: string, context?: SystemLogContext): Array<{ event?: string; data: any }> {
   const results: Array<{ event?: string; data: any }> = [];
   const lines = sseBlock.split('\n');
   let currentEvent: string | undefined;
@@ -670,7 +671,7 @@ export function parseSSEBlock(sseBlock: string): Array<{ event?: string; data: a
 
   for (const line of lines) {
     const trimmedLine = line.trim();
-    
+
     // 跳过空行
     if (!trimmedLine) {
       // 空行表示一个完整的 SSE 块结束
@@ -684,8 +685,9 @@ export function parseSSEBlock(sseBlock: string): Array<{ event?: string; data: a
           });
           currentEvent = undefined;
           currentData = undefined;
-        } catch {
-          // 忽略解析错误
+        } catch (err) {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          SystemLogger.getInstance()?.logError('sse_parse_error', errMsg, currentData, context);
         }
       }
       continue;
@@ -694,16 +696,16 @@ export function parseSSEBlock(sseBlock: string): Array<{ event?: string; data: a
     // 处理 event 行
     if (trimmedLine.startsWith('event:')) {
       currentEvent = trimmedLine.slice(6).trim();
-    } 
+    }
     // 处理 data 行
     else if (trimmedLine.startsWith('data:')) {
       const dataValue = trimmedLine.slice(5).trim();
-      
+
       // 跳过 [DONE] 标记
       if (dataValue === '[DONE]') {
         continue;
       }
-      
+
       // 累积 data（某些 SSE 可能有多行 data）
       currentData = dataValue;
     }
@@ -717,8 +719,9 @@ export function parseSSEBlock(sseBlock: string): Array<{ event?: string; data: a
         event: currentEvent,
         data: parsed
       });
-    } catch {
-      // 忽略解析错误
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      SystemLogger.getInstance()?.logError('sse_parse_error', errMsg, currentData, context);
     }
   }
 

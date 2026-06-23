@@ -1,4 +1,5 @@
 import type { SSEParseResult } from './types.js';
+import { SystemLogger } from '../../lib/system-logger.js';
 
 /**
  * 解析 SSE 数据行（支持 event 和 data 前缀）
@@ -36,9 +37,10 @@ export function parseSSEData(
     return { data: parsed };
   } catch (err) {
     const ctx = context ? `[${context.requestId ?? ''}${context.provider ? '/' + context.provider : ''}]` : '';
-    // Note: In production, the caller (stream-handler) logs parse errors via detailLogger.
-    // This console.warn is a fallback for development/testing.
-    console.warn(`${ctx} SSE parse error: ${err instanceof Error ? err.message : String(err)} | data: ${data.slice(0, 100)}`);
+    const errMsg = err instanceof Error ? err.message : String(err);
+    console.warn(`${ctx} SSE parse error: ${errMsg} | data: ${data.slice(0, 100)}`);
+    const sl = SystemLogger.getInstance();
+    sl?.logError('sse_parse_error', errMsg, data, context);
     return null;
   }
 }

@@ -6,6 +6,7 @@ import { loadFullConfig, createDefaultConfig } from '../config.js';
 import { createConfigContext, ConfigContext } from '../lib/config-context.js';
 import { Logger } from '../logger.js';
 import { DetailLogger } from '../detail-logger.js';
+import { SystemLogger } from '../lib/system-logger.js';
 import { createServer } from '../server.js';
 import { existsSync, writeFileSync, readFileSync, unlinkSync } from 'fs';
 import { join, dirname } from 'path';
@@ -204,6 +205,10 @@ function main() {
         } else {
           console.log(`✓ 详细日志已禁用 (使用 --debug 启用)`);
         }
+
+        // 创建系统级日志实例 (解析错误等)
+        const systemLogger = SystemLogger.init(ctx.logDir);
+        console.log(`✓ 系统日志：${systemLogger.getFilePath()}`);
 
         // 创建服务器 (确保 timeout 是数字类型)
         const timeoutMs = Number(options.timeout);

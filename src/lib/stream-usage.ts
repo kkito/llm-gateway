@@ -3,6 +3,8 @@
  * 处理 OpenAI 和 Anthropic 两种格式的 usage 字段
  */
 
+import { SystemLogger, type SystemLogContext } from './system-logger.js';
+
 export interface StreamUsage {
   promptTokens: number;
   completionTokens: number;
@@ -74,7 +76,8 @@ export function extractUsageFromAnthropicChunk(chunk: any): StreamUsage | null {
  */
 export function findFinalUsageFromChunks(
   chunks: string[],
-  format: 'openai' | 'anthropic'
+  format: 'openai' | 'anthropic',
+  context?: SystemLogContext
 ): StreamUsage | null {
   const extract = format === 'openai' ? extractUsageFromOpenAIChunk : extractUsageFromAnthropicChunk;
 
@@ -92,8 +95,9 @@ export function findFinalUsageFromChunks(
           if (usage) return usage;
         }
       }
-    } catch {
-      // ignore parse errors
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      SystemLogger.getInstance()?.logError('usage_parse_error', errMsg, chunks[i], context);
     }
   }
   return null;

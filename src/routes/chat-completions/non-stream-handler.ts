@@ -1,6 +1,7 @@
 import type { ProviderConfig } from '../../config.js';
 import type { Logger } from '../../logger.js';
 import { convertAnthropicResponseToOpenAI } from '../../converters/openai-to-anthropic.js';
+import { SystemLogger } from '../../lib/system-logger.js';
 
 export interface NonStreamResult {
   responseData: any;
@@ -18,7 +19,12 @@ export async function handleNonStream(
   try {
     const clonedResponse = response.clone();
     responseData = await clonedResponse.json();
-  } catch {
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    SystemLogger.getInstance()?.logError('response_parse_error', errMsg, undefined, {
+      requestId: logEntry.requestId,
+      provider: provider.provider,
+    });
     return null;
   }
 
