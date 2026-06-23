@@ -3,6 +3,7 @@ import { cors } from 'hono/cors';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { fileURLToPath } from 'url';
 import { dirname, join, join as pathJoin } from 'path';
+import { existsSync } from 'fs';
 import type { ProviderConfig, ProxyConfig } from './config.js';
 import type { Logger } from './logger.js';
 import { DetailLogger } from './detail-logger.js';
@@ -206,11 +207,13 @@ export function createServer(
 
   // 静态文件服务 - 使用绝对路径确保在生产环境和开发环境都能正确找到文件
   const assetsPath = join(__dirname, 'assets');
-  app.use('/assets/*', serveStatic({
-    root: assetsPath,
-    // 移除 /assets 前缀，因为 root 已经指向 assets 目录
-    rewriteRequestPath: (path) => path.replace(/^\/assets/, '')
-  }));
+  if (existsSync(assetsPath)) {
+    app.use('/assets/*', serveStatic({
+      root: assetsPath,
+      // 移除 /assets 前缀，因为 root 已经指向 assets 目录
+      rewriteRequestPath: (path) => path.replace(/^\/assets/, '')
+    }));
+  }
 
   // 404 处理
   app.notFound((c) => {
