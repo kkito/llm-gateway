@@ -326,6 +326,46 @@ describe('handleStream', () => {
     expect(chunks[0]).toContain('"content":"Hi"');
   });
 
+  it('skips SSE ping/comment lines for non-OpenRouter providers', async () => {
+    const c = createMockHonoContext();
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode(': ping\n\n'));
+        controller.enqueue(encoder.encode('data: {"id":"msg","choices":[{"delta":{"content":"Hi"},"index":0}]}\n\n'));
+        controller.close();
+      },
+    });
+    const options: StreamHandlerOptions = {
+      response: new Response(stream),
+      provider: { customModel: 'gpt-4', realModel: 'gpt-4', apiKey: 'x', baseUrl: 'https://api.openai.com', provider: 'openai' },
+      model: 'gpt-4',
+      actualModel: 'gpt-4',
+      requestId: 'req-123',
+      logEntry: {},
+      rateLimiter: createMockRateLimiter(),
+      logger: createMockLogger(),
+      detailLogger: createMockDetailLogger(),
+      c,
+    };
+
+    const res = handleStream(options);
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    const chunks: string[] = [];
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(decoder.decode(value));
+    }
+
+    // Only the data chunk should be present, not the ping comment
+    expect(chunks.length).toBe(1);
+    expect(chunks[0]).toContain('"content":"Hi"');
+    expect(chunks[0]).not.toContain('ping');
+  });
+
   it('returns 500 when response.body is null', () => {
     const c = createMockHonoContext();
     const options: StreamHandlerOptions = {

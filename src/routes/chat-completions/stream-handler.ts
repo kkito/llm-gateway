@@ -155,8 +155,8 @@ export function handleStream(options: StreamHandlerOptions): Response {
           for (const part of parts) {
             if (!part.trim()) continue;
 
-            // Skip OpenRouter comment lines
-            if (provider.baseUrl?.includes('openrouter') && part.startsWith(':')) {
+            // Skip SSE comment lines (e.g., ": ping" keepalive) for all providers
+            if (part.startsWith(':')) {
               continue;
             }
 
