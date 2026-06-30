@@ -16,5 +16,10 @@ export function isAnthropicV1Messages(url: string): boolean {
  */
 export function isAnthropicEndpoint(path: string | undefined): boolean {
   if (path == null) return false
-  return path === '/v1/messages' || path === '/messages' || path.endsWith('/messages')
+  return (
+    path === '/v1/messages' ||
+    path === '/v1/message' ||
+    path === '/messages' ||
+    path.endsWith('/messages')
+  )
 }

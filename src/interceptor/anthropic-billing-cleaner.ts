@@ -11,12 +11,14 @@ const FINGERPRINT_INDICES = [4, 7, 20]
  *
  * 格式：x-anthropic-billing-header: cc_version=xxx; cc_entrypoint=xxx; cch=xxx;正文
  * 或：  x-anthropic-billing-header: cc_version=xxx; cc_entrypoint=xxx; cch=xxx正文
+ * 或：  x-anthropic-billing-header: cc_version=xxx; cc_entrypoint=xxx;正文
+ * 或：  x-anthropic-billing-header: cc_version=xxx; cc_entrypoint=xxx正文
  *
  * - i 标志：大小写不敏感
- * - cch= 后面的 ;? 可选（处理最后无分号的情况）
+ * - cch= 部分可选（某些客户端如 Claude Desktop 不发送）
  * - cch 值允许包含空格（如 "e0    bf8"）
  */
-export const BILLING_HEADER_RE = /^x-anthropic-billing-header:\s*cc_version=[a-zA-Z0-9._-]+;\s*cc_entrypoint=[a-zA-Z0-9._-]+;\s*cch=[a-zA-Z0-9 ._-]+;?\s*/i
+export const BILLING_HEADER_RE = /^x-anthropic-billing-header:\s*cc_version=[a-zA-Z0-9._-]+;\s*cc_entrypoint=[a-zA-Z0-9._-]+;?(?:\s*cch=[a-zA-Z0-9 ._-]+;?)?\s*/i
 
 /**
  * 清理字符串中的 billing header 前缀。
@@ -218,11 +220,24 @@ export const anthropicBillingCleaner: UpstreamInterceptor = async (upstream, ctx
     return msg
   })
 
-  if (!hasChanges) return upstream
+  if (!hasChanges) {
+    if (upstream.headers?.['x-anthropic-billing-header']) {
+      const newHeaders = { ...upstream.headers }
+      delete newHeaders['x-anthropic-billing-header']
+      return { ...upstream, headers: newHeaders }
+    }
+    return upstream
+  }
 
   const newBody: any = { ...body, messages: newMessages }
   if (newSystem !== undefined) {
     newBody.system = newSystem as any[]
   }
-  return { ...upstream, body: newBody }
+
+  const newHeaders = { ...upstream.headers }
+  if (newHeaders['x-anthropic-billing-header']) {
+    delete newHeaders['x-anthropic-billing-header']
+  }
+
+  return { ...upstream, body: newBody, headers: newHeaders }
 }

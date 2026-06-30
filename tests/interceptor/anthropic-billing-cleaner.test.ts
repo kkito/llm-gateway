@@ -650,6 +650,23 @@ describe('anthropicBillingCleaner - fingerprint stabilization', () => {
     expect(text).toBe('cc_version=2.1.87;cc_entrypoint=claude-vscode;cch=a8c1e;You are Claude.')
   })
 
+  it('should handle billing header without cch field (e.g., Claude Desktop)', async () => {
+    const upstream = makeUpstream({
+      body: {
+        model: 'claude-sonnet-4-20250514',
+        messages: [
+          {
+            role: 'system',
+            content: 'x-anthropic-billing-header: cc_version=2.1.187.cfe; cc_entrypoint=claude-desktop-3p; You are Claude Code, Anthropic\'s of',
+          },
+        ],
+      },
+    })
+    const result = await anthropicBillingCleaner(upstream, makeCtx())
+    const systemMsg = result.body.messages[0]
+    expect(systemMsg.content).toBe('You are Claude Code, Anthropic\'s of')
+  })
+
   it('should skip when fingerprint is already stable', async () => {
     const userText = 'Tell me about AI.'
     const baseVersion = '2.1.87'
@@ -720,5 +737,39 @@ describe('anthropicBillingCleaner - fingerprint stabilization', () => {
     // After billing header cleanup and fp stabilization, cc_version should have corrected fingerprint
     expect(text).toBe(`cc_version=${baseVersion}.${correctFp};cc_entrypoint=claude-vscode;cch=a8c1e;You are Claude.`)
     expect(text).not.toContain(`cc_version=${ccVersion}`)
+  })
+
+  it('should process when entry path is /v1/message (singular)', async () => {
+    const upstream = makeUpstream({
+      url: 'https://api.anthropic.com/v1/messages',
+      body: {
+        model: 'claude-sonnet-4-20250514',
+        messages: [
+          { role: 'system', content: 'x-anthropic-billing-header: cc_version=2.1.0; cc_entrypoint=claude-vscode; cch=abc;内容。' },
+        ],
+      },
+    })
+    const ctx = makeCtx({ c: { req: { path: '/v1/message' } } as any })
+    const result = await anthropicBillingCleaner(upstream, ctx)
+    const systemMsg = result.body.messages[0]
+    expect(systemMsg.content).toBe('内容。')
+  })
+
+  it('should remove x-anthropic-billing-header from upstream headers', async () => {
+    const upstream = makeUpstream({
+      headers: {
+        authorization: 'Bearer sk-test',
+        'content-type': 'application/json',
+        'x-anthropic-billing-header': 'cc_version=2.1.0; cc_entrypoint=claude-vscode; cch=abc',
+      },
+      body: {
+        model: 'claude-sonnet-4-20250514',
+        messages: [{ role: 'user', content: 'hi' }],
+      },
+    })
+    const ctx = makeCtx({ c: { req: { path: '/v1/messages' } } as any })
+    const result = await anthropicBillingCleaner(upstream, ctx)
+    expect(result.headers).not.toHaveProperty('x-anthropic-billing-header')
+    expect(result.body).toBe(upstream.body)
   })
 })
