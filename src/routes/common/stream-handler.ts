@@ -3,10 +3,14 @@ import type { DetailLogger } from '../../detail-logger.js';
 import type { RateLimiter } from '../../lib/rate-limiter.js';
 import type { Logger } from '../../logger.js';
 import { createStreamConverterState, type StreamConverterState } from '../../converters/anthropic-to-openai.js';
-import { buildFullOpenAIResponse, parseAndConvertAnthropicSSE } from '../utils/sse-handlers.js';
+import { parseSSEBlock, convertAnthropicStreamEventToOpenAI } from '../../converters/anthropic-to-openai.js';
+import { createOpenAIToAnthropicStreamState, type OpenAIToAnthropicStreamState } from '../../converters/openai-to-anthropic.js';
+import { parseAndConvertOpenAISSE } from '../utils/sse-handlers-messages.js';
 import { sanitizeSSEChunk } from '../../privacy/sanitizer.js';
 import { findFinalUsageFromChunks } from '../../lib/stream-usage.js';
-import { RequestLogger } from '../../lib/request-logger.js';
+import { buildFullOpenAIResponse } from '../utils/sse-handlers.js';
+import type { RequestLogger } from '../../lib/request-logger.js';
+import type { OutputFormat } from './non-stream-handler.js';
 
 export interface StreamHandlerOptions {
   response: Response;
@@ -20,6 +24,7 @@ export interface StreamHandlerOptions {
   logger: Logger;
   detailLogger: DetailLogger;
   c: any;
+  outputFormat: OutputFormat;
   privacySettings?: any;
   requestLogger?: RequestLogger;
   currentUser?: { name: string } | null;
@@ -34,15 +39,23 @@ function isSilentError(err: any): boolean {
 }
 
 export function handleStream(options: StreamHandlerOptions): Response {
-  const { response, provider, model, actualModel, requestId, logEntry, rateLimiter, logger, detailLogger, c, requestLogger, currentUser } = options;
+  const { response, provider, model, actualModel, requestId, logEntry, rateLimiter, logger, detailLogger, c, requestLogger, currentUser, outputFormat } = options;
 
   if (!response.body) {
     return c.json({ error: { message: 'No response body' } }, 500);
   }
 
   const providerFormat = provider.provider;
-  const streamState: StreamConverterState | undefined =
-    providerFormat === 'anthropic' ? createStreamConverterState() : undefined;
+
+  // Initialize stream conversion state based on conversion direction
+  const needsAnthropicToOpenAI = providerFormat === 'anthropic' && outputFormat === 'openai';
+  const needsOpenAIToAnthropic = providerFormat === 'openai' && outputFormat === 'anthropic';
+
+  const anthropicToOpenAIState: StreamConverterState | undefined =
+    needsAnthropicToOpenAI ? createStreamConverterState() : undefined;
+
+  const openAIToAnthropicState: OpenAIToAnthropicStreamState | undefined =
+    needsOpenAIToAnthropic ? createOpenAIToAnthropicStreamState() : undefined;
 
   const chunks: string[] = [];
   const rawChunks: string[] = [];
@@ -53,7 +66,6 @@ export function handleStream(options: StreamHandlerOptions): Response {
     async start(controller) {
       try {
         let buffer = '';
-        let finalUsage: any = null;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -75,10 +87,20 @@ export function handleStream(options: StreamHandlerOptions): Response {
               }
             }
 
+            // Handle remaining buffer data for OpenAI→Anthropic conversion
+            if (needsOpenAIToAnthropic && buffer.trim()) {
+              const part = buffer.trim();
+              const anthropicChunks = parseAndConvertOpenAISSE(part, openAIToAnthropicState!, { requestId, provider: provider.provider });
+              for (const anthropicChunk of anthropicChunks) {
+                chunks.push(anthropicChunk);
+                controller.enqueue(new TextEncoder().encode(anthropicChunk));
+              }
+            }
+
             detailLogger.logStreamResponse(requestId + '_raw', rawChunks);
 
-            // Extract usage using unified function (output is always OpenAI format)
-            const streamUsage = findFinalUsageFromChunks(chunks, 'openai', { requestId, provider: provider.provider });
+            // Extract usage using unified function
+            const streamUsage = findFinalUsageFromChunks(chunks, outputFormat, { requestId, provider: provider.provider });
             if (streamUsage) {
               logEntry.promptTokens = streamUsage.promptTokens;
               logEntry.completionTokens = streamUsage.completionTokens;
@@ -86,27 +108,34 @@ export function handleStream(options: StreamHandlerOptions): Response {
               if (streamUsage.cachedTokens) {
                 logEntry.cachedTokens = streamUsage.cachedTokens;
               }
-              finalUsage = {
-                prompt_tokens: streamUsage.promptTokens,
-                completion_tokens: streamUsage.completionTokens,
-                total_tokens: streamUsage.totalTokens,
-              };
             }
 
-            if (finalUsage) {
-              const finalChunk = `data: ${JSON.stringify({
-                id: requestId,
-                object: 'chat.completion.chunk',
-                created: Math.floor(Date.now() / 1000),
-                model,
-                choices: [{ index: 0, delta: {}, finish_reason: null }],
-                usage: finalUsage,
-              })}\n\n`;
-              controller.enqueue(new TextEncoder().encode(finalChunk));
+            // For OpenAI output, append final usage chunk
+            if (outputFormat === 'openai') {
+              const finalUsage = streamUsage
+                ? {
+                    prompt_tokens: streamUsage.promptTokens,
+                    completion_tokens: streamUsage.completionTokens,
+                    total_tokens: streamUsage.totalTokens,
+                  }
+                : null;
+              if (finalUsage) {
+                const finalChunk = `data: ${JSON.stringify({
+                  id: requestId,
+                  object: 'chat.completion.chunk',
+                  created: Math.floor(Date.now() / 1000),
+                  model,
+                  choices: [{ index: 0, delta: {}, finish_reason: null }],
+                  usage: finalUsage,
+                })}\n\n`;
+                controller.enqueue(new TextEncoder().encode(finalChunk));
+              }
             }
 
             detailLogger.logStreamResponse(requestId, chunks);
-            detailLogger.logConvertedResponse(requestId, buildFullOpenAIResponse(chunks, { requestId, provider: provider.provider }));
+            if (outputFormat === 'openai') {
+              detailLogger.logConvertedResponse(requestId, buildFullOpenAIResponse(chunks, { requestId, provider: provider.provider }));
+            }
             if (requestLogger) {
               requestLogger.log({
                 requestId: logEntry.requestId,
@@ -125,6 +154,8 @@ export function handleStream(options: StreamHandlerOptions): Response {
                 cachedTokens: logEntry.cachedTokens,
                 modelGroup: logEntry.modelGroup,
                 actualModel: logEntry.actualModel,
+                errorMessage: logEntry.error?.message,
+                errorType: logEntry.error?.type,
                 responseMetadata: logEntry.responseMetadata,
               });
             }
@@ -155,22 +186,45 @@ export function handleStream(options: StreamHandlerOptions): Response {
           for (const part of parts) {
             if (!part.trim()) continue;
 
-            // Skip SSE comment lines (e.g., ": ping" keepalive) for all providers
+            // Skip SSE comment lines (e.g., ": ping" keepalive)
             if (part.startsWith(':')) {
               continue;
             }
 
-            if (providerFormat === 'anthropic') {
-              const openAIChunks = parseAndConvertAnthropicSSE(part, requestId, model, streamState!);
-              for (const openAIChunk of openAIChunks) {
-                chunks.push(openAIChunk);
-                let sanitizedChunk = openAIChunk;
-                if (options.privacySettings?.enabled && options.privacySettings.sanitizeFilePaths) {
-                  sanitizedChunk = sanitizeSSEChunk(sanitizedChunk, options.requestId);
+            // Direction 1: Anthropic upstream → OpenAI output
+            if (needsAnthropicToOpenAI) {
+              const openAIChunks = parseSSEBlock(part);
+              for (const parsed of openAIChunks) {
+                const openAIChunk = convertAnthropicStreamEventToOpenAI(parsed.data, requestId, model, anthropicToOpenAIState!);
+                if (openAIChunk) {
+                  let sseLine = `data: ${JSON.stringify(openAIChunk)}\n\n`;
+                  chunks.push(sseLine);
+                  if (options.privacySettings?.enabled && options.privacySettings.sanitizeFilePaths) {
+                    sseLine = sanitizeSSEChunk(sseLine, options.requestId);
+                  }
+                  try {
+                    controller.enqueue(new TextEncoder().encode(sseLine));
+                  } catch (err) {
+                    if (isSilentError(err)) return;
+                    throw err;
+                  }
                 }
-                controller.enqueue(new TextEncoder().encode(sanitizedChunk));
               }
-            } else {
+            }
+            // Direction 2: OpenAI upstream → Anthropic output
+            else if (needsOpenAIToAnthropic) {
+              const anthropicChunks = parseAndConvertOpenAISSE(part, openAIToAnthropicState!, { requestId, provider: provider.provider });
+              for (const anthropicChunk of anthropicChunks) {
+                chunks.push(anthropicChunk);
+                let chunk = anthropicChunk;
+                if (options.privacySettings?.enabled && options.privacySettings.sanitizeFilePaths) {
+                  chunk = sanitizeSSEChunk(chunk, options.requestId);
+                }
+                controller.enqueue(new TextEncoder().encode(chunk));
+              }
+            }
+            // No conversion needed: pass through
+            else {
               let sseLine = part;
               if (!sseLine.startsWith('data:')) {
                 sseLine = `data: ${sseLine}`;

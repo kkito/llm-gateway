@@ -1,5 +1,5 @@
 import type { ProviderConfig } from '../config.js'
-import type { UpstreamRequest } from '../routes/chat-completions/upstream-request.js'
+import type { UpstreamRequest } from '../routes/common/upstream-request.js'
 
 /**
  * 上游请求拦截器的执行上下文。

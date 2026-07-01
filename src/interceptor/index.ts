@@ -1,4 +1,4 @@
-import type { UpstreamRequest } from '../routes/chat-completions/upstream-request.js'
+import type { UpstreamRequest } from '../routes/common/upstream-request.js'
 import type { UpstreamInterceptor, UpstreamInterceptorContext } from './types.js'
 
 export type { UpstreamInterceptor, UpstreamInterceptorContext } from './types.js'

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import type { UpstreamInterceptor, UpstreamInterceptorContext } from './types.js'
-import type { UpstreamRequest } from '../routes/chat-completions/upstream-request.js'
+import type { UpstreamRequest } from '../routes/common/upstream-request.js'
 import { isAnthropicEndpoint } from './helpers.js'
 
 const FINGERPRINT_SALT = '59cf53e54c78'

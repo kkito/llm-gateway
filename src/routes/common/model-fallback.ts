@@ -4,16 +4,16 @@ import type { DetailLogger } from '../../detail-logger.js';
 import type { RateLimiter } from '../../lib/rate-limiter.js';
 import type { RequestLogger } from '../../lib/request-logger.js';
 import { interceptors } from '../../interceptor/index.js';
-import { buildMessagesUpstreamRequest, sendMessagesUpstreamRequest } from './upstream-request.js';
-import { processMessagesSuccess } from './msg-response.js';
+import { buildUpstreamRequest, sendUpstreamRequest } from './upstream-request.js';
+import { processSuccessfulResponse } from './response-processor.js';
 
-export interface MsgFallbackResult {
+export interface FallbackResult {
   actualModel: string | undefined;
   triedModels: Array<{ model: string; exceeded: boolean; message?: string }>;
   response: Response;
 }
 
-export interface MsgFallbackContext {
+export interface FallbackContext {
   c: any;
   modelNames: string[];
   allProviders: ProviderConfig[];
@@ -28,13 +28,14 @@ export interface MsgFallbackContext {
   modelGroupName: string;
   timeoutMs: number;
   logDir: string;
+  outputFormat: 'openai' | 'anthropic';
   privacySettings?: PrivacySettings;
   apiKeys?: ApiKey[];
   requestLogger?: RequestLogger;
 }
 
-export async function tryMessagesFallback(ctx: MsgFallbackContext): Promise<MsgFallbackResult> {
-  const { c, modelNames, allProviders, body, stream, rateLimiter, logger, detailLogger, requestId, startTime, currentUser, modelGroupName, timeoutMs, logDir, privacySettings, requestLogger } = ctx;
+export async function tryModelGroupWithFallback(ctx: FallbackContext): Promise<FallbackResult> {
+  const { c, modelNames, allProviders, body, stream, rateLimiter, logger, detailLogger, requestId, startTime, currentUser, modelGroupName, timeoutMs, logDir, privacySettings, requestLogger, outputFormat } = ctx;
   const triedModels: Array<{ model: string; exceeded: boolean; message?: string }> = [];
   let lastErrorBody: any = null;
   let lastErrorStatus = 500;
@@ -55,7 +56,7 @@ export async function tryMessagesFallback(ctx: MsgFallbackContext): Promise<MsgF
     }
 
     // 3. Build and send upstream request
-    const upstream = await buildMessagesUpstreamRequest(provider, body, stream, ctx.apiKeys);
+    const upstream = await buildUpstreamRequest(provider, body, stream, ctx.apiKeys);
 
     // 执行注册的拦截器，允许对 upstream request 进行自定义修改（如添加缓存 header/body 字段）
     const intercepted = await interceptors.execute(upstream, {
@@ -69,7 +70,7 @@ export async function tryMessagesFallback(ctx: MsgFallbackContext): Promise<MsgF
       modelGroup: ctx.modelGroupName,
     });
 
-    const response = await sendMessagesUpstreamRequest(intercepted, detailLogger, requestId, timeoutMs);
+    const response = await sendUpstreamRequest(intercepted, detailLogger, requestId, timeoutMs);
 
     // 4. If response is not OK, save error and try next model
     if (!response.ok) {
@@ -86,25 +87,12 @@ export async function tryMessagesFallback(ctx: MsgFallbackContext): Promise<MsgF
     }
 
     // 5. Success — process and return
-    const processedResponse = await processMessagesSuccess({
-      c,
-      response,
-      provider,
-      modelName,
-      actualModel: modelName,
-      stream,
-      body,
-      rateLimiter,
-      logger,
-      detailLogger,
-      requestId,
-      startTime,
-      currentUser,
-      modelGroup: modelGroupName,
-      triedModels,
-      privacySettings,
-      requestLogger
-    });
+    const processedResponse = await processSuccessfulResponse(
+      c, response, provider, modelName, stream, body,
+      rateLimiter, logger, detailLogger, requestId,
+      startTime, currentUser, modelGroupName, triedModels,
+      outputFormat, privacySettings, requestLogger
+    );
 
     return {
       actualModel: modelName,

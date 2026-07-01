@@ -1,6 +1,6 @@
 import { resolveApiKey, type ApiKey, type ProviderConfig } from '../../config.js';
 import { buildHeaders, buildUrl } from '../../providers/index.js';
-import { convertAnthropicRequestToOpenAI } from '../../converters/anthropic-to-openai.js';
+import { convertOpenAIRequestToAnthropic } from '../../converters/openai-to-anthropic.js';
 import { mergeModelParams } from '../../lib/params-merger.js';
 import { DetailLogger } from '../../detail-logger.js';
 
@@ -11,15 +11,15 @@ export interface UpstreamRequest {
 }
 
 /**
- * Build the upstream URL, headers, and body for a messages request.
+ * Build the upstream URL, headers, and body for a chat request.
  *
- * For Anthropic providers: direct passthrough with `model` override.
- * For OpenAI providers: converts the body via convertAnthropicRequestToOpenAI.
+ * Body is expected in OpenAI format. For Anthropic providers, the body is
+ * converted via convertOpenAIRequestToAnthropic before sending upstream.
  */
-export async function buildMessagesUpstreamRequest(
+export async function buildUpstreamRequest(
   provider: ProviderConfig,
   body: any,
-  _stream: boolean,
+  stream: boolean,
   apiKeys?: ApiKey[]
 ): Promise<UpstreamRequest> {
   let requestBody: any;
@@ -29,11 +29,15 @@ export async function buildMessagesUpstreamRequest(
     ? { ...provider, apiKey: resolvedKey }
     : provider;
 
-  if (effectiveProvider.provider === 'anthropic') {
-    requestBody = { ...body, model: effectiveProvider.realModel };
+  if (effectiveProvider.provider === 'openai') {
+    requestBody = {
+      ...body,
+      model: effectiveProvider.realModel,
+      ...(stream ? { stream_options: { include_usage: true } } : {})
+    };
   } else {
-    const openaiRequest = convertAnthropicRequestToOpenAI(body);
-    requestBody = { ...openaiRequest, model: effectiveProvider.realModel };
+    const anthropicRequest = await convertOpenAIRequestToAnthropic(body);
+    requestBody = { ...anthropicRequest, model: effectiveProvider.realModel };
   }
 
   const requestHeaders = buildHeaders(effectiveProvider);
@@ -52,7 +56,7 @@ export async function buildMessagesUpstreamRequest(
 /**
  * Make the fetch call to the upstream provider and return the Response.
  */
-export async function sendMessagesUpstreamRequest(
+export async function sendUpstreamRequest(
   upstream: UpstreamRequest,
   detailLogger: DetailLogger,
   requestId: string,
@@ -74,7 +78,6 @@ export async function sendMessagesUpstreamRequest(
     try {
       const errorText = await response.clone().text();
       console.log(`   ❌ [错误详情] ${errorText}`);
-      detailLogger.logUpstreamResponse(requestId, { status: response.status, error: errorText });
     } catch {
       // ignore parse errors
     }

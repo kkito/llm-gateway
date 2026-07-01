@@ -5,13 +5,9 @@ import { v4 as uuidv4 } from 'uuid';
 import { ModelGroupResolver } from '../../lib/model-group-resolver.js';
 import { getCurrentUser } from '../../user/middleware/auth.js';
 import { RateLimiter } from '../../lib/rate-limiter.js';
-import { buildUpstreamRequest, sendUpstreamRequest } from './upstream-request.js';
-import { handleNonStream } from './non-stream-handler.js';
-import { handleStream } from './stream-handler.js';
-import { tryModelGroupWithFallback } from './model-fallback.js';
 import { applyPrivacyProtection } from '../../privacy/apply.js';
-import { restorePaths } from '../../privacy/sanitizer.js';
-import { interceptors } from '../../interceptor/index.js';
+import { handler as commonHandler } from '../common/handler.js';
+import { tryModelGroupWithFallback } from '../common/model-fallback.js';
 import { DatabaseManager } from '../../lib/db.js';
 import { RequestLogger } from '../../lib/request-logger.js';
 
@@ -27,15 +23,8 @@ export function createChatCompletionsHandler(
   return async (c: any, endpoint: string) => {
     const startTime = Date.now();
     const requestId = uuidv4();
-    let customModel = 'unknown';
-    let modelGroup: string | undefined;
-    let actualModel: string | undefined;
-    let triedModels: Array<{ model: string; exceeded: boolean; message?: string }> = [];
     let body: any = {};
-    let provider: ProviderConfig | undefined = undefined;
-    let logEntry: any;
 
-    // Get current user
     const currentUser = (c as any).currentUser || getCurrentUser(c);
 
     const dm = DatabaseManager.getExistingInstance();
@@ -45,10 +34,6 @@ export function createChatCompletionsHandler(
       body = await c.req.json();
       const { model, model_group, stream } = body;
 
-      // Debug log
-      console.log(`   🔍 [调试] body.model=${JSON.stringify(model)}, body.model_group=${JSON.stringify(model_group)}`);
-
-      // Validate mutual exclusivity
       if (model && model_group) {
         return c.json({
           error: { message: 'model and model_group are mutually exclusive', type: 'invalid_request_error' }
@@ -61,280 +46,99 @@ export function createChatCompletionsHandler(
         }, 400);
       }
 
-      // Log raw request (before privacy protection, for audit)
-      // Deep copy to preserve original content since privacy protection mutates in place
       detailLogger.logRequest(requestId, JSON.parse(JSON.stringify(body)));
 
-      // Get latest config
       const currentConfig = typeof config === 'function' ? config() : config;
 
-      // Apply privacy protections (before any routing, so all paths get protection)
       if (currentConfig.privacySettings?.enabled) {
         body = applyPrivacyProtection(body, currentConfig.privacySettings, requestId);
       }
 
-      
+      // Model Group mode
       if (model_group) {
-        // Model Group mode: fallback loop
-        modelGroup = model_group;
         console.log(`\n📥 [请求] ${requestId} - 模型组：${model_group} - 流式：${!!stream}`);
 
         const resolver = new ModelGroupResolver();
         const modelNames = resolver.resolveModelGroup(currentConfig.modelGroups, model_group, currentConfig.models);
         console.log(`   ✓ 匹配 model_group: ${model_group} -> [${modelNames.join(', ')}]`);
 
-        const ctx: any = {
+        return tryModelGroupWithFallback({
           c, modelNames, allProviders: currentConfig.models, body, stream,
           rateLimiter, logger, detailLogger, requestId, startTime,
           currentUser, modelGroupName: model_group, timeoutMs, logDir,
+          outputFormat: 'openai',
           privacySettings: currentConfig.privacySettings,
           apiKeys: currentConfig.apiKeys ?? [],
           requestLogger,
-        };
-        const fallbackResult = await tryModelGroupWithFallback(ctx);
-        actualModel = fallbackResult.actualModel;
-        triedModels = fallbackResult.triedModels;
-        customModel = actualModel || 'unknown';
-        return fallbackResult.response;
-      } else {
-        // Single model mode
-        customModel = model;
-        console.log(`\n📥 [请求] ${requestId} - 模型：${model} - 流式：${!!stream}`);
+        });
+      }
 
-        // Try direct provider lookup first
-        const found = currentConfig.models.find(p => p.customModel === model);
-        if (found) {
-          provider = found;
-          actualModel = model;
-        } else if (currentConfig.modelGroups) {
-          // Try resolving as a model group (smart recognition)
-          try {
-            const resolver = new ModelGroupResolver();
-            const modelNames = resolver.resolveModelGroup(currentConfig.modelGroups, model, currentConfig.models);
-            console.log(`   🔍 智能识别：${model} 被识别为 modelGroup -> [${modelNames.join(', ')}]`);
-            modelGroup = model;
-            console.log(`\n📥 [请求] ${requestId} - 模型组：${model} - 流式：${!!stream}`);
+      // Single model mode
+      console.log(`\n📥 [请求] ${requestId} - 模型：${model} - 流式：${!!stream}`);
 
-            const ctx: any = {
-              c, modelNames, allProviders: currentConfig.models, body, stream,
-              rateLimiter, logger, detailLogger, requestId, startTime,
-              currentUser, modelGroupName: model, timeoutMs, logDir,
-              privacySettings: currentConfig.privacySettings,
-              apiKeys: currentConfig.apiKeys ?? [],
-              requestLogger,
-            };
-            const fallbackResult = await tryModelGroupWithFallback(ctx);
-            actualModel = fallbackResult.actualModel;
-            triedModels = fallbackResult.triedModels;
-            customModel = actualModel || 'unknown';
-            return fallbackResult.response;
-          } catch (_groupError) {
-            // Not a valid modelGroup, fall through to 404 below
-          }
-        }
+      const found = currentConfig.models.find(p => p.customModel === model);
+      if (found) {
+        console.log(`   ✓ 匹配 provider: ${found.customModel} -> ${found.realModel} (${found.provider})`);
+        return commonHandler({
+          c, endpoint, provider: found, body, stream,
+          outputFormat: 'openai',
+          rateLimiter, logger, detailLogger, requestId, startTime,
+          timeoutMs, currentUser,
+          privacySettings: currentConfig.privacySettings,
+          apiKeys: currentConfig.apiKeys ?? [],
+          requestLogger,
+        });
+      }
 
-        if (!provider) {
-          console.log(`   ❌ 未找到模型配置`);
-          logger.log({
-            timestamp: new Date().toISOString(),
-            requestId,
-            customModel: model,
-            endpoint,
-            method: 'POST',
-            statusCode: 404,
-            durationMs: Date.now() - startTime,
-            isStreaming: !!stream,
-            userName: currentUser?.name,
-            error: { message: 'Model not found' }
+      // Smart recognition: try resolving as a model group
+      if (currentConfig.modelGroups) {
+        try {
+          const resolver = new ModelGroupResolver();
+          const modelNames = resolver.resolveModelGroup(currentConfig.modelGroups, model, currentConfig.models);
+          console.log(`   🔍 智能识别：${model} 被识别为 modelGroup -> [${modelNames.join(', ')}]`);
+          console.log(`\n📥 [请求] ${requestId} - 模型组：${model} - 流式：${!!stream}`);
+
+          return tryModelGroupWithFallback({
+            c, modelNames, allProviders: currentConfig.models, body, stream,
+            rateLimiter, logger, detailLogger, requestId, startTime,
+            currentUser, modelGroupName: model, timeoutMs, logDir,
+            outputFormat: 'openai',
+            privacySettings: currentConfig.privacySettings,
+            apiKeys: currentConfig.apiKeys ?? [],
+            requestLogger,
           });
-          if (requestLogger) {
-            requestLogger.log({
-              requestId,
-              timestamp: new Date().toISOString(),
-              userName: currentUser?.name ?? null,
-              customModel: model,
-              endpoint,
-              statusCode: 404,
-              durationMs: Date.now() - startTime,
-              isStreaming: !!stream,
-              errorMessage: 'Model not found',
-            });
-          }
-          return c.json({ error: { message: 'Model not found' } }, 404);
+        } catch (_groupError) {
+          // Not a valid modelGroup, fall through to 404
         }
       }
 
-      console.log(`   ✓ 匹配 provider: ${provider.customModel} -> ${provider.realModel} (${provider.provider})`);
-
-      // Rate limit check
-      try {
-        const limitResult = await rateLimiter.checkLimits(provider, logDir);
-        if (limitResult.exceeded) {
-          console.log(`   ⚠️  [限制触发] ${limitResult.message}`);
-          const errorResponse = rateLimiter.createErrorResponse(limitResult.message!);
-          return c.json(errorResponse, 429);
-        }
-      } catch (error: any) {
-        console.log(`   ❌ [限制检查错误] ${error.message}`);
-        return c.json({ error: { message: error.message } }, 500);
-      }
-
-      // Build and send upstream request
-      const upstream = await buildUpstreamRequest(provider, body, stream, currentConfig.apiKeys ?? []);
-
-      // 执行注册的拦截器，允许对 upstream request 进行自定义修改（如添加缓存 header/body 字段）
-      const intercepted = await interceptors.execute(upstream, {
-        provider,
-        c,
-        currentUser,
-        clientIp: c.req.header('x-forwarded-for') ?? c.req.header('x-real-ip') ?? null,
-        requestId,
-        customModel,
-        stream,
-        modelGroup,
-      });
-
-      const response = await sendUpstreamRequest(intercepted, detailLogger, requestId, timeoutMs);
-
-      // Build log entry
-      logEntry = {
+      console.log(`   ❌ 未找到模型配置`);
+      logger.log({
         timestamp: new Date().toISOString(),
         requestId,
-        customModel: model_group ? actualModel! : model,
-        modelGroup: model_group,
-        actualModel: model_group ? actualModel : actualModel,
-        triedModels: triedModels.length > 0 ? triedModels : undefined,
-        realModel: provider.realModel,
-        provider: provider.provider,
+        customModel: model,
         endpoint,
         method: 'POST',
-        statusCode: response.status,
+        statusCode: 404,
         durationMs: Date.now() - startTime,
         isStreaming: !!stream,
-        userName: currentUser?.name
-      };
-
-      // Auth check
-      if ((c as any).userAuthEnabled && !currentUser) {
-        logger.log({
-          timestamp: new Date().toISOString(),
-          requestId,
-          customModel: model_group ? actualModel! : model,
-          modelGroup: model_group,
-          endpoint,
-          method: 'POST',
-          statusCode: 401,
-          durationMs: Date.now() - startTime,
-          isStreaming: !!stream,
-          userName: currentUser?.name,
-          error: { message: 'Authentication required' }
-        });
-        if (requestLogger) {
-          requestLogger.log({
-            requestId: logEntry.requestId,
-            timestamp: logEntry.timestamp,
-            userName: currentUser?.name ?? null,
-            customModel: logEntry.customModel,
-            realModel: logEntry.realModel,
-            provider: logEntry.provider,
-            endpoint: logEntry.endpoint,
-            statusCode: 401,
-            durationMs: logEntry.durationMs,
-            isStreaming: logEntry.isStreaming,
-            promptTokens: logEntry.promptTokens,
-            completionTokens: logEntry.completionTokens,
-            totalTokens: logEntry.totalTokens,
-            cachedTokens: logEntry.cachedTokens,
-            modelGroup: logEntry.modelGroup,
-            actualModel: logEntry.actualModel,
-            errorMessage: 'Authentication required',
-          });
-        }
-        return c.json({ error: { message: 'Authentication required' } }, 401);
-      }
-
-      // Non-stream response handling
-      if (response.ok && !stream) {
-        const result = await handleNonStream(response, provider, model, logEntry, logger);
-        if (result) {
-          // Restore paths in response
-          if (currentConfig.privacySettings?.enabled && currentConfig.privacySettings.sanitizeFilePaths) {
-            restorePaths(result.responseData, requestId);
-          }
-          logger.log(result.logEntry);
-          if (requestLogger) {
-            requestLogger.log({
-              requestId: result.logEntry.requestId,
-              timestamp: result.logEntry.timestamp,
-              userName: currentUser?.name ?? null,
-              customModel: result.logEntry.customModel,
-              realModel: result.logEntry.realModel,
-              provider: result.logEntry.provider,
-              endpoint: result.logEntry.endpoint,
-              statusCode: result.logEntry.statusCode,
-              durationMs: result.logEntry.durationMs,
-              isStreaming: result.logEntry.isStreaming,
-              promptTokens: result.logEntry.promptTokens,
-              completionTokens: result.logEntry.completionTokens,
-              totalTokens: result.logEntry.totalTokens,
-              cachedTokens: result.logEntry.cachedTokens,
-              modelGroup: result.logEntry.modelGroup,
-              actualModel: result.logEntry.actualModel,
-              responseMetadata: result.logEntry.responseMetadata,
-            });
-          }
-          const pricing = provider.inputPricePer1M !== undefined && provider.outputPricePer1M !== undefined && provider.cachedPricePer1M !== undefined
-            ? { inputPricePer1M: provider.inputPricePer1M, outputPricePer1M: provider.outputPricePer1M, cachedPricePer1M: provider.cachedPricePer1M }
-            : undefined;
-          rateLimiter.recordUsage(actualModel || model, result.logEntry, pricing);
-          return c.json(result.responseData);
-        }
-      }
-
-      logger.log(logEntry);
+        userName: currentUser?.name,
+        error: { message: 'Model not found' }
+      });
       if (requestLogger) {
         requestLogger.log({
-          requestId: logEntry.requestId,
-          timestamp: logEntry.timestamp,
+          requestId,
+          timestamp: new Date().toISOString(),
           userName: currentUser?.name ?? null,
-          customModel: logEntry.customModel,
-          realModel: logEntry.realModel,
-          provider: logEntry.provider,
-          endpoint: logEntry.endpoint,
-          statusCode: logEntry.statusCode,
-          durationMs: logEntry.durationMs,
-          isStreaming: logEntry.isStreaming,
-          promptTokens: logEntry.promptTokens,
-          completionTokens: logEntry.completionTokens,
-          totalTokens: logEntry.totalTokens,
-          cachedTokens: logEntry.cachedTokens,
-          modelGroup: logEntry.modelGroup,
-          actualModel: logEntry.actualModel,
-          errorMessage: logEntry.error?.message,
-          errorType: logEntry.error?.type,
-          responseMetadata: logEntry.responseMetadata,
+          customModel: model,
+          endpoint,
+          statusCode: 404,
+          durationMs: Date.now() - startTime,
+          isStreaming: !!stream,
+          errorMessage: 'Model not found',
         });
       }
-
-      // Fallback for non-OK or empty body
-      if (!response.body) {
-        console.log(`\n❌ [错误] 上游响应体为空 ${requestId}`);
-        return c.json({ error: { message: 'No response body' } }, 500);
-      }
-
-      // Stream response handling
-      if (stream && response.ok) {
-        return handleStream({
-          response, provider, model, actualModel: actualModel || model,
-          requestId, startTime, logEntry, rateLimiter, logger, detailLogger, c,
-          privacySettings: currentConfig.privacySettings,
-          requestLogger,
-          currentUser,
-        });
-      }
-
-      console.log(`\n✅ [完成] ${requestId} - 耗时：${Date.now() - startTime}ms\n`);
-      return c.body(response.body);
+      return c.json({ error: { message: 'Model not found' } }, 404);
 
     } catch (error: any) {
       console.log(`   ❌ [错误] ${error?.message || 'Unknown error'}`);
@@ -344,8 +148,7 @@ export function createChatCompletionsHandler(
       logger.log({
         timestamp: new Date().toISOString(),
         requestId,
-        customModel: modelGroup ? actualModel! : (body.model as string),
-        modelGroup: modelGroup,
+        customModel: body.model as string,
         endpoint,
         method: 'POST',
         statusCode: 500,
@@ -356,22 +159,11 @@ export function createChatCompletionsHandler(
       });
       if (requestLogger) {
         requestLogger.log({
-          requestId: logEntry?.requestId ?? requestId,
-          timestamp: logEntry?.timestamp ?? new Date().toISOString(),
+          requestId, timestamp: new Date().toISOString(),
           userName: currentUser?.name ?? null,
-          customModel: logEntry?.customModel,
-          realModel: logEntry?.realModel,
-          provider: logEntry?.provider,
-          endpoint: logEntry?.endpoint ?? endpoint,
-          statusCode: 500,
-          durationMs: logEntry?.durationMs ?? Date.now() - startTime,
-          isStreaming: false,
-          promptTokens: logEntry?.promptTokens,
-          completionTokens: logEntry?.completionTokens,
-          totalTokens: logEntry?.totalTokens,
-          cachedTokens: logEntry?.cachedTokens,
-          modelGroup: logEntry?.modelGroup,
-          actualModel: logEntry?.actualModel,
+          customModel: body.model as string,
+          endpoint, statusCode: 500,
+          durationMs: Date.now() - startTime, isStreaming: false,
           errorMessage: error.message || 'Internal error',
           errorType: error.name,
         });

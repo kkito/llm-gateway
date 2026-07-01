@@ -3,55 +3,35 @@ import type { Logger } from '../../logger.js';
 import type { DetailLogger } from '../../detail-logger.js';
 import type { RateLimiter } from '../../lib/rate-limiter.js';
 import type { RequestLogger } from '../../lib/request-logger.js';
-import { handleMessagesNonStream } from './non-stream-handler.js';
-import { handleStream as handleMessagesStream } from './stream-handler.js';
+import { handleNonStream, type OutputFormat } from './non-stream-handler.js';
+import { handleStream } from './stream-handler.js';
 import { restorePaths } from '../../privacy/sanitizer.js';
 
-export interface ProcessMsgResponseOptions {
-  c: any;
-  response: Response;
-  provider: ProviderConfig;
-  modelName: string;
-  actualModel: string;
-  stream: boolean;
-  body: any;
-  rateLimiter: RateLimiter;
-  logger: Logger;
-  detailLogger: DetailLogger;
-  requestId: string;
-  startTime: number;
-  currentUser: any;
-  modelGroup: string | undefined;
-  triedModels: Array<{ model: string; exceeded: boolean; message?: string }>;
-  privacySettings?: PrivacySettings;
-  requestLogger?: RequestLogger;
-}
-
-export async function processMessagesSuccess(options: ProcessMsgResponseOptions): Promise<Response> {
-  const {
-    c,
-    response,
-    provider,
-    modelName,
-    stream,
-    rateLimiter,
-    logger,
-    detailLogger,
-    requestId,
-    startTime,
-    currentUser,
-    modelGroup,
-    triedModels,
-    privacySettings,
-    requestLogger
-  } = options;
-
+export async function processSuccessfulResponse(
+  c: any,
+  response: Response,
+  provider: ProviderConfig,
+  modelName: string,
+  stream: boolean,
+  body: any,
+  rateLimiter: RateLimiter,
+  logger: Logger,
+  detailLogger: DetailLogger,
+  requestId: string,
+  startTime: number,
+  currentUser: any,
+  modelGroup: string | undefined,
+  triedModels: Array<{ model: string; exceeded: boolean; message?: string }>,
+  outputFormat: OutputFormat,
+  privacySettings?: PrivacySettings,
+  requestLogger?: RequestLogger
+): Promise<Response> {
   const logEntry: any = {
     timestamp: new Date().toISOString(),
     requestId,
     customModel: modelName,
     modelGroup,
-    actualModel: options.actualModel,
+    actualModel: modelName,
     triedModels: triedModels.length > 0 ? triedModels : undefined,
     realModel: provider.realModel,
     provider: provider.provider,
@@ -75,7 +55,7 @@ export async function processMessagesSuccess(options: ProcessMsgResponseOptions)
 
   // Non-stream path
   if (!stream) {
-    const result = await handleMessagesNonStream(response, provider, modelName, logEntry, logger);
+    const result = await handleNonStream(response, provider, modelName, logEntry, logger, outputFormat);
     if (result) {
       // Restore paths in response before returning
       if (privacySettings?.enabled && privacySettings.sanitizeFilePaths) {
@@ -102,11 +82,11 @@ export async function processMessagesSuccess(options: ProcessMsgResponseOptions)
 
   // Stream path
   if (stream) {
-    return handleMessagesStream({
+    return handleStream({
       response,
       provider,
       model: modelName,
-      actualModel: options.actualModel,
+      actualModel: modelName,
       requestId,
       startTime,
       logEntry,
@@ -116,7 +96,8 @@ export async function processMessagesSuccess(options: ProcessMsgResponseOptions)
       c,
       requestLogger,
       currentUser,
-      privacySettings
+      privacySettings,
+      outputFormat
     });
   }
 

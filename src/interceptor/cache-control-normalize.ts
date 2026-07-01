@@ -1,5 +1,5 @@
 import type { UpstreamInterceptor } from './types.js'
-import type { UpstreamRequest } from '../routes/chat-completions/upstream-request.js'
+import type { UpstreamRequest } from '../routes/common/upstream-request.js'
 import { isAnthropicEndpoint } from './helpers.js'
 
 /**
