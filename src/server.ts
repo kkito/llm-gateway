@@ -9,7 +9,8 @@ import type { Logger } from './logger.js';
 import { DetailLogger } from './detail-logger.js';
 import { createChatCompletionsRoute } from './routes/chat-completions/index.js';
 import { createMessagesRoute } from './routes/messages/index.js';
-import { createModelsRoute } from './admin/routes/models.js';
+import { createModelsRoute } from './routes/models.js';
+import { createModelsPageRoute } from './admin/routes/models.js';
 import { createModelFormRoute } from './admin/routes/model-form.js';
 import { createModelLimitsRoute } from './admin/routes/model-limits.js';
 import { createModelGroupsRoute } from './admin/routes/model-groups.js';
@@ -358,8 +359,11 @@ export function createServer(
     app.route('', createApiKeysRoute({ configPath: ctx.configPath }));
   }
 
-  // 模型列表路由
+  // 模型列表 JSON 接口（OpenAI 兼容，/models 与 /v1/models）
   app.route('', createModelsRoute(() => currentConfig));
+
+  // 模型管理页面（仅 /admin/models 可访问）
+  app.route('', createModelsPageRoute(() => currentConfig));
 
   // 模型表单路由
   if (!isTestEnv) {
