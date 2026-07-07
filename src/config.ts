@@ -38,6 +38,7 @@ export interface ProviderConfig {
   cachedPricePer1M?: number;   // 缓存 token 每百万价格（美元）
   limits?: ModelLimit[];       // 使用限制配置
   hidden?: boolean;            // 是否隐藏该模型（不对外展示）
+  maxContextLength?: number;   // 最大上下文窗口（token 数），未配置时默认 200000
   defaultParams?: Record<string, any>; // 默认参数配置
 }
 
@@ -153,6 +154,13 @@ function validateModelsArray(models: any): ProviderConfig[] {
       if (typeof item.defaultParams !== 'object' || Array.isArray(item.defaultParams) || item.defaultParams === null) {
         throw new Error(`defaultParams must be an object at model ${index}`);
       }
+    }
+  });
+
+  // 补全 maxContextLength 默认值
+  models.forEach((item: any) => {
+    if (item.maxContextLength == null) {
+      item.maxContextLength = 200000;
     }
   });
 
