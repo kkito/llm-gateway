@@ -309,6 +309,22 @@ export const ModelFormPage: FC<Props> = (props) => {
               </div>
 
               <div class="form-group">
+                <label class="form-label" for="maxContextLength">
+                  最大上下文长度（Max Context Length）
+                  <input
+                    class="form-input"
+                    id="maxContextLength"
+                    name="maxContextLength"
+                    type="number"
+                    placeholder="默认 200000"
+                    value={props.model?.maxContextLength || ''}
+                    min={1}
+                  />
+                  <span class="form-hint">模型支持的最大 token 数，未填写则使用默认值 200000</span>
+                </label>
+              </div>
+
+              <div class="form-group">
                 <label class="form-label">
                   默认参数（可选）
                   <JsonEditor

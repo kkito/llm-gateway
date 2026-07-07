@@ -241,6 +241,9 @@ export function createModelFormRoute(deps: RouteDeps) {
       }
     }
 
+    // 解析 maxContextLength
+    const maxContextLength = body.maxContextLength ? Number(body.maxContextLength) : undefined;
+
     // 获取当前配置
     const currentConfig = typeof config === 'function' ? config() : config;
 
@@ -280,7 +283,7 @@ export function createModelFormRoute(deps: RouteDeps) {
       return c.html(
         <ModelFormPage
           error={`模型 "${customModel}" 已存在，请使用不同的名称`}
-          model={{ customModel, realModel, apiKey: finalApiKey, baseUrl, provider, desc, defaultParams }}
+          model={{ customModel, realModel, apiKey: finalApiKey, baseUrl, provider, desc, defaultParams, maxContextLength }}
           apiKeyOptions={getApiKeyOptions(proxyConfig.apiKeys || [])}
         />
       );
@@ -296,6 +299,7 @@ export function createModelFormRoute(deps: RouteDeps) {
         provider,
         desc: desc || undefined,
         defaultParams,
+        maxContextLength,
       };
 
       // 保存到文件 - 保留 apiKeys 等其他配置
@@ -363,6 +367,9 @@ export function createModelFormRoute(deps: RouteDeps) {
       }
     }
 
+    // 解析 maxContextLength
+    const maxContextLength = body.maxContextLength ? Number(body.maxContextLength) : undefined;
+
     // 获取当前配置
     const currentConfig = typeof config === 'function' ? config() : config;
     const oldEntry = currentConfig.models.find(p => p.customModel === oldModel);
@@ -428,6 +435,7 @@ export function createModelFormRoute(deps: RouteDeps) {
         cachedPricePer1M: oldEntry.cachedPricePer1M,
         hidden: hidden || undefined,
         defaultParams,
+        maxContextLength,
       };
 
       const newConfigList = updateConfigEntry(currentConfig.models, oldModel, newEntry);
