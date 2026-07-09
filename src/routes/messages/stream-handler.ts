@@ -184,5 +184,6 @@ export function handleStream(options: StreamHandlerOptions): Response {
     },
   });
 
+  c.header('Content-Type', 'text/event-stream; charset=UTF-8');
   return c.body(transformedStream);
 }

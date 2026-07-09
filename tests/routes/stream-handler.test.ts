@@ -4,8 +4,10 @@ import { handleStream, type StreamHandlerOptions } from '../../src/routes/chat-c
 // ==================== Mock Helpers ====================
 
 function createMockHonoContext(): any {
+  const headers = new Headers();
   return {
-    body: (stream: ReadableStream) => new Response(stream),
+    header: (name: string, value: string) => headers.set(name, value),
+    body: (stream: ReadableStream) => new Response(stream, { headers }),
     json: (data: any, status: number) => new Response(JSON.stringify(data), { status }),
   };
 }
