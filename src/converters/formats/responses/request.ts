@@ -32,9 +32,11 @@ export function responsesToChatRequest(body: any): ChatRequest {
         }],
       });
     } else if (item.type === 'function_call_output') {
+      // Responses API 的 function_call_output 使用 `output` 字段
+      const toolOutput = item.output ?? item.content;
       messages.push({
         role: 'tool',
-        content: typeof item.content === 'string' ? item.content : JSON.stringify(item.content ?? ''),
+        content: typeof toolOutput === 'string' ? toolOutput : JSON.stringify(toolOutput ?? ''),
         tool_call_id: item.call_id || '',
       });
     } else {
