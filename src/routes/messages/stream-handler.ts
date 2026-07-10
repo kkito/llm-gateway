@@ -6,6 +6,8 @@ import { createOpenAIToAnthropicStreamState, type OpenAIToAnthropicStreamState }
 import { parseAndConvertOpenAISSE } from '../utils/sse-handlers-messages.js';
 import { sanitizeSSEChunk } from '../../privacy/sanitizer.js';
 import { findFinalUsageFromChunks } from '../../lib/stream-usage.js';
+import { resolveConverterChain } from '../../converters/router.js';
+import type { FormatName } from '../../converters/format-adapter.js';
 import { RequestLogger } from '../../lib/request-logger.js';
 
 export interface StreamHandlerOptions {
@@ -41,8 +43,9 @@ export function handleStream(options: StreamHandlerOptions): Response {
   }
 
   const providerFormat = provider.provider;
+  const plan = resolveConverterChain('anthropic', providerFormat as FormatName);
   const streamState: OpenAIToAnthropicStreamState | undefined =
-    providerFormat === 'openai' ? createOpenAIToAnthropicStreamState() : undefined;
+    !plan.passthrough ? createOpenAIToAnthropicStreamState() : undefined;
 
   const chunks: string[] = [];
   const rawChunks: string[] = [];
@@ -63,7 +66,7 @@ export function handleStream(options: StreamHandlerOptions): Response {
             // 处理缓冲区中剩余的数据
             if (buffer.trim()) {
               const part = buffer.trim();
-              if (providerFormat === 'openai') {
+              if (!plan.passthrough) {
                 const anthropicChunks = parseAndConvertOpenAISSE(part, streamState!, { requestId, provider: provider.provider });
                 for (const anthropicChunk of anthropicChunks) {
                   chunks.push(anthropicChunk);
@@ -143,7 +146,7 @@ export function handleStream(options: StreamHandlerOptions): Response {
 
             eventCounter++;
 
-            if (providerFormat === 'openai') {
+            if (!plan.passthrough) {
               // OpenAI → Anthropic 流式转换
               const anthropicChunks = parseAndConvertOpenAISSE(part, streamState!, { requestId, provider: provider.provider });
               for (const anthropicChunk of anthropicChunks) {

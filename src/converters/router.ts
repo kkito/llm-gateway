@@ -12,6 +12,11 @@ const REGISTRY: Record<string, FormatAdapter> = {
   'response-api': responsesAdapter,
 };
 
+/** openai 与 chat 是同一 canonical 格式的不同命名，归一化后再比较 */
+function normalizeFormat(format: FormatName): FormatName {
+  return format === 'openai' ? 'chat' : format;
+}
+
 export interface ChainPlan {
   passthrough: boolean;
   source: FormatName;
@@ -21,13 +26,15 @@ export interface ChainPlan {
 }
 
 export function resolveConverterChain(source: FormatName, provider: FormatName): ChainPlan {
+  const normalizedSource = normalizeFormat(source);
+  const normalizedProvider = normalizeFormat(provider);
   const sourceAdapter = REGISTRY[source];
   const providerAdapter = REGISTRY[provider];
   if (!sourceAdapter || !providerAdapter) {
     throw new Error(`unknown format: source=${source} provider=${provider}`);
   }
   return {
-    passthrough: source === provider,
+    passthrough: normalizedSource === normalizedProvider,
     source,
     provider,
     sourceAdapter,

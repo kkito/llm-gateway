@@ -2,6 +2,8 @@ import { resolveApiKey, type ApiKey, type ProviderConfig } from '../../config.js
 import { buildHeaders, buildUrl } from '../../providers/index.js';
 import { convertOpenAIRequestToAnthropic } from '../../converters/formats/anthropic/openai-to-anthropic.js';
 import { mergeModelParams } from '../../lib/params-merger.js';
+import { resolveConverterChain } from '../../converters/router.js';
+import type { FormatName } from '../../converters/format-adapter.js';
 import { DetailLogger } from '../../detail-logger.js';
 
 export interface UpstreamRequest {
@@ -30,7 +32,8 @@ export async function buildUpstreamRequest(
     ? { ...provider, apiKey: resolvedKey }
     : provider;
 
-  if (effectiveProvider.provider === 'openai') {
+  const plan = resolveConverterChain('chat', effectiveProvider.provider as FormatName);
+  if (plan.passthrough) {
     requestBody = {
       ...body,
       model: effectiveProvider.realModel,

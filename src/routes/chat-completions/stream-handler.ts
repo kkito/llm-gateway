@@ -6,6 +6,8 @@ import { createStreamConverterState, type StreamConverterState } from '../../con
 import { buildFullOpenAIResponse, parseAndConvertAnthropicSSE } from '../utils/sse-handlers.js';
 import { sanitizeSSEChunk } from '../../privacy/sanitizer.js';
 import { findFinalUsageFromChunks } from '../../lib/stream-usage.js';
+import { resolveConverterChain } from '../../converters/router.js';
+import type { FormatName } from '../../converters/format-adapter.js';
 import { RequestLogger } from '../../lib/request-logger.js';
 
 export interface StreamHandlerOptions {
@@ -41,8 +43,9 @@ export function handleStream(options: StreamHandlerOptions): Response {
   }
 
   const providerFormat = provider.provider;
+  const plan = resolveConverterChain('chat', providerFormat as FormatName);
   const streamState: StreamConverterState | undefined =
-    providerFormat === 'anthropic' ? createStreamConverterState() : undefined;
+    !plan.passthrough ? createStreamConverterState() : undefined;
 
   const chunks: string[] = [];
   const rawChunks: string[] = [];
@@ -160,7 +163,7 @@ export function handleStream(options: StreamHandlerOptions): Response {
               continue;
             }
 
-            if (providerFormat === 'anthropic') {
+            if (!plan.passthrough) {
               const openAIChunks = parseAndConvertAnthropicSSE(part, requestId, model, streamState!);
               for (const openAIChunk of openAIChunks) {
                 chunks.push(openAIChunk);

@@ -1,7 +1,7 @@
 // src/converters/format-adapter.ts
 import type { ChatRequest, ChatResponse, ChatStreamChunk } from './canonical/types.js';
 
-export type FormatName = 'chat' | 'anthropic' | 'responses' | 'response-api';
+export type FormatName = 'chat' | 'openai' | 'anthropic' | 'responses' | 'response-api';
 
 /** 有状态流式转换器：一条上游 chunk -> 0..n 条下游 chunk；flush 收尾 */
 export interface StreamConverter {

@@ -1,6 +1,8 @@
 import type { ProviderConfig } from '../../config.js';
 import type { Logger } from '../../logger.js';
 import { convertAnthropicResponseToOpenAI } from '../../converters/formats/anthropic/openai-to-anthropic.js';
+import { resolveConverterChain } from '../../converters/router.js';
+import type { FormatName } from '../../converters/format-adapter.js';
 import { SystemLogger } from '../../lib/system-logger.js';
 
 export interface NonStreamResult {
@@ -28,7 +30,8 @@ export async function handleNonStream(
     return null;
   }
 
-  if (provider.provider === 'anthropic') {
+  const plan = resolveConverterChain('chat', provider.provider as FormatName);
+  if (!plan.passthrough) {
     const converted = convertAnthropicResponseToOpenAI(responseData, model);
     responseData = converted;
 

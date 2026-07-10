@@ -2,6 +2,8 @@ import { resolveApiKey, type ApiKey, type ProviderConfig } from '../../config.js
 import { buildHeaders, buildUrl } from '../../providers/index.js';
 import { convertAnthropicRequestToOpenAI } from '../../converters/formats/anthropic/anthropic-to-openai.js';
 import { mergeModelParams } from '../../lib/params-merger.js';
+import { resolveConverterChain } from '../../converters/router.js';
+import type { FormatName } from '../../converters/format-adapter.js';
 import { DetailLogger } from '../../detail-logger.js';
 
 export interface UpstreamRequest {
@@ -29,7 +31,8 @@ export async function buildMessagesUpstreamRequest(
     ? { ...provider, apiKey: resolvedKey }
     : provider;
 
-  if (effectiveProvider.provider === 'anthropic') {
+  const plan = resolveConverterChain('anthropic', effectiveProvider.provider as FormatName);
+  if (plan.passthrough) {
     requestBody = { ...body, model: effectiveProvider.realModel };
   } else {
     const openaiRequest = convertAnthropicRequestToOpenAI(body);

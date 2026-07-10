@@ -16,4 +16,18 @@ describe('router', () => {
     const plan = resolveConverterChain('responses', 'response-api');
     expect(plan.passthrough).toBe(false);
   });
+  it('openai->anthropic 走 chat 中转', () => {
+    const plan = resolveConverterChain('openai', 'anthropic');
+    expect(plan.passthrough).toBe(false);
+    expect(plan.source).toBe('openai');
+    expect(plan.provider).toBe('anthropic');
+  });
+  it('chat->chat 透传', () => {
+    const plan = resolveConverterChain('chat', 'chat');
+    expect(plan.passthrough).toBe(true);
+  });
+  it('openai->openai 透传 (response-api 视为 openai 兼容)', () => {
+    const plan = resolveConverterChain('openai', 'openai');
+    expect(plan.passthrough).toBe(true);
+  });
 });

@@ -1,6 +1,8 @@
 import type { ProviderConfig } from '../../config.js';
 import type { Logger } from '../../logger.js';
 import { convertOpenAIResponseToAnthropic } from '../../converters/formats/anthropic/anthropic-to-openai.js';
+import { resolveConverterChain } from '../../converters/router.js';
+import type { FormatName } from '../../converters/format-adapter.js';
 import { SystemLogger } from '../../lib/system-logger.js';
 
 export interface NonStreamResult {
@@ -28,7 +30,8 @@ export async function handleMessagesNonStream(
     return null;
   }
 
-  if (provider.provider === 'openai') {
+  const plan = resolveConverterChain('anthropic', provider.provider as FormatName);
+  if (!plan.passthrough) {
     // Extract tokens from original OpenAI response before conversion
     const originalUsage = responseData.usage;
     logEntry.promptTokens = originalUsage?.prompt_tokens;
