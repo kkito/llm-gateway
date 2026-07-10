@@ -38,4 +38,67 @@ describe('responses request', () => {
     expect(r.input[0].role).toBe('user');
     expect(r.input[0].content).toBe('hi');
   });
+
+  it('扁平 tools -> chat function.name 保留', () => {
+    const r = {
+      model: 'gpt-4o',
+      tools: [{ type: 'function', name: 'get_weather', description: 'd', parameters: { type: 'object' } }],
+      input: 'hi',
+    };
+    const chat = responsesToChatRequest(r);
+    expect(chat.tools?.[0].function.name).toBe('get_weather');
+    expect(chat.tools?.[0].function.description).toBe('d');
+  });
+
+  it('嵌套 tools 也能解析出 function.name（保真对齐 SDK）', () => {
+    const r = {
+      model: 'gpt-4o',
+      tools: [{ type: 'function', function: { name: 'get_weather', description: 'd', parameters: {} } }],
+      input: 'hi',
+    };
+    const chat = responsesToChatRequest(r);
+    expect(chat.tools?.[0].function.name).toBe('get_weather');
+    expect(chat.tools?.[0].function.description).toBe('d');
+  });
+
+  it('非 function 工具（web_search/namespace）被丢弃，不生成缺 name 的畸形 tool', () => {
+    const r = {
+      model: 'gpt-4o',
+      tools: [
+        { type: 'function', name: 'exec_command', description: 'run', parameters: {} },
+        { type: 'web_search', external_web_access: false },
+        { type: 'namespace', name: 'multi_agent_v1' },
+        { type: 'function', function: { name: 'get_weather' } },
+      ],
+      input: 'hi',
+    };
+    const chat = responsesToChatRequest(r);
+    expect(chat.tools).toHaveLength(2);
+    expect(chat.tools!.map((t) => t.function.name).sort()).toEqual(['exec_command', 'get_weather']);
+    // 转发出去的所有 tool 都必须带 name
+    for (const t of chat.tools!) {
+      expect(t.function.name).toBeTruthy();
+      expect(t.type).toBe('function');
+    }
+  });
+
+  it('tool_choice 双向转换', () => {
+    const r = { model: 'gpt-4o', input: 'hi', tool_choice: { type: 'function', name: 'get_weather' } };
+    const chat = responsesToChatRequest(r);
+    expect(chat.tool_choice).toEqual({ type: 'function', function: { name: 'get_weather' } });
+
+    const back = chatToResponsesRequest(chat);
+    expect(back.tool_choice).toEqual({ type: 'function', name: 'get_weather' });
+  });
+
+  it('chat -> responses 工具补全 type:"function"', () => {
+    const chat = {
+      model: 'gpt-4o',
+      messages: [{ role: 'user', content: 'hi' }],
+      tools: [{ type: 'function', function: { name: 'get_weather', description: 'd', parameters: {} } }],
+    } as any;
+    const r = chatToResponsesRequest(chat);
+    expect(r.tools[0].type).toBe('function');
+    expect(r.tools[0].name).toBe('get_weather');
+  });
 });

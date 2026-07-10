@@ -38,6 +38,7 @@ export interface ChatRequest {
   model: string;
   messages: ChatMessage[];
   tools?: ChatTool[];
+  tool_choice?: any;
   max_tokens?: number;
   stream?: boolean;
   temperature?: number;

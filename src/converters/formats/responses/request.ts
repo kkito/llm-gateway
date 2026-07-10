@@ -51,17 +51,28 @@ export function responsesToChatRequest(body: any): ChatRequest {
     }
   }
 
-  const tools: ChatTool[] | undefined = body.tools?.map((t: any) => ({
-    type: 'function',
-    function: { name: t.name, description: t.description ?? '', parameters: t.parameters ?? {} },
-  }));
+  // OpenAI Responses 的 tools 可能是多种类型：
+  // - function（扁平 {type,name,...} 或嵌套 {type,function:{name,...}}）→ 转 openai function tool
+  // - namespace / web_search / 其他内置工具 → openai chat 端点不支持，直接丢弃
+  // 只转发 function 工具，避免生成缺 name 的畸形 tool 导致上游 400。
+  const tools: ChatTool[] | undefined = body.tools
+    ?.filter((t: any) => t?.type === 'function')
+    .map((t: any) => {
+      const fn = t.function ?? t;
+      return {
+        type: 'function',
+        function: { name: fn.name, description: fn.description ?? '', parameters: fn.parameters ?? {} },
+      };
+    });
 
   return {
     model: body.model,
     messages,
     tools,
+    tool_choice: body.tool_choice ? mapToolChoiceToChat(body.tool_choice) : undefined,
     max_tokens: body.max_output_tokens,
     stream: body.stream,
+    temperature: body.temperature,
     previousResponseId: body.previous_response_id,
     responseInstructions: body.instructions,
   };
@@ -94,10 +105,30 @@ export function chatToResponsesRequest(chat: ChatRequest): any {
   const result: any = { model: chat.model, input };
   if (instructions) result.instructions = instructions;
   if (chat.previousResponseId) result.previous_response_id = chat.previousResponseId;
-  if (chat.tools) result.tools = chat.tools.map((t) => ({ name: t.function.name, description: t.function.description, parameters: t.function.parameters }));
+  if (chat.tools) result.tools = chat.tools.map((t) => ({ type: 'function', name: t.function.name, description: t.function.description, parameters: t.function.parameters }));
+  if (chat.tool_choice) result.tool_choice = mapChatToolChoiceToResponses(chat.tool_choice);
   if (chat.stream) result.stream = true;
+  if (chat.temperature !== undefined) result.temperature = chat.temperature;
   if (chat.max_tokens) result.max_output_tokens = chat.max_tokens;
   return result;
+}
+
+/** Responses tool_choice ({type:"function", name}) -> chat tool_choice ({type:"function", function:{name}}) */
+function mapToolChoiceToChat(toolChoice: any): any {
+  if (typeof toolChoice === 'string') return toolChoice;
+  if (toolChoice && toolChoice.type === 'function') {
+    return { type: 'function', function: { name: toolChoice.name } };
+  }
+  return toolChoice;
+}
+
+/** chat tool_choice ({type:"function", function:{name}}) -> Responses tool_choice ({type:"function", name}) */
+function mapChatToolChoiceToResponses(toolChoice: any): any {
+  if (typeof toolChoice === 'string') return toolChoice;
+  if (toolChoice && toolChoice.type === 'function') {
+    return { type: 'function', name: toolChoice.function?.name };
+  }
+  return toolChoice;
 }
 
 function normalizeInput(input: any): ResponsesInputItem[] {

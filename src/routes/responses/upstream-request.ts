@@ -2,6 +2,7 @@ import { resolveApiKey, type ApiKey, type ProviderConfig } from '../../config.js
 import { buildHeaders, buildUrl } from '../../providers/index.js';
 import { resolveConverterChain } from '../../converters/router.js';
 import { mergeModelParams } from '../../lib/params-merger.js';
+import { filterOpenAIChatFields } from '../../lib/openai-chat-fields.js';
 import { DetailLogger } from '../../detail-logger.js';
 
 export interface UpstreamRequest {
@@ -43,6 +44,14 @@ export async function buildResponsesUpstreamRequest(
 
   // 合并默认参数（用户参数优先级更高）
   requestBody = mergeModelParams(effectiveProvider.defaultParams, requestBody);
+
+  // 仅对 openai-compatible chat 端点收敛为白名单字段，防止 Responses 保真字段
+  // （previous_response_id/instructions）或 provider 自定义 defaultParams
+  // （thinking/reasoning_effort）泄漏到上游导致 400。
+  // response-api passthrough 路径保留完整 Responses 字段，不做过滤。
+  if (endpoint === 'chat') {
+    requestBody = filterOpenAIChatFields(requestBody);
+  }
 
   return {
     url,
