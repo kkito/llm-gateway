@@ -73,6 +73,14 @@ export function parseAndConvertOpenAISSE(
     if (!parsedData.choices || parsedData.choices.length === 0) {
       // 这是正常的，通常出现在流结束时携带 usage 信息
       emptyChoicesCount++;
+      // 但若该帧携带 usage 或 finish_reason（上游常把收尾信息放在空 choices 帧），
+      // 仍需交给 converter 以补发 message_delta / message_stop，否则流无法正常关闭
+      if (parsedData.usage || (parsedData as any).finish_reason) {
+        const anthropicEvents = convertOpenAIStreamChunkToAnthropic(parsedData, state);
+        for (const event of anthropicEvents) {
+          anthropicChunks.push(formatAnthropicEventToSSE(event));
+        }
+      }
       continue;
     }
 

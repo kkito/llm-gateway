@@ -107,6 +107,7 @@ export interface StreamConverterState {
  */
 export interface OpenAIToAnthropicStreamState {
   sentMessageStart: boolean;
+  sentMessageStop: boolean;
   sentContentBlockStart: boolean;
   sentContentBlockFinish: boolean;
   currentContentBlockType: 'text' | 'tool_use' | 'thinking';
@@ -143,6 +144,7 @@ export function createStreamConverterState(): StreamConverterState {
 export function createOpenAIToAnthropicStreamState(): OpenAIToAnthropicStreamState {
   return {
     sentMessageStart: false,
+    sentMessageStop: false,
     sentContentBlockStart: false,
     sentContentBlockFinish: false,
     currentContentBlockType: 'text',

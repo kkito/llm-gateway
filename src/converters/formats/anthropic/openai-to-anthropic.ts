@@ -450,7 +450,8 @@ export function convertOpenAIStreamChunkToAnthropic(
 
   const choice = chunk.choices?.[0];
   const delta = choice?.delta;
-  const finishReason = choice?.finish_reason;
+  // finish_reason 可能在 choices[0] 中，也可能在 chunk 顶层（上游空 choices 收尾帧）
+  const finishReason = choice?.finish_reason ?? (chunk as any).finish_reason;
 
   // 1. 第一次 chunk：发送 message_start
   if (!s.sentMessageStart) {
@@ -634,6 +635,13 @@ export function convertOpenAIStreamChunkToAnthropic(
 
   // 8. 处理 finish_reason（结束消息）
   if (finishReason) {
+    // 防止上游重复发送 finish_reason 导致多个 message_stop
+    // （多个 message_stop 会让 Anthropic 客户端报 "message_stop without a current message"）
+    if (s.sentMessageStop) {
+      return events;
+    }
+    s.sentMessageStop = true;
+
     // 结束当前 content block
     if (s.sentContentBlockStart && !s.sentContentBlockFinish) {
       events.push({

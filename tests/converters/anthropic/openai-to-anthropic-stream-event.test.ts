@@ -138,4 +138,41 @@ describe('openai-to-anthropic converter - stream event conversion', () => {
     expect(deltaEvent?.usage?.input_tokens).toBe(10);
     expect(deltaEvent?.usage?.output_tokens).toBe(20);
   });
+
+  it('deduplicates message_stop when upstream sends finish_reason twice', () => {
+    const state = createState();
+    state.sentMessageStart = true;
+    state.sentContentBlockStart = true;
+    state.sentContentBlockFinish = true;
+    const finishChunk = {
+      id: 'chatcmpl-123', object: 'chat.completion.chunk' as const, created: 123, model: 'gpt-4',
+      choices: [{ index: 0, delta: {}, finish_reason: 'stop' }]
+    };
+    const first = convertOpenAIStreamChunkToAnthropic(finishChunk, state);
+    const second = convertOpenAIStreamChunkToAnthropic(finishChunk, state);
+    expect(first.filter(e => e.type === 'message_stop').length).toBe(1);
+    // 第二个 finish_reason 不应再产生 message_stop（否则客户端报 "message_stop without a current message"）
+    expect(second.filter(e => e.type === 'message_stop').length).toBe(0);
+    expect(second.length).toBe(0);
+  });
+
+  it('emits message_delta+message_stop from a usage-only chunk with top-level finish_reason', () => {
+    const state = createState();
+    state.sentMessageStart = true;
+    state.sentContentBlockStart = true;
+    state.sentContentBlockFinish = true;
+    // 上游常在空 choices 帧里放顶层 finish_reason + usage 作为收尾
+    const tailChunk = {
+      id: 'chatcmpl-123', object: 'chat.completion.chunk' as const, created: 123, model: 'gpt-4',
+      choices: [],
+      finish_reason: 'stop',
+      usage: { prompt_tokens: 5, completion_tokens: 7, total_tokens: 12 }
+    };
+    const result = convertOpenAIStreamChunkToAnthropic(tailChunk, state);
+    expect(result.some(e => e.type === 'message_delta')).toBe(true);
+    expect(result.some(e => e.type === 'message_stop')).toBe(true);
+    const deltaEvent = result.find(e => e.type === 'message_delta');
+    expect(deltaEvent?.usage?.input_tokens).toBe(5);
+    expect(deltaEvent?.usage?.output_tokens).toBe(7);
+  });
 });
