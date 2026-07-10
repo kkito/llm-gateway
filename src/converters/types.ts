@@ -2,7 +2,13 @@
  * Anthropic 和 OpenAI 共享类型定义
  *
  * 用于协议转换器的共享类型
+ *
+ * @deprecated canonical 类型已迁移到 ./canonical/types.js，本文件同时做兼容 re-export。
+ * 下方保留的 Anthropic/OpenAI 类型将在后续任务随 converter 迁移到 formats/ 目录。
  */
+
+// 归一化 canonical Chat* 类型 re-export（新架构入口）
+export * from './canonical/types.js';
 
 // ==================== Anthropic 类型 ====================
 
