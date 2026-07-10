@@ -1,5 +1,5 @@
 import type { SSEParseResult } from './types.js';
-import { SystemLogger } from '../../lib/system-logger.js';
+import { SystemLogger } from '../../../../lib/system-logger.js';
 
 /**
  * 解析 SSE 数据行（支持 event 和 data 前缀）

@@ -15,11 +15,11 @@ import {
   type OpenAITool,
   type OpenAIRequest,
   type OpenAIResponse
-} from './types.js';
+} from '../../types.js';
 
 import type { OpenAIStreamChunk, AnthropicStreamEvent, StreamConverterState } from './shared/types.js';
 import { mapAnthropicToOpenAIFinishReason, createStreamConverterState } from './shared/index.js';
-import { SystemLogger, type SystemLogContext } from '../lib/system-logger.js';
+import { SystemLogger, type SystemLogContext } from '../../../lib/system-logger.js';
 export { createStreamConverterState, type StreamConverterState } from './shared/types.js';
 
 // ==================== 请求转换：Anthropic → OpenAI ====================

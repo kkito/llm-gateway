@@ -1,6 +1,6 @@
 import { resolveApiKey, type ApiKey, type ProviderConfig } from '../../config.js';
 import { buildHeaders, buildUrl } from '../../providers/index.js';
-import { convertOpenAIRequestToAnthropic } from '../../converters/openai-to-anthropic.js';
+import { convertOpenAIRequestToAnthropic } from '../../converters/formats/anthropic/openai-to-anthropic.js';
 import { mergeModelParams } from '../../lib/params-merger.js';
 import { DetailLogger } from '../../detail-logger.js';
 

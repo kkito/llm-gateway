@@ -1,6 +1,6 @@
 import type { ProviderConfig } from '../../config.js';
 import type { Logger } from '../../logger.js';
-import { convertOpenAIResponseToAnthropic } from '../../converters/anthropic-to-openai.js';
+import { convertOpenAIResponseToAnthropic } from '../../converters/formats/anthropic/anthropic-to-openai.js';
 import { SystemLogger } from '../../lib/system-logger.js';
 
 export interface NonStreamResult {

@@ -14,7 +14,7 @@ import {
   type OpenAIMessage,
   type OpenAIRequest,
   type OpenAIResponse
-} from './types.js';
+} from '../../types.js';
 
 import type { OpenAIStreamChunk, AnthropicStreamEvent, OpenAIToAnthropicStreamState } from './shared/types.js';
 import { mapOpenAIToAnthropicFinishReason } from './shared/finish-reason.js';

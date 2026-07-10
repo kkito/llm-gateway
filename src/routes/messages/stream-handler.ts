@@ -2,7 +2,7 @@ import type { ProviderConfig } from '../../config.js';
 import type { DetailLogger } from '../../detail-logger.js';
 import type { RateLimiter } from '../../lib/rate-limiter.js';
 import type { Logger } from '../../logger.js';
-import { createOpenAIToAnthropicStreamState, type OpenAIToAnthropicStreamState } from '../../converters/openai-to-anthropic.js';
+import { createOpenAIToAnthropicStreamState, type OpenAIToAnthropicStreamState } from '../../converters/formats/anthropic/openai-to-anthropic.js';
 import { parseAndConvertOpenAISSE } from '../utils/sse-handlers-messages.js';
 import { sanitizeSSEChunk } from '../../privacy/sanitizer.js';
 import { findFinalUsageFromChunks } from '../../lib/stream-usage.js';

@@ -6,7 +6,7 @@ import {
   convertOpenAIStreamChunkToAnthropic,
   formatAnthropicEventToSSE,
   type OpenAIToAnthropicStreamState
-} from '../../converters/openai-to-anthropic.js';
+} from '../../converters/formats/anthropic/openai-to-anthropic.js';
 import { SystemLogger, type SystemLogContext } from '../../lib/system-logger.js';
 
 /**

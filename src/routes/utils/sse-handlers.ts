@@ -6,7 +6,7 @@ import {
   parseSSEBlock,
   convertAnthropicStreamEventToOpenAI,
   type StreamConverterState
-} from '../../converters/anthropic-to-openai.js';
+} from '../../converters/formats/anthropic/anthropic-to-openai.js';
 import { SystemLogger, type SystemLogContext } from '../../lib/system-logger.js';
 
 /**
