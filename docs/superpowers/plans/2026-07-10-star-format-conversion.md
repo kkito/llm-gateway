@@ -1290,7 +1290,7 @@ git commit -m "feat(responses): 流式命名事件状态机（含 Read 清洗/re
 - Create: `src/routes/responses/non-stream-handler.ts`
 - Modify: 主路由注册处（如 `src/routes/index.ts` 或 `src/app.ts`）
 
-- [ ] **Step 1: 扩展 ProviderType**
+- [x] **Step 1: 扩展 ProviderType**
 
 ```ts
 // src/config.ts
@@ -1298,7 +1298,7 @@ export type ProviderType = 'openai' | 'anthropic' | 'response-api';
 ```
 同步检查 `src/lib/schema.ts` 与任何对 provider 字符串的校验（如 `providers/openai.ts`、`providers/anthropic.ts` 的 `getType()`），为 `response-api` 返回合适的 `BaseProvider` 子类或在 `getType()` 映射中处理。若 `getEndpoint('chat')` 对 response-api 需指向 `/v1/responses`，新增一个 `ResponseApiProvider` 或在 `buildUrl` 中按 `provider.provider === 'response-api'` 选择 endpoint `'responses'`。
 
-- [ ] **Step 2: 写 upstream-request.ts（用 router 链）**
+- [x] **Step 2: 写 upstream-request.ts（用 router 链）**
 
 ```ts
 // src/routes/responses/upstream-request.ts
@@ -1330,7 +1330,7 @@ export async function buildResponsesUpstreamRequest(
 }
 ```
 
-- [ ] **Step 3: 写 stream-handler.ts（串联两段有状态流）**
+- [x] **Step 3: 写 stream-handler.ts（串联两段有状态流）**
 
 ```ts
 // src/routes/responses/stream-handler.ts
@@ -1382,20 +1382,20 @@ export function handleResponsesStream(opts: {
 }
 ```
 
-- [ ] **Step 4: 写 non-stream-handler.ts 与 handler.ts（镜像 messages 路由，调用 router）**
+- [x] **Step 4: 写 non-stream-handler.ts 与 handler.ts（镜像 messages 路由，调用 router）**
 
 注意：`handler.ts` 复用 `buildResponsesUpstreamRequest` 与 `handleResponsesStream`，非流式分支调用 `plan.providerAdapter.toChatResponse` / `plan.sourceAdapter.fromChatResponse` 还原。具体代码参照现有 `src/routes/messages/handler.ts` 与 `non-stream-handler.ts` 结构平移，仅把直接的 `convertAnthropic* / convertOpenAI*` 调用替换为 router 链调用。
 
-- [ ] **Step 5: 主路由注册**
+- [x] **Step 5: 主路由注册**
 
 在路由注册处加：`app.post('/v1/responses', responsesHandler)`。
 
-- [ ] **Step 6: 类型检查 + 运行全量测试**
+- [x] **Step 6: 类型检查 + 运行全量测试**
 
 Run: `npx tsc --noEmit && npx vitest run`
 Expected: 编译通过；全部测试 PASS。
 
-- [ ] **Step 7: 提交**
+- [x] **Step 7: 提交**
 
 ```bash
 git add -A src/config.ts src/routes/responses src/routes/index.ts
@@ -1414,7 +1414,7 @@ git commit -m "feat: 新增 /v1/responses 路由并扩展 ProviderType 支持 re
 - Modify: `src/routes/chat-completions/stream-handler.ts`
 - Modify: `src/routes/chat-completions/non-stream-handler.ts`
 
-- [ ] **Step 1: messages/upstream-request.ts 改为 router 链**
+- [x] **Step 1: messages/upstream-request.ts 改为 router 链**
 
 将：
 ```ts
@@ -1429,7 +1429,7 @@ requestBody = { ...plan.providerAdapter.fromChatRequest(chat), model: effectiveP
 ```
 （对 `provider === 'anthropic'` 分支保持 passthrough 不变，或交给 router 自动 passthrough。）
 
-- [ ] **Step 2: chat-completions/upstream-request.ts 改为 router 链**
+- [x] **Step 2: chat-completions/upstream-request.ts 改为 router 链**
 
 将：
 ```ts
@@ -1443,18 +1443,18 @@ const chat = plan.sourceAdapter.toChatRequest(body);
 requestBody = { ...plan.providerAdapter.fromChatRequest(chat), model: effectiveProvider.realModel };
 ```
 
-- [ ] **Step 3: 两个 stream-handler 改为串联两段有状态流（参照 Task 8 的 handleResponsesStream 写法）**
+- [x] **Step 3: 两个 stream-handler 改为串联两段有状态流（参照 Task 8 的 handleResponsesStream 写法）**
 
 `messages/stream-handler.ts` 用 `resolveConverterChain('anthropic', provider.provider)`；`chat-completions/stream-handler.ts` 用 `resolveConverterChain('openai', provider.provider)`。上游段 `providerAdapter.createUpstreamStream()` → 下游段 `sourceAdapter.createDownstreamStream()`。passthrough 时两段均为恒等/直传。
 
-- [ ] **Step 4: 非流式 handler 同样用 router 还原响应**
+- [x] **Step 4: 非流式 handler 同样用 router 还原响应**
 
-- [ ] **Step 5: 运行全量测试确认行为不变**
+- [x] **Step 5: 运行全量测试确认行为不变**
 
 Run: `npx vitest run`
 Expected: 全部 PASS（与改造前一致）。
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 git add -A src/routes/messages src/routes/chat-completions
@@ -1469,7 +1469,7 @@ git commit -m "refactor: messages/chat-completions 路由统一走 router 转换
 - Test: `tests/converters/router.test.ts`（已建，补 passthrough 场景）
 - 运行：全量 `npx vitest run`
 
-- [ ] **Step 1: 补 router passthrough / 跨格式测试**
+- [x] **Step 1: 补 router passthrough / 跨格式测试**
 
 在 `tests/converters/router.test.ts` 增加：
 ```ts
@@ -1481,17 +1481,17 @@ it('chat->chat 透传', () => {
 });
 ```
 
-- [ ] **Step 2: 运行全量测试**
+- [x] **Step 2: 运行全量测试**
 
 Run: `npx vitest run`
 Expected: 全部 PASS（含 `tests/converters/**` 全部遗留与新增用例）。
 
-- [ ] **Step 3: 类型检查**
+- [x] **Step 3: 类型检查**
 
 Run: `npx tsc --noEmit`
 Expected: 无错误。
 
-- [ ] **Step 4: 提交**
+- [x] **Step 4: 提交**
 
 ```bash
 git add -A tests/converters/router.test.ts
