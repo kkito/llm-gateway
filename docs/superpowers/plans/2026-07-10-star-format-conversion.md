@@ -239,7 +239,7 @@ Expected: FAIL（`Cannot find module '../../src/converters/router.js'`）
 // src/converters/format-adapter.ts
 import type { ChatRequest, ChatResponse, ChatStreamChunk } from './canonical/types.js';
 
-export type FormatName = 'chat' | 'anthropic' | 'responses' | 'response-api';
+export type FormatName = 'chat' | 'openai' | 'anthropic' | 'responses' | 'response-api';
 
 /** 有状态流式转换器：一条上游 chunk -> 0..n 条下游 chunk；flush 收尾 */
 export interface StreamConverter {
@@ -268,6 +268,7 @@ import { responsesAdapter } from './formats/responses/index.js';
 
 const REGISTRY: Record<string, FormatAdapter> = {
   chat: chatAdapter,
+  openai: chatAdapter,
   anthropic: anthropicAdapter,
   responses: responsesAdapter,
   'response-api': responsesAdapter,
@@ -281,14 +282,21 @@ export interface ChainPlan {
   providerAdapter: FormatAdapter;
 }
 
+/** openai 与 chat 是同一 canonical 格式的不同命名，归一化后再比较 */
+function normalizeFormat(format: FormatName): FormatName {
+  return format === 'openai' ? 'chat' : format;
+}
+
 export function resolveConverterChain(source: FormatName, provider: FormatName): ChainPlan {
+  const normalizedSource = normalizeFormat(source);
+  const normalizedProvider = normalizeFormat(provider);
   const sourceAdapter = REGISTRY[source];
   const providerAdapter = REGISTRY[provider];
   if (!sourceAdapter || !providerAdapter) {
     throw new Error(`unknown format: source=${source} provider=${provider}`);
   }
   return {
-    passthrough: source === provider,
+    passthrough: normalizedSource === normalizedProvider,
     source,
     provider,
     sourceAdapter,
@@ -1446,6 +1454,11 @@ requestBody = { ...plan.providerAdapter.fromChatRequest(chat), model: effectiveP
 - [x] **Step 3: 两个 stream-handler 改为串联两段有状态流（参照 Task 8 的 handleResponsesStream 写法）**
 
 `messages/stream-handler.ts` 用 `resolveConverterChain('anthropic', provider.provider)`；`chat-completions/stream-handler.ts` 用 `resolveConverterChain('openai', provider.provider)`。上游段 `providerAdapter.createUpstreamStream()` → 下游段 `sourceAdapter.createDownstreamStream()`。passthrough 时两段均为恒等/直传。
+
+  > **实现策略（与代码实际一致）：分支判定基于 `plan.passthrough`，而非链式串联 adapter 转换。**
+  > - 当 `plan.passthrough === true`（如 `openai`→`openai`、`anthropic`→`anthropic`）：直接透传 provider 的**原始响应流**，保留既有 openrouter 处理、usage 注入、`sanitize` 等内容不变，不调用 `providerAdapter`/`sourceAdapter` 的流式转换。这避免了无谓的「解析成 chat chunk 再序列化回去」往返，也保证 openrouter 等特例逻辑不被破坏。
+  > - 当 `plan.passthrough === false`：才走 `providerAdapter.createUpstreamStream()` → `sourceAdapter.createDownstreamStream()` 的两段有状态流串联（canonical chat 中转）。
+  > 注意 `resolveConverterChain` 已通过 `normalizeFormat` 把 `openai` 归一到 `chat`，因此 `openai`→`chat`/`openai`→`openai` 都会被判定为 passthrough，能正确命中透传分支。
 
 - [x] **Step 4: 非流式 handler 同样用 router 还原响应**
 

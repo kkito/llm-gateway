@@ -30,6 +30,43 @@ function isSilentError(err: any): boolean {
 }
 
 /**
+ * 从 responses 命名事件 SSE 字符串里反向查找最后的 response.usage。
+ * 最终用量在 `response.completed` 事件的 `response.usage.{input_tokens,output_tokens}` 中。
+ */
+function extractUsageFromResponsesChunks(chunks: string[]): {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  cachedTokens?: number;
+} | null {
+  for (let i = chunks.length - 1; i >= 0; i--) {
+    const lines = chunks[i].split('\n');
+    for (const line of lines) {
+      if (!line.startsWith('data:')) continue;
+      const jsonStr = line.slice(5).trim();
+      if (!jsonStr) continue;
+      try {
+        const parsed = JSON.parse(jsonStr);
+        const usage = parsed?.response?.usage;
+        if (!usage) continue;
+        const promptTokens = usage.input_tokens ?? 0;
+        const completionTokens = usage.output_tokens ?? 0;
+        const result: any = {
+          promptTokens,
+          completionTokens,
+          totalTokens: usage.total_tokens ?? promptTokens + completionTokens,
+        };
+        if (usage.cached_tokens) result.cachedTokens = usage.cached_tokens;
+        return result;
+      } catch {
+        // 跳过无法解析的块
+      }
+    }
+  }
+  return null;
+}
+
+/**
  * 串联两段有状态流：
  * 上游 provider 格式 SSE -> canonical ChatStreamChunk[] -> 客户端 responses 命名事件 SSE。
  */
@@ -77,6 +114,15 @@ export function handleStream(options: StreamHandlerOptions): Response {
 
             detailLogger.logStreamResponse(requestId + '_raw', rawChunks);
             detailLogger.logStreamResponse(requestId, chunks);
+
+            // 提取最终流式用量，对齐 messages/chat-completions 路由的记费与计量
+            const usage = extractUsageFromResponsesChunks(chunks);
+            if (usage) {
+              logEntry.promptTokens = usage.promptTokens;
+              logEntry.completionTokens = usage.completionTokens;
+              logEntry.totalTokens = usage.totalTokens;
+              if (usage.cachedTokens !== undefined) logEntry.cachedTokens = usage.cachedTokens;
+            }
             if (requestLogger) {
               requestLogger.log({
                 requestId: logEntry.requestId,

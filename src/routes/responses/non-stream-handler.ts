@@ -47,7 +47,7 @@ export async function handleResponsesNonStream(
     logEntry.totalTokens = usage.total_tokens;
     logEntry.cachedTokens = usage.prompt_tokens_details?.cached_tokens;
   }
-  logEntry.responseMetadata = JSON.stringify(responseData.usage ?? responseData.usage ?? {});
+  logEntry.responseMetadata = JSON.stringify((chat as any).usage ?? {});
 
   detailLogger.logUpstreamResponse(requestId + '_converted', responseData);
   logger.log({ ...logEntry, message: 'Converted upstream response to Responses format' });
