@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseOpenAISSEData } from '../../../src/converters/openai-to-anthropic.js';
+import { parseOpenAISSEData } from '../../../src/converters/formats/anthropic/openai-to-anthropic.js';
 
 describe('openai-to-anthropic converter - SSE parsing', () => {
   it('parses data: line', () => {

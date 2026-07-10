@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mapAnthropicToOpenAIFinishReason, mapOpenAIToAnthropicFinishReason } from '../../../src/converters/shared/finish-reason.js';
+import { mapAnthropicToOpenAIFinishReason, mapOpenAIToAnthropicFinishReason } from '../../../../src/converters/formats/anthropic/shared/finish-reason.js';
 
 describe('mapAnthropicToOpenAIFinishReason', () => {
   it('maps end_turn to stop', () => {

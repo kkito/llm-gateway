@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { convertOpenAIRequestToAnthropic } from '../../../src/converters/openai-to-anthropic.js';
+import { convertOpenAIRequestToAnthropic } from '../../../src/converters/formats/anthropic/openai-to-anthropic.js';
 
 describe('openai-to-anthropic converter - request conversion', () => {
   it('should convert string content to array format', async () => {

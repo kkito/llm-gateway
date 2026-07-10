@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { convertAnthropicResponseToOpenAI } from '../../src/converters/openai-to-anthropic.js';
-import { convertOpenAIResponseToAnthropic } from '../../src/converters/anthropic-to-openai.js';
+import { convertAnthropicResponseToOpenAI } from '../../src/converters/formats/anthropic/openai-to-anthropic.js';
+import { convertOpenAIResponseToAnthropic } from '../../src/converters/formats/anthropic/anthropic-to-openai.js';
 
 describe('SSE 响应转换 - 格式不一致时的处理策略', () => {
   /**

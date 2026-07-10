@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { convertOpenAIStreamChunkToAnthropic, createOpenAIToAnthropicStreamState } from '../../../src/converters/openai-to-anthropic.js';
+import { convertOpenAIStreamChunkToAnthropic, createOpenAIToAnthropicStreamState } from '../../../src/converters/formats/anthropic/openai-to-anthropic.js';
 
 describe('openai-to-anthropic converter - text streaming', () => {
   it('produces complete event sequence for simple text', () => {

@@ -5,14 +5,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildMessagesUpstreamRequest, sendMessagesUpstreamRequest, type UpstreamRequest } from '../../src/routes/messages/upstream-request.js';
 import * as providersModule from '../../src/providers/index.js';
-import * as convertersModule from '../../src/converters/anthropic-to-openai.js';
+import * as convertersModule from '../../src/converters/formats/anthropic/anthropic-to-openai.js';
 
 vi.mock('../../src/providers/index.js', () => ({
   buildHeaders: vi.fn(() => ({ Authorization: 'Bearer test-api-key', 'Content-Type': 'application/json' })),
   buildUrl: vi.fn((_config: any, _path: string) => 'https://api.example.com/v1/chat/completions')
 }));
 
-vi.mock('../../src/converters/anthropic-to-openai.js', () => ({
+vi.mock('../../src/converters/formats/anthropic/anthropic-to-openai.js', () => ({
   convertAnthropicRequestToOpenAI: vi.fn((body: any) => ({
     model: body.model || 'gpt-4',
     messages: body.messages.map((m: any) => ({ role: m.role, content: m.content })),

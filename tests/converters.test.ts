@@ -9,14 +9,14 @@ import {
   convertAnthropicStreamEventToOpenAI,
   parseSSEBlock,
   createStreamConverterState
-} from '../src/converters/anthropic-to-openai.js';
+} from '../src/converters/formats/anthropic/anthropic-to-openai.js';
 import {
   convertOpenAIRequestToAnthropic,
   convertAnthropicResponseToOpenAI,
   convertOpenAIStreamChunkToAnthropic,
   formatAnthropicEventToSSE,
   createOpenAIToAnthropicStreamState
-} from '../src/converters/openai-to-anthropic.js';
+} from '../src/converters/formats/anthropic/openai-to-anthropic.js';
 
 // ==================== Anthropic Request → OpenAI Request 测试 ====================
 

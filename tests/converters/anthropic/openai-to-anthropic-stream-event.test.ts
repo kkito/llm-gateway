@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { convertOpenAIStreamChunkToAnthropic, createOpenAIToAnthropicStreamState } from '../../../src/converters/openai-to-anthropic.js';
-import type { OpenAIToAnthropicStreamState } from '../../../src/converters/shared/types.js';
+import { convertOpenAIStreamChunkToAnthropic, createOpenAIToAnthropicStreamState } from '../../../src/converters/formats/anthropic/openai-to-anthropic.js';
+import type { OpenAIToAnthropicStreamState } from '../../../src/converters/formats/anthropic/shared/types.js';
 
 describe('openai-to-anthropic converter - stream event conversion', () => {
   function createState(): OpenAIToAnthropicStreamState {

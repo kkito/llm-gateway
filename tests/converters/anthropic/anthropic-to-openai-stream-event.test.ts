@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { convertAnthropicStreamEventToOpenAI, createStreamConverterState } from '../../../src/converters/anthropic-to-openai.js';
-import type { AnthropicStreamEvent } from '../../../src/converters/shared/types.js';
+import { convertAnthropicStreamEventToOpenAI, createStreamConverterState } from '../../../src/converters/formats/anthropic/anthropic-to-openai.js';
+import type { AnthropicStreamEvent } from '../../../src/converters/formats/anthropic/shared/types.js';
 
 describe('anthropic-to-openai converter - stream event conversion', () => {
   const requestId = 'test-request-123';

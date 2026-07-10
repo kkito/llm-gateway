@@ -8,7 +8,7 @@ import { ModelGroupExhaustedError } from '../../src/lib/model-group-error.js';
 
 // ==================== Module mocks ====================
 
-vi.mock('../../src/converters/openai-to-anthropic.js', async (importOriginal) => {
+vi.mock('../../src/converters/formats/anthropic/openai-to-anthropic.js', async (importOriginal) => {
   const actual: any = await importOriginal();
   return {
     ...actual,

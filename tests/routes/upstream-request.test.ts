@@ -5,7 +5,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { buildUpstreamRequest, sendUpstreamRequest, type UpstreamRequest } from '../../src/routes/chat-completions/upstream-request.js';
 import * as providersModule from '../../src/providers/index.js';
-import * as convertersModule from '../../src/converters/openai-to-anthropic.js';
+import * as convertersModule from '../../src/converters/formats/anthropic/openai-to-anthropic.js';
 import { DetailLogger } from '../../src/detail-logger.js';
 
 vi.mock('../../src/providers/index.js', () => ({
@@ -13,7 +13,7 @@ vi.mock('../../src/providers/index.js', () => ({
   buildUrl: vi.fn((_config: any, _path: string) => 'https://api.example.com/v1/chat/completions')
 }));
 
-vi.mock('../../src/converters/openai-to-anthropic.js', () => ({
+vi.mock('../../src/converters/formats/anthropic/openai-to-anthropic.js', () => ({
   convertOpenAIRequestToAnthropic: vi.fn(async (body: any) => ({
     model: body.model,
     messages: body.messages.map((m: any) => ({ role: m.role, content: m.content })),

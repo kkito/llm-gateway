@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { convertAnthropicRequestToOpenAI } from '../../../src/converters/anthropic-to-openai.js';
+import { convertAnthropicRequestToOpenAI } from '../../../src/converters/formats/anthropic/anthropic-to-openai.js';
 
 describe('anthropic-to-openai converter - request conversion', () => {
   it('should convert simple text request', () => {

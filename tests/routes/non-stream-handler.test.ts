@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handleNonStream } from '../../src/routes/chat-completions/non-stream-handler.js';
-import { convertAnthropicResponseToOpenAI } from '../../src/converters/openai-to-anthropic.js';
+import { convertAnthropicResponseToOpenAI } from '../../src/converters/formats/anthropic/openai-to-anthropic.js';
 
-vi.mock('../../src/converters/openai-to-anthropic.js', () => ({
+vi.mock('../../src/converters/formats/anthropic/openai-to-anthropic.js', () => ({
   convertAnthropicResponseToOpenAI: vi.fn()
 }));
 

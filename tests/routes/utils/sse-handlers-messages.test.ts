@@ -9,7 +9,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { parseAndConvertOpenAISSE } from '../../../src/routes/utils/sse-handlers-messages.js';
-import { createOpenAIToAnthropicStreamState } from '../../../src/converters/openai-to-anthropic.js';
+import { createOpenAIToAnthropicStreamState } from '../../../src/converters/formats/anthropic/openai-to-anthropic.js';
 
 describe('parseAndConvertOpenAISSE', () => {
   it('should parse and convert MiniMax format with reasoning and reasoning_content', () => {

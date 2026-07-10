@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { parseSSEData } from '../../../src/converters/shared/sse-parser.js';
-import { parseSSEBlock } from '../../../src/converters/anthropic-to-openai.js';
+import { parseSSEData } from '../../../src/converters/formats/anthropic/shared/sse-parser.js';
+import { parseSSEBlock } from '../../../src/converters/formats/anthropic/anthropic-to-openai.js';
 
 describe('anthropic-to-openai converter - SSE parsing', () => {
   it('should parse valid SSE data line', () => {

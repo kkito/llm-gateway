@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseSSEData, parseSSEBlock } from '../../../src/converters/shared/sse-parser.js';
+import { parseSSEData, parseSSEBlock } from '../../../../src/converters/formats/anthropic/shared/sse-parser.js';
 
 describe('parseSSEData', () => {
   it('parses data: line', () => {
