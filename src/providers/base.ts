@@ -1,4 +1,4 @@
-import type { ProviderConfig } from '../config.js';
+import type { ProviderConfig, ProviderType } from '../config.js';
 
 /**
  * Provider 接口定义
@@ -18,7 +18,7 @@ export interface Provider {
   /**
    * 获取 provider 类型
    */
-  getType(): 'openai' | 'anthropic';
+  getType(): 'openai' | 'anthropic' | 'response-api';
 
   /**
    * 构建完整的请求 URL
@@ -39,7 +39,7 @@ export interface ProviderFactory {
 export abstract class BaseProvider implements Provider {
   abstract buildHeaders(apiKey: string): Record<string, string>;
   abstract getEndpoint(path: string): string;
-  abstract getType(): 'openai' | 'anthropic';
+  abstract getType(): ProviderType;
 
   /**
    * 获取 Base URL

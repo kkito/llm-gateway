@@ -1,4 +1,5 @@
 import { BaseProvider } from './base.js';
+import type { ProviderType } from '../config.js';
 
 /**
  * OpenAI Provider 实现
@@ -28,7 +29,26 @@ export class OpenAIProvider extends BaseProvider {
     return path;
   }
 
-  getType(): 'openai' {
+  getType(): ProviderType {
     return 'openai';
+  }
+}
+
+/**
+ * Responses API Provider 实现
+ *
+ * 认证方式与 OpenAI 一致（Bearer），endpoint 指向 /v1/responses。
+ * 形同 OpenAI，但出站走 Responses API 而非 chat/completions。
+ */
+export class ResponseApiProvider extends OpenAIProvider {
+  getEndpoint(path: string): string {
+    if (path === 'responses') {
+      return '/v1/responses';
+    }
+    return super.getEndpoint(path);
+  }
+
+  getType(): 'response-api' {
+    return 'response-api';
   }
 }

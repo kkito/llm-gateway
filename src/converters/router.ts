@@ -6,6 +6,7 @@ import { responsesAdapter } from './formats/responses/index.js';
 
 const REGISTRY: Record<string, FormatAdapter> = {
   chat: chatAdapter,
+  openai: chatAdapter,
   anthropic: anthropicAdapter,
   responses: responsesAdapter,
   'response-api': responsesAdapter,

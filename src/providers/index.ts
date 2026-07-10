@@ -1,6 +1,6 @@
 import type { ProviderConfig } from '../config.js';
 import type { Provider, ProviderFactory } from './base.js';
-import { OpenAIProvider } from './openai.js';
+import { OpenAIProvider, ResponseApiProvider } from './openai.js';
 import { AnthropicProvider } from './anthropic.js';
 
 /**
@@ -9,10 +9,12 @@ import { AnthropicProvider } from './anthropic.js';
 export class DefaultProviderFactory implements ProviderFactory {
   private openAIProvider: OpenAIProvider;
   private anthropicProvider: AnthropicProvider;
+  private responseApiProvider: ResponseApiProvider;
 
   constructor() {
     this.openAIProvider = new OpenAIProvider();
     this.anthropicProvider = new AnthropicProvider();
+    this.responseApiProvider = new ResponseApiProvider();
   }
 
   getProvider(config: ProviderConfig): Provider {
@@ -21,6 +23,8 @@ export class DefaultProviderFactory implements ProviderFactory {
         return this.openAIProvider;
       case 'anthropic':
         return this.anthropicProvider;
+      case 'response-api':
+        return this.responseApiProvider;
       default:
         throw new Error(`Unknown provider type: ${config.provider}`);
     }
@@ -52,6 +56,6 @@ export function buildUrl(config: ProviderConfig, path: string): string {
 }
 
 // 导出具体 Provider 类供直接使用
-export { OpenAIProvider } from './openai.js';
+export { OpenAIProvider, ResponseApiProvider } from './openai.js';
 export { AnthropicProvider } from './anthropic.js';
 export type { Provider, ProviderFactory } from './base.js';

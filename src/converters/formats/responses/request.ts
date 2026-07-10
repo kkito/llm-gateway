@@ -9,6 +9,7 @@ interface ResponsesInputItem {
   name?: string;
   arguments?: string;
   tool_call_id?: string;
+  output?: any;
 }
 
 /** Responses 请求 -> canonical chat 请求 */

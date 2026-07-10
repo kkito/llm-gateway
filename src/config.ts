@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 
-export type ProviderType = 'openai' | 'anthropic';
+export type ProviderType = 'openai' | 'anthropic' | 'response-api';
 
 export * from './lib/password.js';
 export * from './lib/paths.js';

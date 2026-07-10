@@ -9,6 +9,7 @@ import type { Logger } from './logger.js';
 import { DetailLogger } from './detail-logger.js';
 import { createChatCompletionsRoute } from './routes/chat-completions/index.js';
 import { createMessagesRoute } from './routes/messages/index.js';
+import { createResponsesRoute } from './routes/responses/index.js';
 import { createModelsRoute } from './routes/models.js';
 import { createModelsPageRoute } from './admin/routes/models.js';
 import { createModelFormRoute } from './admin/routes/model-form.js';
@@ -267,6 +268,15 @@ export function createServer(
 
   // 消息路由
   app.route('', createMessagesRoute(
+    () => currentConfig,
+    logger,
+    detailLogger,
+    timeoutMs,
+    logDir
+  ));
+
+  // Responses API 路由（OpenAI Responses 格式）
+  app.route('', createResponsesRoute(
     () => currentConfig,
     logger,
     detailLogger,

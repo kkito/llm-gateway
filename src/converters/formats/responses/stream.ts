@@ -37,7 +37,6 @@ function mapResponsesStopReason(status: string | undefined, hasToolUse: boolean,
 export class ResponsesUpstreamStream implements StreamConverter {
   private messageId = `resp_${Date.now()}`;
   private model = '';
-  private hasSentMessageStart = false;
   private hasToolUse = false;
   private nextContentIndex = 0;
   private indexByKey = new Map<string, number>();
@@ -81,7 +80,6 @@ export class ResponsesUpstreamStream implements StreamConverter {
         case 'response.created': {
           if (respObj.id) this.messageId = respObj.id;
           if (respObj.model) this.model = respObj.model;
-          this.hasSentMessageStart = true;
           out.push({
             id: cid(), object: 'chat.completion.chunk', created: this.created, model: this.model,
             choices: [{ index: 0, delta: { role: 'assistant' }, finish_reason: null }],
