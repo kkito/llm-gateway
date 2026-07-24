@@ -472,6 +472,99 @@ describe('handleStream', () => {
     expect(chunks.length).toBe(0);
   });
 
+  it('正确处理跨 TCP chunk 边界的 UTF-8 多字节字符（中文不被截断为乱码）', async () => {
+    const c = createMockHonoContext();
+    const encoder = new TextEncoder();
+
+    // 组装中文 SSE 事件完整内容
+    const sseEvents = [
+      `data: ${JSON.stringify({ id: 'test-id', object: 'chat.completion.chunk', created: 1234567, model: 'gpt-4', choices: [{ index: 0, delta: { role: 'assistant' }, finish_reason: null }] })}\n\n`,
+      `data: ${JSON.stringify({ id: 'test-id', object: 'chat.completion.chunk', created: 1234567, model: 'gpt-4', choices: [{ index: 0, delta: { content: '等' }, finish_reason: null }] })}\n\n`,
+      `data: ${JSON.stringify({ id: 'test-id', object: 'chat.completion.chunk', created: 1234567, model: 'gpt-4', choices: [{ index: 0, delta: { content: '等' }, finish_reason: null }] })}\n\n`,
+      `data: ${JSON.stringify({ id: 'test-id', object: 'chat.completion.chunk', created: 1234567, model: 'gpt-4', choices: [{ index: 0, delta: { content: '，' }, finish_reason: null }] })}\n\n`,
+      `data: ${JSON.stringify({ id: 'test-id', object: 'chat.completion.chunk', created: 1234567, model: 'gpt-4', choices: [{ index: 0, delta: { content: '让' }, finish_reason: null }] })}\n\n`,
+      `data: ${JSON.stringify({ id: 'test-id', object: 'chat.completion.chunk', created: 1234567, model: 'gpt-4', choices: [{ index: 0, delta: { content: '我' }, finish_reason: null }] })}\n\n`,
+      `data: ${JSON.stringify({ id: 'test-id', object: 'chat.completion.chunk', created: 1234567, model: 'gpt-4', choices: [{ index: 0, delta: { content: '换' }, finish_reason: null }] })}\n\n`,
+      `data: ${JSON.stringify({ id: 'test-id', object: 'chat.completion.chunk', created: 1234567, model: 'gpt-4', choices: [{ index: 0, delta: { content: '个' }, finish_reason: null }] })}\n\n`,
+      `data: ${JSON.stringify({ id: 'test-id', object: 'chat.completion.chunk', created: 1234567, model: 'gpt-4', choices: [{ index: 0, delta: { content: '思' }, finish_reason: null }] })}\n\n`,
+      `data: ${JSON.stringify({ id: 'test-id', object: 'chat.completion.chunk', created: 1234567, model: 'gpt-4', choices: [{ index: 0, delta: { content: '路' }, finish_reason: null }] })}\n\n`,
+      `data: ${JSON.stringify({ id: 'test-id', object: 'chat.completion.chunk', created: 1234567, model: 'gpt-4', choices: [{ index: 0, delta: {}, finish_reason: 'stop' }], usage: { prompt_tokens: 5, completion_tokens: 4, total_tokens: 9 } })}\n\n`,
+    ];
+
+    // 将所有 SSE 事件拼接到一个大的 Uint8Array 中
+    const allBytes = encoder.encode(sseEvents.join(''));
+    const totalLen = allBytes.length;
+
+    // 故意从一个多字节字符中间切开：在第 2 个 SSE 事件的 content "等" 中间截断
+    // "等" 的 UTF-8 是 e7 ad 89，我们在第一个 "等" 的第二个字节后切开
+    // 找到第二个 SSE 事件中 "等" 的起始位置
+    const fullJoined = sseEvents.join('');
+    const secondEventStart = sseEvents[0].length;
+    const secondEventContent = sseEvents[1];
+    // "等" 在 JSON 字符串中作为 value，实际 3 字节 UTF-8
+    // 找到第二个 SSE 事件开头的位置 + "等" 的组成字节具体位置
+    const secondEventBytes = encoder.encode(secondEventContent);
+
+    // 在 "等" 的第 2 个字节后切开：从编码 "等" 的位置找
+    const idxOfContent = secondEventContent.indexOf('"content":"') + '"content":"'.length;
+    const idxBeforeDeng = encoder.encode(secondEventContent.slice(0, idxOfContent)).length;
+    const splitPoint = secondEventStart + idxBeforeDeng + 2; // 在 "等" 的 UTF-8 第 2 个字节后切开
+
+    const chunk1 = encoder.encode(fullJoined.slice(0, splitPoint));
+    const chunk2 = encoder.encode(fullJoined.slice(splitPoint));
+
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(chunk1);
+        controller.enqueue(chunk2);
+        controller.close();
+      },
+    });
+
+    const logEntry: any = {};
+    const options: StreamHandlerOptions = {
+      response: new Response(stream),
+      provider: { customModel: 'gpt-4', realModel: 'gpt-4', apiKey: 'x', baseUrl: 'https://api.openai.com', provider: 'openai' },
+      model: 'gpt-4',
+      actualModel: 'gpt-4',
+      requestId: 'req-utf8',
+      logEntry,
+      rateLimiter: createMockRateLimiter(),
+      logger: createMockLogger(),
+      detailLogger: createMockDetailLogger(),
+      c,
+    };
+
+    const res = handleStream(options);
+    const reader = res.body!.getReader();
+    const decrypt = new TextDecoder();
+    const outputChunks: string[] = [];
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      outputChunks.push(decrypt.decode(value));
+    }
+
+    const allOutput = outputChunks.join('');
+
+    // 验证所有中文内容正确拼接，不包含替换字符 \uFFFD
+    expect(allOutput).not.toContain('\uFFFD');
+    expect(allOutput).toContain('"content":"等"');
+    expect(allOutput).toContain('"content":"等"');
+    expect(allOutput).toContain('"content":"，"');
+    expect(allOutput).toContain('"content":"让"');
+    expect(allOutput).toContain('"content":"我"');
+    expect(allOutput).toContain('"content":"换"');
+    expect(allOutput).toContain('"content":"个"');
+    expect(allOutput).toContain('"content":"思"');
+    expect(allOutput).toContain('"content":"路"');
+
+    // 验证 usage 仍然正常提取
+    expect(logEntry.promptTokens).toBe(5);
+    expect(logEntry.completionTokens).toBe(4);
+  });
+
   it('extracts final usage from last chunk that has it', async () => {
     const c = createMockHonoContext();
     const encoder = new TextEncoder();

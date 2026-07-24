@@ -154,7 +154,7 @@ export function handleStream(options: StreamHandlerOptions): Response {
             break;
           }
 
-          const chunk = decoder.decode(value, { stream: false });
+          const chunk = decoder.decode(value, { stream: true });
           rawChunks.push(chunk);
           buffer += chunk;
 
