@@ -284,4 +284,105 @@ describe('Admin Model Test E2E', () => {
       expect(data.message).toContain('请求超时');
     });
   });
+
+  describe('POST /admin/models/test with response-api provider', () => {
+    it('should send Responses-format body to /v1/responses and parse output array', async () => {
+      globalThis.fetch = async (url: string | URL, init?: RequestInit) => {
+        // 验证出站 URL 指向 /v1/responses
+        expect(String(url)).toBe('https://api.openai.com/v1/responses');
+
+        const parsedBody = JSON.parse((init as RequestInit).body as string);
+        // 验证请求体是 Responses 格式（input 数组，而非 messages）
+        expect(parsedBody.model).toBe('gpt-4');
+        expect(parsedBody.input).toBeDefined();
+        expect(parsedBody.input[0].role).toBe('user');
+        expect(parsedBody.input[0].content[0].type).toBe('input_text');
+        expect(parsedBody.max_output_tokens).toBe(4096);
+        expect(parsedBody.messages).toBeUndefined();
+
+        return {
+          ok: true,
+          status: 200,
+          text: async () =>
+            JSON.stringify({
+              id: 'resp-123',
+              model: 'gpt-4',
+              status: 'completed',
+              output: [
+                {
+                  type: 'message',
+                  role: 'assistant',
+                  content: [{ type: 'output_text', text: 'Responses API 返回内容' }],
+                },
+              ],
+              usage: { input_tokens: 15, output_tokens: 25 },
+            }),
+        } as Response;
+      };
+
+      const response = await app.request('/admin/models/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'response-api',
+          baseUrl: 'https://api.openai.com/v1',
+          apiKey: 'sk-resp-key',
+          realModel: 'gpt-4',
+          message: '你好',
+        }),
+      });
+
+      expect(response.status).toBe(200);
+      const data = await response.json();
+      expect(data.success).toBe(true);
+      expect(data.model).toBe('gpt-4');
+      expect(data.content).toBe('Responses API 返回内容');
+      expect(data.usage).toEqual({ prompt_tokens: 15, completion_tokens: 25 });
+    });
+
+    it('should parse reasoning item from responses output', async () => {
+      globalThis.fetch = async (url: string | URL, init?: RequestInit) => {
+        return {
+          ok: true,
+          status: 200,
+          text: async () =>
+            JSON.stringify({
+              id: 'resp-456',
+              model: 'gpt-4',
+              status: 'completed',
+              output: [
+                {
+                  type: 'reasoning',
+                  text: '思考过程内容',
+                },
+                {
+                  type: 'message',
+                  role: 'assistant',
+                  content: [{ type: 'output_text', text: '最终答案' }],
+                },
+              ],
+              usage: { input_tokens: 5, output_tokens: 8 },
+            }),
+        } as Response;
+      };
+
+      const response = await app.request('/admin/models/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'response-api',
+          baseUrl: 'https://api.openai.com/v1',
+          apiKey: 'sk-resp-key',
+          realModel: 'gpt-4',
+          message: '你好',
+        }),
+      });
+
+      expect(response.status).toBe(200);
+      const data = await response.json();
+      expect(data.success).toBe(true);
+      expect(data.reasoningContent).toBe('思考过程内容');
+      expect(data.content).toBe('最终答案');
+    });
+  });
 });

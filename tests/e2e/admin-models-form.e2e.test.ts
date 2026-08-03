@@ -82,6 +82,17 @@ describe('Admin Models Form E2E', () => {
       expect(html).toContain('My Anthropic Key');
     });
 
+    it('API Provider 下拉应包含 response-api (Responses API) 选项', async () => {
+      const response = await app.request('/admin/models/new');
+      expect(response.status).toBe(200);
+      const html = await response.text();
+
+      // provider 下拉应同时包含 openai / response-api / anthropic 三类
+      expect(html).toContain('value="openai"');
+      expect(html).toContain('value="response-api"');
+      expect(html).toContain('value="anthropic"');
+    });
+
     it('API Key 下拉选项应只显示名称，不包含 provider', async () => {
       const response = await app.request('/admin/models/new');
       expect(response.status).toBe(200);
@@ -194,6 +205,33 @@ describe('Admin Models Form E2E', () => {
       const newModel = savedConfig.models.find((m: any) => m.customModel === 'manual-key-model');
       expect(newModel).toBeDefined();
       expect(newModel.apiKey).toBe('sk-manual-key-123'); // 应该使用手动输入的 API Key
+    });
+
+    it('应允许创建 response-api (Responses API) 模型的配置', async () => {
+      const formData = new FormData();
+      formData.append('customModel', 'resp-model');
+      formData.append('realModel', 'gpt-4');
+      formData.append('provider', 'response-api');
+      formData.append('baseUrl', 'https://api.openai.com/v1');
+      formData.append('apiKeySource', 'manual');
+      formData.append('apiKey', 'sk-resp-key');
+      formData.append('desc', 'Responses API model');
+
+      const response = await app.request('/admin/models', {
+        method: 'POST',
+        body: formData
+      });
+
+      // 应该成功创建并重定向
+      expect(response.status).toBe(302);
+      expect(response.headers.get('Location')).toBe('/admin/models');
+
+      // 验证配置已保存且 provider 类型为 response-api
+      const savedConfig = JSON.parse(readFileSync(testConfigPath, 'utf-8'));
+      const newModel = savedConfig.models.find((m: any) => m.customModel === 'resp-model');
+      expect(newModel).toBeDefined();
+      expect(newModel.provider).toBe('response-api');
+      expect(newModel.realModel).toBe('gpt-4');
     });
 
     it('当选择手动输入但未提供 API Key 时应报错', async () => {

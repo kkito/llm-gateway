@@ -229,7 +229,13 @@ export const ModelFormPage: FC<Props> = (props) => {
                       value="openai"
                       selected={props.model?.provider === 'openai'}
                     >
-                      OpenAI
+                      OpenAI (Chat Completions)
+                    </option>
+                    <option
+                      value="response-api"
+                      selected={props.model?.provider === 'response-api'}
+                    >
+                      OpenAI (Responses API)
                     </option>
                     <option
                       value="anthropic"

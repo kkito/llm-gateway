@@ -4,8 +4,9 @@ import { saveConfig, updateConfigEntry, loadFullConfig, getApiKeyOptions, getApi
 import { removeModelFromConfig, renameModelInConfig } from '../../config-operations.js';
 import { ModelFormPage } from '../views/model-form.js';
 import { ModelsPage } from '../views/models.js';
-import { OpenAIProvider } from '../../providers/openai.js';
+import { OpenAIProvider, ResponseApiProvider } from '../../providers/openai.js';
 import { AnthropicProvider } from '../../providers/anthropic.js';
+import type { ProviderType } from '../../config.js';
 import { mergeModelParams } from '../../lib/params-merger.js';
 import { writeFileSync, mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
@@ -17,15 +18,21 @@ interface RouteDeps {
   onConfigChange: (newConfig: ProxyConfig) => void;
 }
 
-function createProvider(providerType: 'openai' | 'anthropic') {
+/** 表单可选用的 provider 类型 */
+type FormProvider = ProviderType;
+
+function createProvider(providerType: FormProvider) {
   if (providerType === 'anthropic') {
     return new AnthropicProvider();
+  }
+  if (providerType === 'response-api') {
+    return new ResponseApiProvider();
   }
   return new OpenAIProvider();
 }
 
 async function testModelConnection(
-  providerType: 'openai' | 'anthropic',
+  providerType: FormProvider,
   baseUrl: string,
   apiKey: string,
   realModel: string,
@@ -43,17 +50,26 @@ async function testModelConnection(
   fullResponse?: string;
 }> {
   const provider = createProvider(providerType);
-  const url = provider.buildUrl({ baseUrl, provider: providerType, apiKey, realModel, customModel: '' }, 'chat');
+
+  // response-api 走 OpenAI Responses 协议（/v1/responses），其余走 Chat Completions（/v1/chat/completions）
+  const isResponses = providerType === 'response-api';
+  const url = provider.buildUrl({ baseUrl, provider: providerType, apiKey, realModel, customModel: '' }, isResponses ? 'responses' : 'chat');
   const headers = provider.buildHeaders(apiKey);
 
-  const testBody = {
-    model: realModel,
-    messages: [{ role: 'user', content: message }],
-    max_tokens: 4096,
-  };
+  const baseBody = isResponses
+    ? {
+        model: realModel,
+        input: [{ role: 'user', content: [{ type: 'input_text', text: message }] }],
+        max_output_tokens: 4096,
+      }
+    : {
+        model: realModel,
+        messages: [{ role: 'user', content: message }],
+        max_tokens: 4096,
+      };
 
   // Merge defaultParams (user-provided test params override defaults)
-  const mergedBody = mergeModelParams(defaultParams, testBody);
+  const mergedBody = mergeModelParams(defaultParams, baseBody);
 
   // Debug: log the actual request being sent
   const testLogDir = join(getDetailLogDir(), 'test');
@@ -97,20 +113,40 @@ async function testModelConnection(
         };
       }
 
-      // 提取内容（OpenAI 格式）
-      const messageObj = data.choices?.[0]?.message;
-      let content = messageObj?.content || '';
-      let reasoningContent = messageObj?.reasoning_content || messageObj?.reasoning || '';
+      let content = '';
+      let reasoningContent = '';
 
-      // 提取内容（Anthropic 格式）
-      if (data.content && Array.isArray(data.content)) {
-        const textBlocks = data.content.filter((block: any) => block.type === 'text');
-        const thinkingBlocks = data.content.filter((block: any) => block.type === 'thinking');
-        content = textBlocks.map((block: any) => block.text).join('\n\n');
-        reasoningContent = thinkingBlocks.map((block: any) => block.thinking).join('\n\n');
+      if (isResponses) {
+        // 提取内容（OpenAI Responses 格式：output 数组）
+        const outputs = Array.isArray(data.output) ? data.output : [];
+        for (const item of outputs) {
+          if (item.type === 'message') {
+            const parts = Array.isArray(item.content) ? item.content : [];
+            for (const p of parts) {
+              if (p.type === 'output_text' || p.type === 'text') content += (p.text ?? '');
+            }
+          } else if (item.type === 'reasoning') {
+            reasoningContent += (item.text ?? '');
+          }
+        }
+      } else {
+        // 提取内容（OpenAI Chat 格式）
+        const messageObj = data.choices?.[0]?.message;
+        content = messageObj?.content || '';
+        reasoningContent = messageObj?.reasoning_content || messageObj?.reasoning || '';
+
+        // 提取内容（Anthropic 格式）
+        if (data.content && Array.isArray(data.content)) {
+          const textBlocks = data.content.filter((block: any) => block.type === 'text');
+          const thinkingBlocks = data.content.filter((block: any) => block.type === 'thinking');
+          content = textBlocks.map((block: any) => block.text).join('\n\n');
+          reasoningContent = thinkingBlocks.map((block: any) => block.thinking).join('\n\n');
+        }
       }
 
-      const usage = data.usage ? { prompt_tokens: data.usage.prompt_tokens || 0, completion_tokens: data.usage.completion_tokens || 0 } : undefined;
+      const usage = isResponses
+        ? (data.usage ? { prompt_tokens: data.usage.input_tokens || 0, completion_tokens: data.usage.output_tokens || 0 } : undefined)
+        : (data.usage ? { prompt_tokens: data.usage.prompt_tokens || 0, completion_tokens: data.usage.completion_tokens || 0 } : undefined);
 
       return {
         success: true,
@@ -144,7 +180,7 @@ export function createModelFormRoute(deps: RouteDeps) {
   // 测试模型配置
   app.post('/admin/models/test', async (c) => {
     const body = await c.req.json();
-    const { provider, baseUrl, apiKey, apiKeyId, realModel, message, defaultParams } = body as { provider?: 'openai' | 'anthropic'; baseUrl?: string; apiKey?: string; apiKeyId?: string; realModel?: string; message: string; defaultParams?: Record<string, any> };
+    const { provider, baseUrl, apiKey, apiKeyId, realModel, message, defaultParams } = body as { provider?: FormProvider; baseUrl?: string; apiKey?: string; apiKeyId?: string; realModel?: string; message: string; defaultParams?: Record<string, any> };
 
     if (!provider || !baseUrl || !realModel) {
       return c.json({ success: false, message: '请填写所有必填字段（Provider、Base URL、实际模型名称）' }, 400);
@@ -226,7 +262,7 @@ export function createModelFormRoute(deps: RouteDeps) {
     const customModel = body.customModel as string;
     const realModel = body.realModel as string;
     const baseUrl = body.baseUrl as string;
-    const provider = body.provider as 'openai' | 'anthropic';
+    const provider = body.provider as FormProvider;
     const desc = body.desc as string;
     const apiKeySource = body.apiKeySource as string;
     const apiKey = body.apiKey as string;
@@ -352,7 +388,7 @@ export function createModelFormRoute(deps: RouteDeps) {
     const customModel = body.customModel as string;
     const realModel = body.realModel as string;
     const baseUrl = body.baseUrl as string;
-    const provider = body.provider as 'openai' | 'anthropic';
+    const provider = body.provider as FormProvider;
     const desc = body.desc as string;
     const apiKeySource = body.apiKeySource as string | undefined;
     const apiKey = body.apiKey as string | undefined;
