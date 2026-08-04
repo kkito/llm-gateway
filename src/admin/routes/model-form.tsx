@@ -11,6 +11,7 @@ import { mergeModelParams } from '../../lib/params-merger.js';
 import { writeFileSync, mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import { getDetailLogDir } from '../../lib/paths.js';
+import { fetchWithProxy } from '../../lib/proxy.js';
 
 interface RouteDeps {
   config: ProxyConfig | (() => ProxyConfig);
@@ -37,7 +38,8 @@ async function testModelConnection(
   apiKey: string,
   realModel: string,
   message: string,
-  defaultParams?: Record<string, any>
+  defaultParams?: Record<string, any>,
+  proxy?: string
 ): Promise<{
   success: boolean;
   model?: string;
@@ -87,7 +89,7 @@ async function testModelConnection(
   console.log(`   [Test] Request logged to: ${testLogPath}`);
 
   try {
-    const response = await fetch(url, {
+    const response = await fetchWithProxy(url, {
       method: 'POST',
       headers: {
         ...headers,
@@ -95,6 +97,7 @@ async function testModelConnection(
       },
       body: JSON.stringify(mergedBody),
       signal: AbortSignal.timeout(60000),
+      proxy,
     });
 
     const rawBody = await response.text();
@@ -180,7 +183,7 @@ export function createModelFormRoute(deps: RouteDeps) {
   // 测试模型配置
   app.post('/admin/models/test', async (c) => {
     const body = await c.req.json();
-    const { provider, baseUrl, apiKey, apiKeyId, realModel, message, defaultParams } = body as { provider?: FormProvider; baseUrl?: string; apiKey?: string; apiKeyId?: string; realModel?: string; message: string; defaultParams?: Record<string, any> };
+    const { provider, baseUrl, apiKey, apiKeyId, realModel, message, defaultParams, proxy } = body as { provider?: FormProvider; baseUrl?: string; apiKey?: string; apiKeyId?: string; realModel?: string; message: string; defaultParams?: Record<string, any>; proxy?: string };
 
     if (!provider || !baseUrl || !realModel) {
       return c.json({ success: false, message: '请填写所有必填字段（Provider、Base URL、实际模型名称）' }, 400);
@@ -240,7 +243,7 @@ export function createModelFormRoute(deps: RouteDeps) {
     }
 
     const testMessage = message || '请介绍一下你自己';
-    const result = await testModelConnection(provider, baseUrl, resolvedApiKey, realModel, testMessage, defaultParams);
+    const result = await testModelConnection(provider, baseUrl, resolvedApiKey, realModel, testMessage, defaultParams, proxy);
     return c.json(result);
   });
 
@@ -279,6 +282,9 @@ export function createModelFormRoute(deps: RouteDeps) {
 
     // 解析 maxContextLength
     const maxContextLength = body.maxContextLength ? Number(body.maxContextLength) : undefined;
+
+    // 解析 proxy
+    const proxy = (body.proxy as string)?.trim() || undefined;
 
     // 获取当前配置
     const currentConfig = typeof config === 'function' ? config() : config;
@@ -336,6 +342,7 @@ export function createModelFormRoute(deps: RouteDeps) {
         desc: desc || undefined,
         defaultParams,
         maxContextLength,
+        proxy,
       };
 
       // 保存到文件 - 保留 apiKeys 等其他配置
@@ -406,6 +413,9 @@ export function createModelFormRoute(deps: RouteDeps) {
     // 解析 maxContextLength
     const maxContextLength = body.maxContextLength ? Number(body.maxContextLength) : undefined;
 
+    // 解析 proxy
+    const proxy = (body.proxy as string)?.trim() || undefined;
+
     // 获取当前配置
     const currentConfig = typeof config === 'function' ? config() : config;
     const oldEntry = currentConfig.models.find(p => p.customModel === oldModel);
@@ -472,6 +482,7 @@ export function createModelFormRoute(deps: RouteDeps) {
         hidden: hidden || undefined,
         defaultParams,
         maxContextLength,
+        proxy,
       };
 
       const newConfigList = updateConfigEntry(currentConfig.models, oldModel, newEntry);

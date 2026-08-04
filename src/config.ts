@@ -40,6 +40,7 @@ export interface ProviderConfig {
   hidden?: boolean;            // 是否隐藏该模型（不对外展示）
   maxContextLength?: number;   // 最大上下文窗口（token 数），未配置时默认 200000
   defaultParams?: Record<string, any>; // 默认参数配置
+  proxy?: string;              // HTTP/HTTPS 代理地址，如 http://127.0.0.1:7890，空则不代理
 }
 
 /**
@@ -154,6 +155,11 @@ function validateModelsArray(models: any): ProviderConfig[] {
       if (typeof item.defaultParams !== 'object' || Array.isArray(item.defaultParams) || item.defaultParams === null) {
         throw new Error(`defaultParams must be an object at model ${index}`);
       }
+    }
+
+    // 验证 proxy（可选）：必须是字符串
+    if (item.proxy !== undefined && typeof item.proxy !== 'string') {
+      throw new Error(`proxy must be a string at model ${index}`);
     }
   });
 

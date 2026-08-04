@@ -29,6 +29,9 @@ importers:
       marked:
         specifier: ^18.0.2
         version: 18.0.2
+      undici:
+        specifier: ^8.10.0
+        version: 8.10.0
       uuid:
         specifier: ^13.0.0
         version: 13.0.0
@@ -1298,6 +1301,10 @@ packages:
     resolution: {integrity: sha512-uZsKNuzQxDMUY6M3pIMvy5tvlGmtq8XJ2oLAkfRKGNu+1VQAIvLy2xIVG5ATZl5wDXl/tddByAWCizRbOme+TA==}
     engines: {node: '>=20.18.1'}
 
+  undici@8.10.0:
+    resolution: {integrity: sha512-HvltHd7avK13QIw/oLe4qoOLyoVSoafqJ2jYOrtMRBkbYT31eiBQ8O0ehRKZiEZCMEyLFQNIADpgCWC5fALvYQ==}
+    engines: {node: '>=22.19.0'}
+
   universalify@2.0.1:
     resolution: {integrity: sha512-gptHNQghINnc/vTGIk0SOFGFNXw7JVrlRUtConJRlvaw6DuX0wO5Jeko9sWrMBhh+PsYAZ7oXAiOnf/UKogyiw==}
     engines: {node: '>= 10.0.0'}
@@ -2363,6 +2370,8 @@ snapshots:
   undici-types@7.27.2: {}
 
   undici@7.27.2: {}
+
+  undici@8.10.0: {}
 
   universalify@2.0.1: {}
 

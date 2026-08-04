@@ -108,7 +108,8 @@ Session 采用内存存储方式，服务重启后所有 Session 失效。
       "realModel": "gpt-4",
       "apiKey": "sk-xxx",
       "baseUrl": "https://api.openai.com",
-      "provider": "openai"
+      "provider": "openai",
+      "proxy": "http://127.0.0.1:7890"
     }
   ],
   "adminPassword": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"

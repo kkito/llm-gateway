@@ -5,11 +5,13 @@ import { mergeModelParams } from '../../lib/params-merger.js';
 import { resolveConverterChain } from '../../converters/router.js';
 import type { FormatName } from '../../converters/format-adapter.js';
 import { DetailLogger } from '../../detail-logger.js';
+import { fetchWithProxy } from '../../lib/proxy.js';
 
 export interface UpstreamRequest {
   url: string;
   headers: Record<string, string>;
   body: any;
+  proxy?: string;
 }
 
 /**
@@ -48,7 +50,8 @@ export async function buildMessagesUpstreamRequest(
   return {
     url,
     headers: requestHeaders,
-    body: requestBody
+    body: requestBody,
+    proxy: effectiveProvider.proxy
   };
 }
 
@@ -64,11 +67,12 @@ export async function sendMessagesUpstreamRequest(
   detailLogger.logUpstreamRequest(requestId, upstream.body);
   console.log(`   📤 [Proxy 转发] ${upstream.url}`);
 
-  const response = await globalThis.fetch(upstream.url, {
+  const response = await fetchWithProxy(upstream.url, {
     method: 'POST',
     headers: upstream.headers,
     body: JSON.stringify(upstream.body),
-    signal: AbortSignal.timeout(timeoutMs)
+    signal: AbortSignal.timeout(timeoutMs),
+    proxy: upstream.proxy
   });
 
   console.log(`   📤 [响应] 状态码：${response.status}`);

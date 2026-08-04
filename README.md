@@ -75,11 +75,14 @@ Create config file at `~/.llm-gateway/config.json`:
       "apiKey": "sk-ant-your-anthropic-key",
       "provider": "anthropic",
       "baseUrl": "https://api.anthropic.com",
-      "desc": "Claude model for long text processing"
+      "proxy": "http://127.0.0.1:7890",
+      "desc": "Claude model for long text processing (via HTTP proxy)"
     }
   ]
 }
 ```
+
+`proxy` 为可选字段：指定后，发往该模型上游的请求将通过该代理转发（如 `http://127.0.0.1:7890`）；留空则直连。支持 `http://`、`https://`、`socks5://` 协议，可带认证（如 `http://user:pass@127.0.0.1:7890`、`socks5://user:pass@127.0.0.1:1080`）；不支持 `socks5h://` 和 `socks4://`。可在 admin 后台每个模型的表单里配置。
 
 ### Start
 

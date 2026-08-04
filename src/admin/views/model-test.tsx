@@ -22,6 +22,7 @@ export const ModelTest: FC<Props> = (props) => {
     var apiKeyManual = document.getElementById('apiKeyManual');
     var realModel = document.getElementById('realModel').value;
     var message = document.getElementById('testMessage').value;
+    var proxy = document.getElementById('proxy') ? document.getElementById('proxy').value : '';
 
     // 获取 API Key：手动输入优先，否则用下拉框选择的 ID
     // 如果都为空，让后端从已保存的模型配置中兜底读取
@@ -60,7 +61,7 @@ export const ModelTest: FC<Props> = (props) => {
       var res = await fetch('/admin/models/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider: provider, baseUrl: baseUrl, apiKey: apiKey, apiKeyId: apiKeyId, realModel: realModel, message: message, defaultParams: DEFAULT_PARAMS })
+        body: JSON.stringify({ provider: provider, baseUrl: baseUrl, apiKey: apiKey, apiKeyId: apiKeyId, realModel: realModel, message: message, proxy: proxy, defaultParams: DEFAULT_PARAMS })
       });
       var data = await res.json();
 

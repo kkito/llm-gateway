@@ -264,6 +264,21 @@ export const ModelFormPage: FC<Props> = (props) => {
               </div>
 
               <div class="form-group">
+                <label class="form-label" for="proxy">
+                  HTTP 代理（可选）
+                  <input
+                    class="form-input"
+                    id="proxy"
+                    name="proxy"
+                    type="text"
+                    placeholder="http://user:pass@127.0.0.1:7890 或 socks5://127.0.0.1:1080"
+                    value={safeValue(props.model?.proxy)}
+                  />
+                  <span class="form-hint">发往上游的请求通过此代理转发，留空则直连。支持 http://、https://、socks5://（可带 user:pass@ 认证）；不支持 socks5h:// 和 socks4://</span>
+                </label>
+              </div>
+
+              <div class="form-group">
                 <label class="form-label" for="apiKeySource">
                   API Key
                   <div style="display: flex; flexDirection: column; gap: 0.5rem;">
