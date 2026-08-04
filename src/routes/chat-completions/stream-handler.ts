@@ -44,8 +44,18 @@ export function handleStream(options: StreamHandlerOptions): Response {
 
   const providerFormat = provider.provider;
   const plan = resolveConverterChain('chat', providerFormat as FormatName);
+  const isResponseApi = providerFormat === 'response-api';
   const streamState: StreamConverterState | undefined =
-    !plan.passthrough ? createStreamConverterState() : undefined;
+    (!plan.passthrough && !isResponseApi) ? createStreamConverterState() : undefined;
+
+  // response-api 上游（responses SSE -> canonical chunk -> OpenAI chat SSE）：按 cc-switch 思路，
+  // 用 upstream/downstream 双 StreamConverter 串联，结尾补 data: [DONE]。
+  const responsesUpstream = isResponseApi
+    ? plan.providerAdapter.createUpstreamStream()
+    : undefined;
+  const chatDownstream = isResponseApi
+    ? plan.sourceAdapter.createDownstreamStream()
+    : undefined;
 
   const chunks: string[] = [];
   const rawChunks: string[] = [];
@@ -61,6 +71,28 @@ export function handleStream(options: StreamHandlerOptions): Response {
         while (true) {
           const { done, value } = await reader.read();
           if (done) {
+            // response-api 上游：flush 剩余 buffer，串接 upstream/downstream 转换
+            // （[DONE] 在 finalUsage 之后统一补发，确保其是流最后一条）
+            if (isResponseApi) {
+              if (buffer.trim()) {
+                for (const chatChunk of responsesUpstream!.transform(buffer)) {
+                  for (const out of chatDownstream!.transform(chatChunk)) {
+                    chunks.push(out);
+                    controller.enqueue(new TextEncoder().encode(out));
+                  }
+                }
+              }
+              for (const chatChunk of responsesUpstream!.flush()) {
+                for (const out of chatDownstream!.transform(chatChunk)) {
+                  chunks.push(out);
+                  controller.enqueue(new TextEncoder().encode(out));
+                }
+              }
+              for (const out of chatDownstream!.flush()) {
+                chunks.push(out);
+                controller.enqueue(new TextEncoder().encode(out));
+              }
+            }
             // OpenRouter: last chunk may not end with \n\n
             if (provider.baseUrl?.includes('openrouter') && buffer.trim()) {
               let sseLine = buffer;
@@ -106,6 +138,13 @@ export function handleStream(options: StreamHandlerOptions): Response {
                 usage: finalUsage,
               })}\n\n`;
               controller.enqueue(new TextEncoder().encode(finalChunk));
+            }
+
+            // response-api 转换分支：上游没有 chat 的 [DONE]，必须补发作为流的最后一条（cc-switch 实践）
+            if (isResponseApi) {
+              const doneLine = `data: [DONE]\n\n`;
+              chunks.push(doneLine);
+              controller.enqueue(new TextEncoder().encode(doneLine));
             }
 
             detailLogger.logStreamResponse(requestId, chunks);
@@ -163,7 +202,20 @@ export function handleStream(options: StreamHandlerOptions): Response {
               continue;
             }
 
-            if (!plan.passthrough) {
+            if (isResponseApi) {
+              const partBlock = `${part}\n\n`;
+              for (const chatChunk of responsesUpstream!.transform(partBlock)) {
+                for (const out of chatDownstream!.transform(chatChunk)) {
+                  chunks.push(out);
+                  try {
+                    controller.enqueue(new TextEncoder().encode(out));
+                  } catch (err) {
+                    if (isSilentError(err)) return;
+                    throw err;
+                  }
+                }
+              }
+            } else if (!plan.passthrough) {
               const openAIChunks = parseAndConvertAnthropicSSE(part, requestId, model, streamState!);
               for (const openAIChunk of openAIChunks) {
                 chunks.push(openAIChunk);

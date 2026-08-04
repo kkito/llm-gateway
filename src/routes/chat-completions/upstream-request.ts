@@ -35,19 +35,24 @@ export async function buildUpstreamRequest(
     : provider;
 
   const plan = resolveConverterChain('chat', effectiveProvider.provider as FormatName);
+  let url: string;
   if (plan.passthrough) {
     requestBody = {
       ...body,
       model: effectiveProvider.realModel,
       ...(stream ? { stream_options: { include_usage: true } } : {})
     };
+  } else if (effectiveProvider.provider === 'response-api') {
+    // 客户端 chat 格式 -> canonical -> response-api（复用通用 adapter 链，与 /v1/responses 路由一致）
+    const chat = plan.sourceAdapter.toChatRequest(body);
+    requestBody = { ...plan.providerAdapter.fromChatRequest({ ...chat, model: effectiveProvider.realModel }) };
   } else {
     const anthropicRequest = await convertOpenAIRequestToAnthropic(body);
     requestBody = { ...anthropicRequest, model: effectiveProvider.realModel };
   }
 
   const requestHeaders = buildHeaders(effectiveProvider);
-  const url = buildUrl(effectiveProvider, 'chat');
+  url = buildUrl(effectiveProvider, effectiveProvider.provider === 'response-api' ? 'responses' : 'chat');
 
   // 合并默认参数（用户参数优先级更高）
   requestBody = mergeModelParams(effectiveProvider.defaultParams, requestBody);
