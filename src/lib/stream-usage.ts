@@ -102,3 +102,37 @@ export function findFinalUsageFromChunks(
   }
   return null;
 }
+
+/**
+ * 判断一个 OpenAI 兼容 SSE 流是否已经带有标准的"结束"标志。
+ * 结束标志满足任一即可：
+ *   - 出现 data: [DONE] 哨兵
+ *   - 出现任一非 null 的 finish_reason（choices 内或 chunk 顶层）
+ * 用于兜底补发：若流结束时既无 [DONE] 也无非 null finish_reason（如 muse-spark 这类
+ * 只回选 finish_reason:null + usage/cost 的上游），网关需手动补一个标准终止 chunk，
+ * 否则严格客户端会报 "Model stream ended without a finish reason"。
+ */
+export function hasStreamEnded(chunks: string[]): boolean {
+  for (const chunkText of chunks) {
+    const lines = chunkText.split('\n');
+    for (const line of lines) {
+      if (!line.startsWith('data:')) continue;
+      const jsonStr = line.slice(5).trim();
+      if (jsonStr === '[DONE]') return true;
+      if (!jsonStr) continue;
+      try {
+        const parsed = JSON.parse(jsonStr);
+        const choices = parsed.choices;
+        if (Array.isArray(choices)) {
+          for (const choice of choices) {
+            if (choice?.finish_reason) return true;
+          }
+        }
+        if (parsed.finish_reason) return true;
+      } catch {
+        // 单块解析失败不影响整体判定
+      }
+    }
+  }
+  return false;
+}

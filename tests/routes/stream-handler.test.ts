@@ -324,8 +324,11 @@ describe('handleStream', () => {
     }
 
     // Only the data chunk should be present, not the comment
-    expect(chunks.length).toBe(1);
-    expect(chunks[0]).toContain('"content":"Hi"');
+    const allContent = chunks.join('');
+    expect(allContent).not.toContain('OPENROUTER PROCESSING');
+    expect(allContent).toContain('"content":"Hi"');
+    // 上游无结束标志时，网关补一个标准终止 chunk
+    expect(allContent).toContain('"finish_reason":"stop"');
   });
 
   it('skips SSE ping/comment lines for non-OpenRouter providers', async () => {
@@ -363,9 +366,11 @@ describe('handleStream', () => {
     }
 
     // Only the data chunk should be present, not the ping comment
-    expect(chunks.length).toBe(1);
-    expect(chunks[0]).toContain('"content":"Hi"');
-    expect(chunks[0]).not.toContain('ping');
+    const allContent = chunks.join('');
+    expect(allContent).toContain('"content":"Hi"');
+    expect(allContent).not.toContain('ping');
+    // 上游无结束标志时，网关补一个标准终止 chunk
+    expect(allContent).toContain('"finish_reason":"stop"');
   });
 
   it('returns 500 when response.body is null', () => {
@@ -599,5 +604,126 @@ describe('handleStream', () => {
 
     expect(logEntry.promptTokens).toBe(5);
     expect(logEntry.completionTokens).toBe(10);
+  });
+
+  it('appends a standard finish_reason:stop when upstream stream lacks an end marker', async () => {
+    const c = createMockHonoContext();
+    const encoder = new TextEncoder();
+    // 模拟 muse-spark 这类上游：只有 finish_reason:null + usage/cost，无 [DONE] 也无非 null finish_reason
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode('data: {"id":"","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"你好"},"finish_reason":null}]}\n\n'));
+        controller.enqueue(encoder.encode('data: {"id":"","object":"chat.completion.chunk","choices":[]}\n\n'));
+        controller.enqueue(encoder.encode('data: {"choices":[],"usage":{"prompt_tokens":5,"completion_tokens":10,"total_tokens":15}}\n\n'));
+        controller.enqueue(encoder.encode('data: {"choices":[],"cost":"0"}\n\n'));
+        controller.close();
+      },
+    });
+    const options: StreamHandlerOptions = {
+      response: new Response(stream),
+      provider: { customModel: 'gpt-4', realModel: 'gpt-4', apiKey: 'x', baseUrl: 'https://api.openai.com', provider: 'openai' },
+      model: 'gpt-4',
+      actualModel: 'gpt-4',
+      requestId: 'req-123',
+      logEntry: {},
+      rateLimiter: createMockRateLimiter(),
+      logger: createMockLogger(),
+      detailLogger: createMockDetailLogger(),
+      c,
+    };
+
+    const res = handleStream(options);
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    const chunks: string[] = [];
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(decoder.decode(value));
+    }
+
+    // 网关补的终止块必须是流的最后一条，且带 finish_reason:"stop"
+    const lastChunk = chunks[chunks.length - 1];
+    expect(lastChunk).toMatch(/^data:/);
+    const parsed = JSON.parse(lastChunk.slice(5).trim());
+    expect(parsed.choices?.[0]?.finish_reason).toBe('stop');
+  });
+
+  it('does not append a finish_reason when upstream already ended with a non-null finish_reason', async () => {
+    const c = createMockHonoContext();
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"content":"Hi"},"index":0,"finish_reason":null}]}\n\n'));
+        controller.enqueue(encoder.encode('data: {"choices":[{"delta":{},"index":0,"finish_reason":"stop"}]}\n\n'));
+        controller.close();
+      },
+    });
+    const options: StreamHandlerOptions = {
+      response: new Response(stream),
+      provider: { customModel: 'gpt-4', realModel: 'gpt-4', apiKey: 'x', baseUrl: 'https://api.openai.com', provider: 'openai' },
+      model: 'gpt-4',
+      actualModel: 'gpt-4',
+      requestId: 'req-123',
+      logEntry: {},
+      rateLimiter: createMockRateLimiter(),
+      logger: createMockLogger(),
+      detailLogger: createMockDetailLogger(),
+      c,
+    };
+
+    const res = handleStream(options);
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    const chunks: string[] = [];
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(decoder.decode(value));
+    }
+
+    // 上游已带结束标志，网关不应额外补 stop terminate（"stop" 应只来自上游那一次）
+    const allContent = chunks.join('');
+    expect(allContent.match(/"finish_reason":"stop"/g)).toHaveLength(1);
+  });
+
+  it('does not append a finish_reason when upstream already sent [DONE]', async () => {
+    const c = createMockHonoContext();
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"content":"Hi"},"index":0}]}\n\n'));
+        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+        controller.close();
+      },
+    });
+    const options: StreamHandlerOptions = {
+      response: new Response(stream),
+      provider: { customModel: 'gpt-4', realModel: 'gpt-4', apiKey: 'x', baseUrl: 'https://api.openai.com', provider: 'openai' },
+      model: 'gpt-4',
+      actualModel: 'gpt-4',
+      requestId: 'req-123',
+      logEntry: {},
+      rateLimiter: createMockRateLimiter(),
+      logger: createMockLogger(),
+      detailLogger: createMockDetailLogger(),
+      c,
+    };
+
+    const res = handleStream(options);
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    const chunks: string[] = [];
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(decoder.decode(value));
+    }
+
+    const allContent = chunks.join('');
+    // 不额外补 stop 终止块
+    expect(allContent.match(/"finish_reason":"stop"/g)).toBeNull();
+    // 上游的 [DONE] 原样透传，仍是流的最后一条
+    expect(allContent.trim().endsWith('data: [DONE]')).toBe(true);
   });
 });

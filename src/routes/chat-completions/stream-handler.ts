@@ -5,7 +5,7 @@ import type { Logger } from '../../logger.js';
 import { createStreamConverterState, type StreamConverterState } from '../../converters/formats/anthropic/anthropic-to-openai.js';
 import { buildFullOpenAIResponse, parseAndConvertAnthropicSSE } from '../utils/sse-handlers.js';
 import { sanitizeSSEChunk } from '../../privacy/sanitizer.js';
-import { findFinalUsageFromChunks } from '../../lib/stream-usage.js';
+import { findFinalUsageFromChunks, hasStreamEnded } from '../../lib/stream-usage.js';
 import { resolveConverterChain } from '../../converters/router.js';
 import type { FormatName } from '../../converters/format-adapter.js';
 import { RequestLogger } from '../../lib/request-logger.js';
@@ -138,6 +138,23 @@ export function handleStream(options: StreamHandlerOptions): Response {
                 usage: finalUsage,
               })}\n\n`;
               controller.enqueue(new TextEncoder().encode(finalChunk));
+            }
+
+            // 非 response-api 上游兜底：若确实透传了内容块，但整个流既无 [DONE] 也无非 null
+            // finish_reason（如 muse-spark 只回 finish_reason:null + usage/cost 的上游），则手动补
+            // 一个标准终止 chunk，否则严格客户端会报 "Model stream ended without a finish reason"。
+            // 幂等：hasStreamEnded 判定流已带结束标志时不补；chunks 为空（内容全被丢弃）也不补，
+            // 避免把空流伪造成成功完成。
+            if (!isResponseApi && chunks.length > 0 && !hasStreamEnded(chunks)) {
+              const terminator = `data: ${JSON.stringify({
+                id: requestId,
+                object: 'chat.completion.chunk',
+                created: Math.floor(Date.now() / 1000),
+                model,
+                choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
+              })}\n\n`;
+              chunks.push(terminator);
+              controller.enqueue(new TextEncoder().encode(terminator));
             }
 
             // response-api 转换分支：上游没有 chat 的 [DONE]，必须补发作为流的最后一条（cc-switch 实践）

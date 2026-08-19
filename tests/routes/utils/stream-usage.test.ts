@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractUsageFromOpenAIChunk, extractUsageFromAnthropicChunk, findFinalUsageFromChunks } from '../../../src/lib/stream-usage.js';
+import { extractUsageFromOpenAIChunk, extractUsageFromAnthropicChunk, findFinalUsageFromChunks, hasStreamEnded } from '../../../src/lib/stream-usage.js';
 
 describe('extractUsageFromOpenAIChunk', () => {
   it('extracts basic usage', () => {
@@ -94,5 +94,35 @@ describe('findFinalUsageFromChunks', () => {
     ];
     const result = findFinalUsageFromChunks(chunks, 'anthropic')!;
     expect(result.cachedTokens).toBe(5);
+  });
+});
+
+describe('hasStreamEnded', () => {
+  it('returns true when a chunk carries a non-null finish_reason', () => {
+    const chunks = [
+      'data: {"choices":[{"index":0,"delta":{"content":"Hi"},"finish_reason":null}]}\n\n',
+      'data: {"choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}\n\n',
+    ];
+    expect(hasStreamEnded(chunks)).toBe(true);
+  });
+
+  it('returns true on the [DONE] sentinel', () => {
+    const chunks = ['data: {"choices":[{"delta":{"content":"Hi"}}]}\n\n', 'data: [DONE]\n\n'];
+    expect(hasStreamEnded(chunks)).toBe(true);
+  });
+
+  it('returns false when every chunk has finish_reason null and no [DONE]', () => {
+    // 模拟 muse-spark 这类上游：只有 finish_reason:null + usage/cost，无终止标志
+    const chunks = [
+      'data: {"choices":[{"index":0,"delta":{"content":"你好"},"finish_reason":null}]}\n\n',
+      'data: {"choices":[]}\n\n',
+      'data: {"choices":[],"usage":{"prompt_tokens":1,"completion_tokens":2,"total_tokens":3}}\n\n',
+      'data: {"choices":[],"cost":"0"}\n\n',
+    ];
+    expect(hasStreamEnded(chunks)).toBe(false);
+  });
+
+  it('returns false for empty chunks', () => {
+    expect(hasStreamEnded([])).toBe(false);
   });
 });
