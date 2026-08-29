@@ -292,6 +292,48 @@ export function createChatCompletionsHandler(
       }
 
       logger.log(logEntry);
+
+      // Fallback for non-OK or empty body
+      if (!response.body) {
+        console.log(`\n❌ [错误] 上游响应体为空 ${requestId}`);
+        if (requestLogger) {
+          requestLogger.log({
+            requestId: logEntry.requestId,
+            timestamp: logEntry.timestamp,
+            userName: currentUser?.name ?? null,
+            customModel: logEntry.customModel,
+            realModel: logEntry.realModel,
+            provider: logEntry.provider,
+            endpoint: logEntry.endpoint,
+            statusCode: logEntry.statusCode,
+            durationMs: logEntry.durationMs,
+            isStreaming: logEntry.isStreaming,
+            promptTokens: logEntry.promptTokens,
+            completionTokens: logEntry.completionTokens,
+            totalTokens: logEntry.totalTokens,
+            cachedTokens: logEntry.cachedTokens,
+            modelGroup: logEntry.modelGroup,
+            actualModel: logEntry.actualModel,
+            errorMessage: logEntry.error?.message,
+            errorType: logEntry.error?.type,
+            responseMetadata: logEntry.responseMetadata,
+          });
+        }
+        return c.json({ error: { message: 'No response body' } }, 500);
+      }
+
+      // Stream response handling
+      if (stream && response.ok) {
+        return handleStream({
+          response, provider, model, actualModel: actualModel || model,
+          requestId, startTime, logEntry, rateLimiter, logger, detailLogger, c,
+          privacySettings: currentConfig.privacySettings,
+          requestLogger,
+          currentUser,
+        });
+      }
+
+      // Non-stream fallback (e.g. handleNonStream returned null)
       if (requestLogger) {
         requestLogger.log({
           requestId: logEntry.requestId,
@@ -313,23 +355,6 @@ export function createChatCompletionsHandler(
           errorMessage: logEntry.error?.message,
           errorType: logEntry.error?.type,
           responseMetadata: logEntry.responseMetadata,
-        });
-      }
-
-      // Fallback for non-OK or empty body
-      if (!response.body) {
-        console.log(`\n❌ [错误] 上游响应体为空 ${requestId}`);
-        return c.json({ error: { message: 'No response body' } }, 500);
-      }
-
-      // Stream response handling
-      if (stream && response.ok) {
-        return handleStream({
-          response, provider, model, actualModel: actualModel || model,
-          requestId, startTime, logEntry, rateLimiter, logger, detailLogger, c,
-          privacySettings: currentConfig.privacySettings,
-          requestLogger,
-          currentUser,
         });
       }
 

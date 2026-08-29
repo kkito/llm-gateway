@@ -543,4 +543,55 @@ describe('createChatCompletionsHandler', () => {
       expect(detailLogger.logRequest).toHaveBeenCalledTimes(1);
     });
   });
+
+  describe('requestLogger and streaming ttft', () => {
+    it('should NOT call requestLogger.log() for streaming requests — stream handler handles it', async () => {
+      const mockRequestLogger = { log: vi.fn(), start: vi.fn(), stop: vi.fn() };
+
+      vi.doMock('../../src/lib/db.js', () => ({
+        DatabaseManager: {
+          getExistingInstance: vi.fn(() => ({ getDrizzle: vi.fn() })),
+        }
+      }));
+      vi.doMock('../../src/lib/request-logger.js', () => ({
+        RequestLogger: {
+          getInstance: vi.fn(() => mockRequestLogger),
+        }
+      }));
+
+      const { createChatCompletionsHandler: freshHandler } = await import('../../src/routes/chat-completions/handler.js');
+
+      const provider = {
+        customModel: 'gpt-4',
+        realModel: 'gpt-4-real',
+        apiKey: 'test-key',
+        baseUrl: 'https://api.openai.com',
+        provider: 'openai' as const
+      };
+      const config = { models: [provider] };
+      const logger = createMockLogger();
+      const detailLogger = createMockDetailLogger();
+      const handler = freshHandler(config, logger as any, detailLogger as any, 30000, '/tmp/test');
+
+      const mockResponse = new Response('stream-body');
+      const { sendUpstreamRequest } = await import('../../src/routes/chat-completions/upstream-request.js');
+      vi.mocked(sendUpstreamRequest as any).mockResolvedValue(mockResponse);
+
+      const c = createMockC();
+      c.req.json = vi.fn(async () => ({
+        model: 'gpt-4',
+        messages: [{ role: 'user', content: 'hi' }],
+        stream: true
+      }));
+
+      await handler(c, '/v1/chat/completions');
+
+      // handleStream is called (mocked), but requestLogger.log() should NOT be called by the handler itself
+      expect(mockRequestLogger.log).not.toHaveBeenCalled();
+
+      vi.doUnmock('../../src/lib/db.js');
+      vi.doUnmock('../../src/lib/request-logger.js');
+    });
+
+  });
 });
