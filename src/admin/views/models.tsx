@@ -1,6 +1,7 @@
 import { FC } from 'hono/jsx';
 import { TopbarNav } from '../components/TopbarNav.js';
 import type { ProviderConfig } from '../../config.js';
+import { VERSION } from '../../lib/version.js';
 
 interface Props {
   models: ProviderConfig[];
@@ -457,6 +458,18 @@ export const ModelsPage: FC<Props> = (props) => {
               </table>
             </div>
           )}
+        {/* 版本信息 */}
+        <div style={{
+          textAlign: 'center',
+          marginTop: '1.5rem',
+          paddingTop: '1rem',
+          borderTop: '1px solid var(--border-color)',
+          fontSize: '0.75rem',
+          color: 'var(--text-secondary)'
+        }}>
+          v{VERSION}
+        </div>
+
         </TopbarNav>
 
         <script
