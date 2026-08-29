@@ -2,6 +2,7 @@ import { FC } from 'hono/jsx';
 import { Layout } from '../components/Layout.js';
 import type { ProviderConfig, ModelGroup, UiSettings } from '../../config.js';
 import { marked } from 'marked';
+import { VERSION } from '../../lib/version.js';
 
 interface Props {
   models: ProviderConfig[];
@@ -856,6 +857,18 @@ export const HomePage: FC<Props> = (props) => {
           `
         }}
       />
+
+      {/* 版本信息 */}
+      <div style={{
+        textAlign: 'center',
+        marginTop: '1.5rem',
+        paddingTop: '1rem',
+        borderTop: '1px solid var(--border)',
+        fontSize: '0.75rem',
+        color: 'var(--text-secondary)'
+      }}>
+        v{VERSION}
+      </div>
     </Layout>
   );
 };
