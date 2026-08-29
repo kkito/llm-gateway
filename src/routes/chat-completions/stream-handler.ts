@@ -9,6 +9,7 @@ import { findFinalUsageFromChunks, hasStreamEnded } from '../../lib/stream-usage
 import { resolveConverterChain } from '../../converters/router.js';
 import type { FormatName } from '../../converters/format-adapter.js';
 import { RequestLogger } from '../../lib/request-logger.js';
+import { calcTps } from '../../lib/stream-metrics.js';
 
 export interface StreamHandlerOptions {
   response: Response;
@@ -36,7 +37,7 @@ function isSilentError(err: any): boolean {
 }
 
 export function handleStream(options: StreamHandlerOptions): Response {
-  const { response, provider, model, actualModel, requestId, logEntry, rateLimiter, logger, detailLogger, c, requestLogger, currentUser } = options;
+  const { response, provider, model, actualModel, requestId, startTime, logEntry, rateLimiter, logger, detailLogger, c, requestLogger, currentUser } = options;
 
   if (!response.body) {
     return c.json({ error: { message: 'No response body' } }, 500);
@@ -64,6 +65,13 @@ export function handleStream(options: StreamHandlerOptions): Response {
 
   const transformedStream = new ReadableStream({
     async start(controller) {
+      let firstEnqueueAt: number | null = null;
+      const markTtft = () => {
+        if (firstEnqueueAt === null) {
+          firstEnqueueAt = Date.now();
+          logEntry.ttftMs = firstEnqueueAt - startTime;
+        }
+      };
       try {
         let buffer = '';
         let finalUsage: any = null;
@@ -78,19 +86,19 @@ export function handleStream(options: StreamHandlerOptions): Response {
                 for (const chatChunk of responsesUpstream!.transform(buffer)) {
                   for (const out of chatDownstream!.transform(chatChunk)) {
                     chunks.push(out);
-                    controller.enqueue(new TextEncoder().encode(out));
+                    controller.enqueue(new TextEncoder().encode(out)); markTtft();
                   }
                 }
               }
               for (const chatChunk of responsesUpstream!.flush()) {
                 for (const out of chatDownstream!.transform(chatChunk)) {
                   chunks.push(out);
-                  controller.enqueue(new TextEncoder().encode(out));
+                  controller.enqueue(new TextEncoder().encode(out)); markTtft();
                 }
               }
               for (const out of chatDownstream!.flush()) {
                 chunks.push(out);
-                controller.enqueue(new TextEncoder().encode(out));
+                controller.enqueue(new TextEncoder().encode(out)); markTtft();
               }
             }
             // OpenRouter: last chunk may not end with \n\n
@@ -104,7 +112,7 @@ export function handleStream(options: StreamHandlerOptions): Response {
               }
               chunks.push(sseLine);
               try {
-                controller.enqueue(new TextEncoder().encode(sseLine));
+                controller.enqueue(new TextEncoder().encode(sseLine)); markTtft();
               } catch (err) {
                 if (!isSilentError(err)) throw err;
               }
@@ -137,7 +145,7 @@ export function handleStream(options: StreamHandlerOptions): Response {
                 choices: [{ index: 0, delta: {}, finish_reason: null }],
                 usage: finalUsage,
               })}\n\n`;
-              controller.enqueue(new TextEncoder().encode(finalChunk));
+              controller.enqueue(new TextEncoder().encode(finalChunk)); markTtft();
             }
 
             // 非 response-api 上游兜底：若确实透传了内容块，但整个流既无 [DONE] 也无非 null
@@ -154,16 +162,18 @@ export function handleStream(options: StreamHandlerOptions): Response {
                 choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
               })}\n\n`;
               chunks.push(terminator);
-              controller.enqueue(new TextEncoder().encode(terminator));
+              controller.enqueue(new TextEncoder().encode(terminator)); markTtft();
             }
 
             // response-api 转换分支：上游没有 chat 的 [DONE]，必须补发作为流的最后一条（cc-switch 实践）
             if (isResponseApi) {
               const doneLine = `data: [DONE]\n\n`;
               chunks.push(doneLine);
-              controller.enqueue(new TextEncoder().encode(doneLine));
+              controller.enqueue(new TextEncoder().encode(doneLine)); markTtft();
             }
 
+            logEntry.durationMs = Date.now() - startTime;
+            logEntry.tps = calcTps(logEntry.completionTokens, logEntry.durationMs, logEntry.ttftMs);
             detailLogger.logStreamResponse(requestId, chunks);
             detailLogger.logConvertedResponse(requestId, buildFullOpenAIResponse(chunks, { requestId, provider: provider.provider }));
             if (requestLogger) {
@@ -185,6 +195,8 @@ export function handleStream(options: StreamHandlerOptions): Response {
                 modelGroup: logEntry.modelGroup,
                 actualModel: logEntry.actualModel,
                 responseMetadata: logEntry.responseMetadata,
+                ttftMs: logEntry.ttftMs ?? null,
+                tps: logEntry.tps ?? null,
               });
             }
             logger.log(logEntry);
@@ -225,7 +237,7 @@ export function handleStream(options: StreamHandlerOptions): Response {
                 for (const out of chatDownstream!.transform(chatChunk)) {
                   chunks.push(out);
                   try {
-                    controller.enqueue(new TextEncoder().encode(out));
+                    controller.enqueue(new TextEncoder().encode(out)); markTtft();
                   } catch (err) {
                     if (isSilentError(err)) return;
                     throw err;
@@ -240,7 +252,7 @@ export function handleStream(options: StreamHandlerOptions): Response {
                 if (options.privacySettings?.enabled && options.privacySettings.sanitizeFilePaths) {
                   sanitizedChunk = sanitizeSSEChunk(sanitizedChunk, options.requestId);
                 }
-                controller.enqueue(new TextEncoder().encode(sanitizedChunk));
+                controller.enqueue(new TextEncoder().encode(sanitizedChunk)); markTtft();
               }
             } else {
               let sseLine = part;
@@ -255,7 +267,7 @@ export function handleStream(options: StreamHandlerOptions): Response {
                 sseLine = sanitizeSSEChunk(sseLine, options.requestId);
               }
               try {
-                controller.enqueue(new TextEncoder().encode(sseLine));
+                controller.enqueue(new TextEncoder().encode(sseLine)); markTtft();
               } catch (err) {
                 if (isSilentError(err)) return;
                 throw err;
