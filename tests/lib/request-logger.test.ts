@@ -97,4 +97,24 @@ describe('RequestLogger', () => {
     const count = db.prepare('SELECT COUNT(*) as c FROM requests').get() as any;
     expect(count.c).toBe(50);
   });
+
+  it('should persist ttft_ms and tps when provided', async () => {
+    requestLogger.start();
+    const entry = createEntry({ isStreaming: true, ttftMs: 123, tps: 42.5 });
+    requestLogger.log(entry);
+    await new Promise(r => setTimeout(r, 200));
+    const row = dbManager.getDb().prepare('SELECT ttft_ms, tps FROM requests WHERE request_id=?').get(entry.requestId) as any;
+    expect(row.ttft_ms).toBe(123);
+    expect(row.tps).toBe(42.5);
+  });
+
+  it('should store NULL when ttft/tps missing (non-streaming)', async () => {
+    requestLogger.start();
+    const entry = createEntry({ isStreaming: false });
+    requestLogger.log(entry);
+    await new Promise(r => setTimeout(r, 200));
+    const row = dbManager.getDb().prepare('SELECT ttft_ms, tps FROM requests WHERE request_id=?').get(entry.requestId) as any;
+    expect(row.ttft_ms).toBeNull();
+    expect(row.tps).toBeNull();
+  });
 });

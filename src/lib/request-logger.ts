@@ -24,6 +24,8 @@ export interface RequestLogEntry {
   errorMessage?: string;
   errorType?: string;
   responseMetadata?: string;
+  ttftMs?: number | null;
+  tps?: number | null;
 }
 
 export class RequestLogger {
@@ -108,6 +110,8 @@ export class RequestLogger {
           errorMessage: e.errorMessage ?? null,
           errorType: e.errorType ?? null,
           responseMetadata: e.responseMetadata ?? null,
+          ttftMs: e.ttftMs ?? null,
+          tps: e.tps ?? null,
         }))
       ).run();
     } catch (err: any) {
@@ -127,6 +131,7 @@ export class RequestLogger {
         user_name, custom_model, real_model, provider,
         model_group, actual_model,
         endpoint, status_code, duration_ms, is_streaming,
+        ttft_ms, tps,
         prompt_tokens, completion_tokens, total_tokens, cached_tokens,
         error_message, error_type, response_metadata
       ) VALUES (
@@ -134,6 +139,7 @@ export class RequestLogger {
         @userName, @customModel, @realModel, @provider,
         @modelGroup, @actualModel,
         @endpoint, @statusCode, @durationMs, @isStreaming,
+        @ttftMs, @tps,
         @promptTokens, @completionTokens, @totalTokens, @cachedTokens,
         @errorMessage, @errorType, @responseMetadata
       )
@@ -166,6 +172,8 @@ export class RequestLogger {
           errorMessage: e.errorMessage ?? null,
           errorType: e.errorType ?? null,
           responseMetadata: e.responseMetadata ?? null,
+          ttftMs: e.ttftMs ?? null,
+          tps: e.tps ?? null,
         }))
       );
     } catch (err: any) {
