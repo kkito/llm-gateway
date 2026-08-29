@@ -3,6 +3,7 @@ import type { DetailLogger } from '../../detail-logger.js';
 import type { RateLimiter } from '../../lib/rate-limiter.js';
 import type { Logger } from '../../logger.js';
 import { resolveConverterChain } from '../../converters/router.js';
+import { calcTps } from '../../lib/stream-metrics.js';
 
 export interface StreamHandlerOptions {
   response: Response;
@@ -71,7 +72,7 @@ function extractUsageFromResponsesChunks(chunks: string[]): {
  * 上游 provider 格式 SSE -> canonical ChatStreamChunk[] -> 客户端 responses 命名事件 SSE。
  */
 export function handleStream(options: StreamHandlerOptions): Response {
-  const { response, provider, model, actualModel, requestId, logEntry, rateLimiter, logger, detailLogger, c, requestLogger, currentUser } = options;
+  const { response, provider, model, actualModel, requestId, startTime, logEntry, rateLimiter, logger, detailLogger, c, requestLogger, currentUser } = options;
 
   if (!response.body) {
     return c.json({ error: { message: 'No response body' } }, 500);
@@ -88,6 +89,13 @@ export function handleStream(options: StreamHandlerOptions): Response {
 
   const transformedStream = new ReadableStream({
     async start(controller) {
+      let firstEnqueueAt: number | null = null;
+      const markTtft = () => {
+        if (firstEnqueueAt === null) {
+          firstEnqueueAt = Date.now();
+          logEntry.ttftMs = firstEnqueueAt - startTime;
+        }
+      };
       try {
         let buffer = '';
         while (true) {
@@ -97,21 +105,22 @@ export function handleStream(options: StreamHandlerOptions): Response {
               for (const chatChunk of upstream.transform(buffer)) {
                 for (const out of downstream.transform(chatChunk)) {
                   chunks.push(out);
-                  controller.enqueue(new TextEncoder().encode(out));
+                  controller.enqueue(new TextEncoder().encode(out)); markTtft();
                 }
               }
             }
             for (const chatChunk of upstream.flush()) {
               for (const out of downstream.transform(chatChunk)) {
                 chunks.push(out);
-                controller.enqueue(new TextEncoder().encode(out));
+                controller.enqueue(new TextEncoder().encode(out)); markTtft();
               }
             }
             for (const out of downstream.flush()) {
               chunks.push(out);
-              controller.enqueue(new TextEncoder().encode(out));
+              controller.enqueue(new TextEncoder().encode(out)); markTtft();
             }
 
+            logEntry.durationMs = Date.now() - startTime;
             detailLogger.logStreamResponse(requestId + '_raw', rawChunks);
             detailLogger.logStreamResponse(requestId, chunks);
 
@@ -123,6 +132,7 @@ export function handleStream(options: StreamHandlerOptions): Response {
               logEntry.totalTokens = usage.totalTokens;
               if (usage.cachedTokens !== undefined) logEntry.cachedTokens = usage.cachedTokens;
             }
+            logEntry.tps = calcTps(logEntry.completionTokens, logEntry.durationMs, logEntry.ttftMs);
             if (requestLogger) {
               requestLogger.log({
                 requestId: logEntry.requestId,
@@ -135,6 +145,14 @@ export function handleStream(options: StreamHandlerOptions): Response {
                 statusCode: logEntry.statusCode,
                 durationMs: logEntry.durationMs,
                 isStreaming: true,
+                promptTokens: logEntry.promptTokens,
+                completionTokens: logEntry.completionTokens,
+                totalTokens: logEntry.totalTokens,
+                cachedTokens: logEntry.cachedTokens,
+                modelGroup: logEntry.modelGroup,
+                actualModel: logEntry.actualModel,
+                ttftMs: logEntry.ttftMs ?? null,
+                tps: logEntry.tps ?? null,
               });
             }
             logger.log(logEntry);
@@ -167,7 +185,7 @@ export function handleStream(options: StreamHandlerOptions): Response {
               for (const out of downstream.transform(chatChunk)) {
                 chunks.push(out);
                 try {
-                  controller.enqueue(new TextEncoder().encode(out));
+                  controller.enqueue(new TextEncoder().encode(out)); markTtft();
                 } catch (err) {
                   if (isSilentError(err)) return;
                   throw err;
