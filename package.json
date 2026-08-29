@@ -16,7 +16,7 @@
     "kkito-llm-gateway": "dist/cli/start.js"
   },
   "scripts": {
-    "build": "tsc && npm run copy-assets",
+    "build": "node scripts/inject-version.js && tsc && npm run copy-assets",
     "copy-assets": "tsx scripts/copy-assets.ts",
     "prepare": "npm run build",
     "dev": "tsc --watch",
