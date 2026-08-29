@@ -71,6 +71,8 @@ interface Props {
   endDate?: string;
   tzOffset?: number;
   timezone?: string;
+  avgTtftMs?: number | null;
+  avgTps?: number | null;
 }
 
 function buildBaseUrl(startDate: string, endDate: string, timezone: string, selectedUser: string, selectedModel: string): string {
@@ -86,6 +88,7 @@ export const StatsPage: FC<Props> = (props) => {
     recentRequests = [], page = 1, totalPages = 1, totalItems = 0,
     userNames = [], modelNames = [], selectedUser = '', selectedModel = '',
     startDate = '', endDate = '', tzOffset = 0, timezone = 'UTC',
+    avgTtftMs = null, avgTps = null,
   } = props;
 
   const successRate = stats.totalRequests > 0
@@ -653,6 +656,56 @@ export const StatsPage: FC<Props> = (props) => {
             align-items: center;
             gap: 0.5rem;
           }
+          .request-list-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin-bottom: 1rem;
+          }
+          .request-list-header .request-list-title {
+            margin-bottom: 0;
+          }
+          .avg-metrics {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            font-size: 0.78rem;
+          }
+          .avg-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.3rem 0.7rem;
+            border-radius: 999px;
+            font-weight: 500;
+            border: 1px solid transparent;
+            white-space: nowrap;
+          }
+          .avg-pill--ttft {
+            background: var(--purple-bg);
+            color: #6d28d9;
+            border-color: #ede9fe;
+          }
+          .avg-pill--tps {
+            background: var(--green-bg);
+            color: #047857;
+            border-color: #d1fae5;
+          }
+          .avg-pill--empty {
+            background: var(--bg-page);
+            color: var(--text-secondary);
+            border-color: var(--border-color);
+          }
+          .avg-pill-label {
+            font-size: 0.72rem;
+            opacity: 0.85;
+          }
+          .avg-pill-value {
+            font-weight: 700;
+            font-family: system-ui, -apple-system, sans-serif;
+          }
           .request-table {
             width: 100%;
             border-collapse: collapse;
@@ -955,7 +1008,31 @@ export const StatsPage: FC<Props> = (props) => {
           {/* 请求列表 */}
           {recentRequests.length > 0 && (
             <div class="request-list-card">
-              <h2 class="request-list-title">📋 请求列表 (共 {totalItems.toLocaleString()} 条)</h2>
+              <div class="request-list-header">
+                <h2 class="request-list-title">📋 请求列表 (共 {totalItems.toLocaleString()} 条)</h2>
+                {(avgTtftMs != null || avgTps != null) ? (
+                  <div class="avg-metrics">
+                    {avgTtftMs != null && (
+                      <span class="avg-pill avg-pill--ttft">
+                        <span class="avg-pill-label">平均 TTFT</span>
+                        <span class="avg-pill-value">{formatDuration(avgTtftMs)}</span>
+                      </span>
+                    )}
+                    {avgTps != null && (
+                      <span class="avg-pill avg-pill--tps">
+                        <span class="avg-pill-label">平均 TPS</span>
+                        <span class="avg-pill-value">{avgTps.toFixed(1)} tok/s</span>
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <div class="avg-metrics">
+                    <span class="avg-pill avg-pill--empty">
+                      <span class="avg-pill-label">仅流式请求可计算 TTFT / TPS</span>
+                    </span>
+                  </div>
+                )}
+              </div>
               <div class="stats-table-wrapper">
                 <table class="request-table">
                   <thead>

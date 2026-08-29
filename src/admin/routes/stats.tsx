@@ -239,6 +239,17 @@ export function createStatsRoute() {
       `).get(...params) as { total: number };
       const totalPages = Math.max(1, Math.ceil(totalRow.total / limit));
 
+      // 6.5 流式请求平均 TTFT / TPS（仅 is_streaming=1 且字段非空，与 spec §7 一致）
+      const avgRow = db.prepare(`
+        SELECT
+          AVG(ttft_ms) AS avgTtftMs,
+          AVG(tps) AS avgTps
+        FROM requests
+        WHERE ${whereClause} AND is_streaming = 1 AND ttft_ms IS NOT NULL
+      `).get(...params) as { avgTtftMs: number | null; avgTps: number | null };
+      const avgTtftMs = avgRow.avgTtftMs != null ? Math.round(avgRow.avgTtftMs) : null;
+      const avgTps = avgRow.avgTps != null ? Math.round(avgRow.avgTps * 10) / 10 : null;
+
       // 7. 用户列表（用于筛选下拉框）
       const userRows = db.prepare(`
         SELECT DISTINCT user_name AS userName
@@ -288,6 +299,8 @@ export function createStatsRoute() {
           endDate={endDate}
           tzOffset={0} // 不再使用，保留兼容；视图已改用 timezone
           timezone={timezone}
+          avgTtftMs={avgTtftMs}
+          avgTps={avgTps}
         />
       );
 
