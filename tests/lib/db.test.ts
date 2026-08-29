@@ -77,4 +77,24 @@ describe('DatabaseManager', () => {
     dm.close();
     expect(() => dm.getDb()).toThrow();
   });
+
+  it('should have ttft_ms and tps columns', () => {
+    const dm = DatabaseManager.getInstance(testDir);
+    dm.initialize();
+    const cols = dm.getDb().prepare('PRAGMA table_info(requests)').all() as any[];
+    expect(cols.some((c) => c.name === 'ttft_ms')).toBe(true);
+    expect(cols.some((c) => c.name === 'tps')).toBe(true);
+  });
+
+  it('should keep ttft_ms/tps after re-initialize (idempotent)', () => {
+    const dm = DatabaseManager.getInstance(testDir);
+    dm.initialize();
+    dm.close();
+    DatabaseManager.resetInstance();
+    const dm2 = DatabaseManager.getInstance(testDir);
+    dm2.initialize();
+    const cols = dm2.getDb().prepare('PRAGMA table_info(requests)').all() as any[];
+    expect(cols.some((c) => c.name === 'ttft_ms')).toBe(true);
+    expect(cols.some((c) => c.name === 'tps')).toBe(true);
+  });
 });

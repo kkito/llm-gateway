@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, index } from 'drizzle-orm/sqlite-core';
 
 export const requests = sqliteTable('requests', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -18,6 +18,8 @@ export const requests = sqliteTable('requests', {
   statusCode: integer('status_code'),
   durationMs: integer('duration_ms'),
   isStreaming: integer('is_streaming', { mode: 'boolean' }),
+  ttftMs: integer('ttft_ms'),
+  tps: real('tps'),
 
   promptTokens: integer('prompt_tokens'),
   completionTokens: integer('completion_tokens'),

@@ -55,7 +55,28 @@ export class DatabaseManager {
 
     const migrationsFolder = join(__dirname, '..', '..', 'migrations');
     if (existsSync(migrationsFolder)) {
-      migrate(this._drizzle, { migrationsFolder });
+      try {
+        migrate(this._drizzle, { migrationsFolder });
+      } catch (err: any) {
+        // 兼容线上已存在但无 __drizzle_migrations 记录的老库：migrate 因 "table already exists" 失败
+        const msg: string = err?.cause?.message ?? err?.message ?? String(err);
+        const isAlreadyExists = msg.includes('already exists');
+        if (!isAlreadyExists) throw err;
+        console.warn(`[DB] migrate failed (${msg}), falling back to ensure columns`);
+        this.ensureColumns();
+        // 标记已有迁移已执行，避免下次仍走失败路径
+        try {
+          const applied = this.db!.prepare(`SELECT count(*) as c FROM "__drizzle_migrations"`).get() as { c: number } | undefined;
+          if (!applied || applied.c === 0) {
+            this.db!.exec(`CREATE TABLE IF NOT EXISTS "__drizzle_migrations" (id SERIAL PRIMARY KEY, hash text NOT NULL, created_at numeric)`);
+            const now = Date.now();
+            this.db!.prepare(`INSERT OR IGNORE INTO "__drizzle_migrations" (hash, created_at) VALUES (?, ?)`).run('0000_furry_loa', now);
+            this.db!.prepare(`INSERT OR IGNORE INTO "__drizzle_migrations" (hash, created_at) VALUES (?, ?)`).run('0001_melodic_gambit', now);
+          }
+        } catch {
+          // ignore bookkeeping failure
+        }
+      }
     } else {
       this.db.exec(`
         CREATE TABLE IF NOT EXISTS requests (
@@ -73,6 +94,8 @@ export class DatabaseManager {
           status_code INTEGER,
           duration_ms INTEGER,
           is_streaming INTEGER,
+          ttft_ms INTEGER,
+          tps REAL,
           prompt_tokens INTEGER,
           completion_tokens INTEGER,
           total_tokens INTEGER,
@@ -88,6 +111,18 @@ export class DatabaseManager {
         CREATE INDEX IF NOT EXISTS idx_custom_model ON requests(custom_model);
         CREATE INDEX IF NOT EXISTS idx_created_at ON requests(created_at);
       `);
+    }
+  }
+
+  private ensureColumns(): void {
+    if (!this.db) return;
+    try {
+      const cols = this.db.prepare('PRAGMA table_info(requests)').all() as Array<{ name: string }>;
+      const names = new Set(cols.map(c => c.name));
+      if (!names.has('ttft_ms')) this.db.exec('ALTER TABLE requests ADD COLUMN ttft_ms INTEGER');
+      if (!names.has('tps')) this.db.exec('ALTER TABLE requests ADD COLUMN tps REAL');
+    } catch {
+      // ignore
     }
   }
 
