@@ -203,6 +203,8 @@ export function createStatsRoute() {
           total_tokens AS totalTokens,
           cached_tokens AS cachedTokens,
           is_streaming AS isStreaming,
+          ttft_ms AS ttftMs,
+          tps,
           error_message AS errorMessage
         FROM requests
         WHERE ${whereClause}
@@ -224,6 +226,8 @@ export function createStatsRoute() {
         totalTokens: number | null;
         cachedTokens: number | null;
         isStreaming: number | null;
+        ttftMs: number | null;
+        tps: number | null;
         errorMessage: string | null;
       }>;
 

@@ -49,6 +49,8 @@ interface RecentRequestEntry {
   totalTokens: number | null;
   cachedTokens: number | null;
   isStreaming: number | null;
+  ttftMs: number | null;
+  tps: number | null;
   errorMessage: string | null;
 }
 
@@ -963,6 +965,8 @@ export const StatsPage: FC<Props> = (props) => {
                       <th>模型</th>
                       <th>状态</th>
                       <th>耗时</th>
+                      <th>TTFT</th>
+                      <th>TPS</th>
                       <th>输出</th>
                       <th>缓存/输入 (占比)</th>
                     </tr>
@@ -978,7 +982,9 @@ export const StatsPage: FC<Props> = (props) => {
                             {req.statusCode}
                           </span>
                         </td>
-                        <td>{req.durationMs != null ? `${req.durationMs}ms` : '-'}</td>
+                        <td>{req.durationMs != null ? formatDuration(req.durationMs) : '—'}</td>
+                        <td>{req.ttftMs != null ? formatDuration(req.ttftMs) : '—'}</td>
+                        <td>{req.tps != null ? `${req.tps.toFixed(1)} tok/s` : '—'}</td>
                         <td>{req.completionTokens != null ? req.completionTokens.toLocaleString() : '-'}</td>
                         <td>{formatTokenCacheSum(req.promptTokens, req.cachedTokens)}</td>
                       </tr>
