@@ -9,6 +9,7 @@ import { findFinalUsageFromChunks } from '../../lib/stream-usage.js';
 import { resolveConverterChain } from '../../converters/router.js';
 import type { FormatName } from '../../converters/format-adapter.js';
 import { RequestLogger } from '../../lib/request-logger.js';
+import { calcTps } from '../../lib/stream-metrics.js';
 
 export interface StreamHandlerOptions {
   response: Response;
@@ -36,7 +37,7 @@ function isSilentError(err: any): boolean {
 }
 
 export function handleStream(options: StreamHandlerOptions): Response {
-  const { response, provider, model, actualModel, requestId, logEntry, rateLimiter, logger, detailLogger, c, requestLogger, currentUser } = options;
+  const { response, provider, model, actualModel, requestId, startTime, logEntry, rateLimiter, logger, detailLogger, c, requestLogger, currentUser } = options;
 
   if (!response.body) {
     return c.json({ error: { message: 'No response body' } }, 500);
@@ -54,6 +55,13 @@ export function handleStream(options: StreamHandlerOptions): Response {
 
   const transformedStream = new ReadableStream({
     async start(controller) {
+      let firstEnqueueAt: number | null = null;
+      const markTtft = () => {
+        if (firstEnqueueAt === null) {
+          firstEnqueueAt = Date.now();
+          logEntry.ttftMs = firstEnqueueAt - startTime;
+        }
+      };
       try {
         let buffer = '';
         let finalUsage: any = null;
@@ -70,13 +78,13 @@ export function handleStream(options: StreamHandlerOptions): Response {
                 const anthropicChunks = parseAndConvertOpenAISSE(part, streamState!, { requestId, provider: provider.provider });
                 for (const anthropicChunk of anthropicChunks) {
                   chunks.push(anthropicChunk);
-                  controller.enqueue(new TextEncoder().encode(anthropicChunk));
+                  controller.enqueue(new TextEncoder().encode(anthropicChunk)); markTtft();
                   convertedEventCounter += anthropicChunks.length;
                 }
               } else {
                 const sseLine = part + '\n\n';
                 chunks.push(sseLine);
-                controller.enqueue(new TextEncoder().encode(sseLine));
+                controller.enqueue(new TextEncoder().encode(sseLine)); markTtft();
               }
             }
 
@@ -93,6 +101,8 @@ export function handleStream(options: StreamHandlerOptions): Response {
               }
             }
 
+            logEntry.durationMs = Date.now() - startTime;
+            logEntry.tps = calcTps(logEntry.completionTokens, logEntry.durationMs, logEntry.ttftMs);
             detailLogger.logStreamResponse(requestId, chunks);
             if (requestLogger) {
               requestLogger.log({
@@ -115,6 +125,8 @@ export function handleStream(options: StreamHandlerOptions): Response {
                 errorMessage: logEntry.error?.message,
                 errorType: logEntry.error?.type,
                 responseMetadata: logEntry.responseMetadata,
+                ttftMs: logEntry.ttftMs ?? null,
+                tps: logEntry.tps ?? null,
               });
             }
             logger.log(logEntry);
@@ -155,7 +167,7 @@ export function handleStream(options: StreamHandlerOptions): Response {
                 if (options.privacySettings?.enabled && options.privacySettings.sanitizeFilePaths) {
                   chunk = sanitizeSSEChunk(chunk, options.requestId);
                 }
-                controller.enqueue(new TextEncoder().encode(chunk));
+                controller.enqueue(new TextEncoder().encode(chunk)); markTtft();
                 convertedEventCounter++;
               }
             } else {
@@ -167,7 +179,7 @@ export function handleStream(options: StreamHandlerOptions): Response {
                 chunk = sanitizeSSEChunk(chunk, options.requestId);
               }
               try {
-                controller.enqueue(new TextEncoder().encode(chunk));
+                controller.enqueue(new TextEncoder().encode(chunk)); markTtft();
               } catch (err) {
                 if (isSilentError(err)) return;
                 throw err;
