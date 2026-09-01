@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'fs';
+import { readFileSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { VERSION } from '../../src/lib/version.js';
@@ -43,10 +43,13 @@ describe('VERSION display in pages', () => {
   it('HomePage (/user/main) contains v{VERSION}', async () => {
     const dir = join(tmpdir(), 'test-version-home-' + Date.now());
     mkdirSync(dir, { recursive: true });
+    // 写一份测试 config.json 到临时目录，并作为 configDir 传入 createServer。
+    // 不能依赖 isTestEnv（不传 configDir）：那会回退到真实的 ~/.llm-gateway，
+    // 若该目录不存在（如 CI），loadFullConfig 会抛 "Config file not found" 导致 500。
+    writeFileSync(join(dir, 'config.json'), JSON.stringify(makeConfig()));
     const logger = new Logger(dir);
     const detailLogger = new DetailLogger(dir);
-    // 不传 configDir -> isTestEnv=true，跳过磁盘 config 与 DB 初始化，直接渲染
-    const app = createServer(makeConfig() as any, logger, detailLogger, 30000);
+    const app = createServer(makeConfig() as any, logger, detailLogger, 30000, dir);
     try {
       const res = await app.request('/user/main');
       expect(res.status).toBe(200);
@@ -61,9 +64,10 @@ describe('VERSION display in pages', () => {
   it('ModelsPage (/admin/models) contains v{VERSION}', async () => {
     const dir = join(tmpdir(), 'test-version-models-' + Date.now());
     mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'config.json'), JSON.stringify(makeConfig()));
     const logger = new Logger(dir);
     const detailLogger = new DetailLogger(dir);
-    const app = createServer(makeConfig() as any, logger, detailLogger, 30000);
+    const app = createServer(makeConfig() as any, logger, detailLogger, 30000, dir);
     try {
       const res = await app.request('/admin/models');
       expect(res.status).toBe(200);
