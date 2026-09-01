@@ -31,20 +31,36 @@ export async function handleMessagesNonStream(
   }
 
   const plan = resolveConverterChain('anthropic', provider.provider as FormatName);
+  const isResponseApi = provider.provider === 'response-api';
   if (!plan.passthrough) {
-    // Extract tokens from original OpenAI response before conversion
-    const originalUsage = responseData.usage;
-    logEntry.promptTokens = originalUsage?.prompt_tokens;
-    logEntry.completionTokens = originalUsage?.completion_tokens;
-    logEntry.totalTokens = originalUsage?.total_tokens;
-    logEntry.cachedTokens = originalUsage?.prompt_tokens_details?.cached_tokens;
+    if (isResponseApi) {
+      // Responses JSON -> canonical(chat) -> Anthropic
+      const chat = plan.providerAdapter.toChatResponse(responseData);
+      const converted = plan.sourceAdapter.fromChatResponse(chat as any);
+      // usage 在 chat 层已归一为 prompt_tokens/completion_tokens
+      const usage = (chat as any).usage;
+      logEntry.promptTokens = usage?.prompt_tokens;
+      logEntry.completionTokens = usage?.completion_tokens;
+      logEntry.totalTokens = usage?.total_tokens;
+      logEntry.responseMetadata = JSON.stringify((converted as any).usage ?? usage ?? {});
+      responseData = converted;
+      console.log('   🔄 [Responses→Anthropic 转换]');
+      logger.log({ ...logEntry, message: 'Converted Responses response to Anthropic format' });
+    } else {
+      // Extract tokens from original OpenAI response before conversion
+      const originalUsage = responseData.usage;
+      logEntry.promptTokens = originalUsage?.prompt_tokens;
+      logEntry.completionTokens = originalUsage?.completion_tokens;
+      logEntry.totalTokens = originalUsage?.total_tokens;
+      logEntry.cachedTokens = originalUsage?.prompt_tokens_details?.cached_tokens;
 
-    const converted = convertOpenAIResponseToAnthropic(responseData, model);
-    responseData = converted;
+      const converted = convertOpenAIResponseToAnthropic(responseData, model);
+      responseData = converted;
 
-    logEntry.responseMetadata = JSON.stringify(responseData.usage ?? {});
-    console.log('   🔄 [OpenAI→Anthropic 转换]');
-    logger.log({ ...logEntry, message: 'Converted OpenAI response to Anthropic format' });
+      logEntry.responseMetadata = JSON.stringify(responseData.usage ?? {});
+      console.log('   🔄 [OpenAI→Anthropic 转换]');
+      logger.log({ ...logEntry, message: 'Converted OpenAI response to Anthropic format' });
+    }
   } else {
     const usage = responseData.usage;
     logEntry.promptTokens = usage?.input_tokens;

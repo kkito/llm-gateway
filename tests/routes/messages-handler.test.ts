@@ -518,4 +518,81 @@ describe('createMessagesHandler', () => {
       expect(detailLogger.logRequest).toHaveBeenCalledTimes(1);
     });
   });
+
+  describe('streaming requestLogger', () => {
+    // 每次测试都重置模块缓存并重建 handler，确保 doMock 与单例都干净
+    async function setupStreamingTest() {
+      vi.resetModules();
+      const mockRequestLogger = { log: vi.fn(), start: vi.fn(), stop: vi.fn() };
+
+      vi.doMock('../../src/lib/db.js', () => ({
+        DatabaseManager: {
+          getExistingInstance: vi.fn(() => ({ getDrizzle: vi.fn() })),
+        }
+      }));
+      vi.doMock('../../src/lib/request-logger.js', () => ({
+        RequestLogger: {
+          getInstance: vi.fn(() => mockRequestLogger),
+          resetInstance: vi.fn(),
+        }
+      }));
+
+      const { createMessagesHandler: freshHandler } = await import('../../src/routes/messages/handler.js');
+
+      const provider = {
+        customModel: 'claude-3',
+        realModel: 'claude-3-real',
+        apiKey: 'test-key',
+        baseUrl: 'https://api.anthropic.com',
+        provider: 'anthropic' as const
+      };
+      const config = { models: [provider] };
+      const logger = createMockLogger();
+      const detailLogger = createMockDetailLogger();
+      const handler = freshHandler(config, logger as any, detailLogger as any, 30000, '/tmp/test');
+
+      return { handler, mockRequestLogger, provider, logger, detailLogger };
+    }
+
+    it('should NOT call requestLogger.log() for single-model streaming requests (stream handler is sole writer)', async () => {
+      const { handler, mockRequestLogger } = await setupStreamingTest();
+
+      const { sendMessagesUpstreamRequest } = await import('../../src/routes/messages/upstream-request.js');
+      vi.mocked(sendMessagesUpstreamRequest as any).mockResolvedValue(new Response('stream-body'));
+
+      const c = createMockC();
+      c.req.json = vi.fn(async () => ({
+        model: 'claude-3',
+        messages: [{ role: 'user', content: 'hi' }],
+        stream: true
+      }));
+
+      await handler(c, '/v1/messages');
+
+      // 流式请求：handler 不得提前写入（无 ttftMs/tps），否则 INSERT OR IGNORE
+      // 会丢弃 stream handler 后期含 ttft/tps 的写入。stream handler 才是唯一写入者。
+      expect(mockRequestLogger.log).not.toHaveBeenCalled();
+    });
+
+    it('should call requestLogger.log() for non-stream requests (single final write)', async () => {
+      const { handler, mockRequestLogger } = await setupStreamingTest();
+
+      const { sendMessagesUpstreamRequest } = await import('../../src/routes/messages/upstream-request.js');
+      vi.mocked(sendMessagesUpstreamRequest as any).mockResolvedValue(
+        new Response(JSON.stringify({ content: [{ type: 'text', text: 'Hello' }] }))
+      );
+
+      const c = createMockC();
+      c.req.json = vi.fn(async () => ({
+        model: 'claude-3',
+        messages: [{ role: 'user', content: 'hi' }],
+        stream: false
+      }));
+
+      await handler(c, '/v1/messages');
+
+      // 非流式：handler 是唯一写入者，应写一次
+      expect(mockRequestLogger.log).toHaveBeenCalledTimes(1);
+    });
+  });
 });

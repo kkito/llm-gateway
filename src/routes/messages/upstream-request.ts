@@ -36,13 +36,18 @@ export async function buildMessagesUpstreamRequest(
   const plan = resolveConverterChain('anthropic', effectiveProvider.provider as FormatName);
   if (plan.passthrough) {
     requestBody = { ...body, model: effectiveProvider.realModel };
+  } else if (effectiveProvider.provider === 'response-api') {
+    // Muse 客户端 (anthropic) -> canonical(chat) -> responses 上游
+    // 与 /v1/chat/completions 与 /v1/responses 两条路由一致，走同一星型 adapter 链
+    const chat = plan.sourceAdapter.toChatRequest(body);
+    requestBody = { ...plan.providerAdapter.fromChatRequest({ ...chat, model: effectiveProvider.realModel }) };
   } else {
     const openaiRequest = convertAnthropicRequestToOpenAI(body);
     requestBody = { ...openaiRequest, model: effectiveProvider.realModel };
   }
 
   const requestHeaders = buildHeaders(effectiveProvider);
-  const url = buildUrl(effectiveProvider, 'chat');
+  const url = buildUrl(effectiveProvider, effectiveProvider.provider === 'response-api' ? 'responses' : 'chat');
 
   // 合并默认参数（用户参数优先级更高）
   requestBody = mergeModelParams(effectiveProvider.defaultParams, requestBody);

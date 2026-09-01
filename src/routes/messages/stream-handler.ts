@@ -45,8 +45,12 @@ export function handleStream(options: StreamHandlerOptions): Response {
 
   const providerFormat = provider.provider;
   const plan = resolveConverterChain('anthropic', providerFormat as FormatName);
+  const isResponseApi = providerFormat === 'response-api';
   const streamState: OpenAIToAnthropicStreamState | undefined =
-    !plan.passthrough ? createOpenAIToAnthropicStreamState() : undefined;
+    (!plan.passthrough && !isResponseApi) ? createOpenAIToAnthropicStreamState() : undefined;
+  // response-api 上游：Responses 命名事件 SSE -> canonical -> Anthropic SSE（同 chat 路由的双转换串联思路）
+  const responsesUpstream = isResponseApi ? plan.providerAdapter.createUpstreamStream() : undefined;
+  const anthropicDownstream = isResponseApi ? plan.sourceAdapter.createDownstreamStream() : undefined;
 
   const chunks: string[] = [];
   const rawChunks: string[] = [];
@@ -74,7 +78,16 @@ export function handleStream(options: StreamHandlerOptions): Response {
             // 处理缓冲区中剩余的数据
             if (buffer.trim()) {
               const part = buffer.trim();
-              if (!plan.passthrough) {
+              if (isResponseApi) {
+                const block = `${part}\n\n`;
+                for (const chatChunk of responsesUpstream!.transform(block)) {
+                  for (const out of anthropicDownstream!.transform(chatChunk)) {
+                    chunks.push(out);
+                    controller.enqueue(new TextEncoder().encode(out)); markTtft();
+                    convertedEventCounter++;
+                  }
+                }
+              } else if (!plan.passthrough) {
                 const anthropicChunks = parseAndConvertOpenAISSE(part, streamState!, { requestId, provider: provider.provider });
                 for (const anthropicChunk of anthropicChunks) {
                   chunks.push(anthropicChunk);
@@ -85,6 +98,20 @@ export function handleStream(options: StreamHandlerOptions): Response {
                 const sseLine = part + '\n\n';
                 chunks.push(sseLine);
                 controller.enqueue(new TextEncoder().encode(sseLine)); markTtft();
+              }
+            }
+            if (isResponseApi) {
+              for (const chatChunk of responsesUpstream!.flush()) {
+                for (const out of anthropicDownstream!.transform(chatChunk)) {
+                  chunks.push(out);
+                  controller.enqueue(new TextEncoder().encode(out)); markTtft();
+                  convertedEventCounter++;
+                }
+              }
+              for (const out of anthropicDownstream!.flush()) {
+                chunks.push(out);
+                controller.enqueue(new TextEncoder().encode(out)); markTtft();
+                convertedEventCounter++;
               }
             }
 
@@ -158,7 +185,25 @@ export function handleStream(options: StreamHandlerOptions): Response {
 
             eventCounter++;
 
-            if (!plan.passthrough) {
+            if (isResponseApi) {
+              const block = `${part}\n\n`;
+              for (const chatChunk of responsesUpstream!.transform(block)) {
+                for (const out of anthropicDownstream!.transform(chatChunk)) {
+                  chunks.push(out);
+                  let chunk = out;
+                  if (options.privacySettings?.enabled && options.privacySettings.sanitizeFilePaths) {
+                    chunk = sanitizeSSEChunk(chunk, options.requestId);
+                  }
+                  try {
+                    controller.enqueue(new TextEncoder().encode(chunk)); markTtft();
+                  } catch (err) {
+                    if (isSilentError(err)) return;
+                    throw err;
+                  }
+                  convertedEventCounter++;
+                }
+              }
+            } else if (!plan.passthrough) {
               // OpenAI → Anthropic 流式转换
               const anthropicChunks = parseAndConvertOpenAISSE(part, streamState!, { requestId, provider: provider.provider });
               for (const anthropicChunk of anthropicChunks) {
