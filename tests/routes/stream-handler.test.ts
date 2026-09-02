@@ -687,6 +687,51 @@ describe('handleStream', () => {
     expect(allContent.match(/"finish_reason":"stop"/g)).toHaveLength(1);
   });
 
+  it('strips event: and id: lines in passthrough to avoid "event: done" JSON parse error', async () => {
+    const c = createMockHonoContext();
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode('data: {"id":"x","object":"chat.completion.chunk","created":1,"model":"m","choices":[{"index":0,"delta":{"content":"Hi"},"finish_reason":null}]}\n\n'));
+        // Upstream sends non-standard `event: done` block (seen in real logs: `event: done\\ndata: [DONE]`).
+        controller.enqueue(encoder.encode('event: done\ndata: [DONE]\n\n'));
+        controller.close();
+      },
+    });
+    const options: StreamHandlerOptions = {
+      response: new Response(stream),
+      provider: { customModel: 'gpt-4', realModel: 'gpt-4', apiKey: 'x', baseUrl: 'https://api.openai.com', provider: 'openai' },
+      model: 'gpt-4',
+      actualModel: 'gpt-4',
+      requestId: 'req-123',
+      logEntry: {},
+      rateLimiter: createMockRateLimiter(),
+      logger: createMockLogger(),
+      detailLogger: createMockDetailLogger(),
+      c,
+    };
+    const res = handleStream(options);
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    const chunks: string[] = [];
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(decoder.decode(value));
+    }
+    const all = chunks.join('');
+    // Must not emit `data: event: done` which makes client JSON.parse("event: done") throw
+    expect(all).not.toContain('data: event:');
+    expect(all).not.toContain('event: done');
+    expect(all).toContain('data: [DONE]');
+    for (const chunk of chunks) {
+      if (!chunk.startsWith('data:')) continue;
+      const payload = chunk.slice(5).trim();
+      if (payload === '[DONE]') continue;
+      expect(() => JSON.parse(payload)).not.toThrow();
+    }
+  });
+
   it('does not append a finish_reason when upstream already sent [DONE]', async () => {
     const c = createMockHonoContext();
     const encoder = new TextEncoder();

@@ -255,22 +255,20 @@ export function handleStream(options: StreamHandlerOptions): Response {
                 controller.enqueue(new TextEncoder().encode(sanitizedChunk)); markTtft();
               }
             } else {
-              let sseLine = part;
-              if (!sseLine.startsWith('data:')) {
-                sseLine = `data: ${sseLine}`;
-              }
-              if (!sseLine.endsWith('\n\n')) {
-                sseLine += '\n\n';
-              }
-              chunks.push(sseLine);
-              if (options.privacySettings?.enabled && options.privacySettings.sanitizeFilePaths) {
-                sseLine = sanitizeSSEChunk(sseLine, options.requestId);
-              }
-              try {
-                controller.enqueue(new TextEncoder().encode(sseLine)); markTtft();
-              } catch (err) {
-                if (isSilentError(err)) return;
-                throw err;
+              const dataLines = part.split('\n').filter((l) => l.startsWith('data:'));
+              if (dataLines.length === 0) continue;
+              for (let sseLine of dataLines) {
+                if (!sseLine.endsWith('\n\n')) sseLine += '\n\n';
+                chunks.push(sseLine);
+                if (options.privacySettings?.enabled && options.privacySettings.sanitizeFilePaths) {
+                  sseLine = sanitizeSSEChunk(sseLine, options.requestId);
+                }
+                try {
+                  controller.enqueue(new TextEncoder().encode(sseLine)); markTtft();
+                } catch (err) {
+                  if (isSilentError(err)) return;
+                  throw err;
+                }
               }
             }
           }
