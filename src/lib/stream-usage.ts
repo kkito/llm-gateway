@@ -31,6 +31,7 @@ export function extractUsageFromOpenAIChunk(chunk: any): StreamUsage | null {
   // 缓存 token 信息
   const cachedTokens =
     usage.prompt_tokens_details?.cached_tokens ??
+    usage.input_tokens_details?.cached_tokens ??
     usage.cache_read_input_tokens ??
     usage.cache_creation_input_tokens;
 

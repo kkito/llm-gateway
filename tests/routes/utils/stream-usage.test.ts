@@ -21,6 +21,19 @@ describe('extractUsageFromOpenAIChunk', () => {
     });
   });
 
+  it('extracts cached_tokens from input_tokens_details (input/output naming)', () => {
+    const chunk = {
+      usage: {
+        input_tokens: 12, output_tokens: 383, total_tokens: 395,
+        input_tokens_details: { cached_tokens: 7 },
+        output_tokens_details: { reasoning_tokens: 183 },
+      },
+    };
+    expect(extractUsageFromOpenAIChunk(chunk)).toEqual({
+      promptTokens: 12, completionTokens: 383, totalTokens: 395, cachedTokens: 7,
+    });
+  });
+
   it('extracts cache_read_input_tokens', () => {
     const chunk = { usage: { prompt_tokens: 100, completion_tokens: 50, cache_read_input_tokens: 20 } };
     const result = extractUsageFromOpenAIChunk(chunk)!;

@@ -89,6 +89,37 @@ describe('handleNonStream', () => {
       expect(logEntry.cachedTokens).toBe(10);
     });
 
+    it('extracts cached_tokens from input_tokens_details (input/output naming)', async () => {
+      const openAIJson = {
+        id: 'chatcmpl-test',
+        object: 'chat.completion',
+        model: 'gpt-4',
+        choices: [{ index: 0, message: { role: 'assistant', content: 'Hello' } }],
+        usage: {
+          input_tokens: 12,
+          output_tokens: 383,
+          total_tokens: 395,
+          input_tokens_details: { cached_tokens: 7 },
+          output_tokens_details: { reasoning_tokens: 183 },
+        }
+      };
+      const response = createOpenAIResponse(openAIJson);
+      const logEntry: any = {};
+      const logger = createLogger();
+      const provider = {
+        customModel: 'gpt-4',
+        realModel: 'gpt-4',
+        apiKey: 'x',
+        baseUrl: 'https://api.openai.com',
+        provider: 'openai' as const
+      };
+
+      const result = await handleNonStream(response, provider, 'gpt-4', logEntry, logger);
+
+      expect(result).not.toBeNull();
+      expect(logEntry.cachedTokens).toBe(7);
+    });
+
     it('handles missing usage field gracefully', async () => {
       const openAIJson = {
         id: 'chatcmpl-test',

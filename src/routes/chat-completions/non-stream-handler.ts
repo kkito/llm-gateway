@@ -44,10 +44,10 @@ export async function handleNonStream(
     logger.log({ ...logEntry, message: 'Converted Anthropic response to OpenAI format' });
   } else {
     const usage = responseData.usage;
-    logEntry.promptTokens = usage?.prompt_tokens;
-    logEntry.completionTokens = usage?.completion_tokens;
+    logEntry.promptTokens = usage?.prompt_tokens ?? usage?.input_tokens;
+    logEntry.completionTokens = usage?.completion_tokens ?? usage?.output_tokens;
     logEntry.totalTokens = usage?.total_tokens;
-    logEntry.cachedTokens = usage?.prompt_tokens_details?.cached_tokens;
+    logEntry.cachedTokens = usage?.prompt_tokens_details?.cached_tokens ?? usage?.input_tokens_details?.cached_tokens;
     logEntry.responseMetadata = JSON.stringify(responseData.usage ?? {});
   }
 
