@@ -82,13 +82,50 @@ describe('responses request', () => {
     }
   });
 
-  it('tool_choice 双向转换', () => {
-    const r = { model: 'gpt-4o', input: 'hi', tool_choice: { type: 'function', name: 'get_weather' } };
+  it('tool_choice 双向转换（带 tools 时保留）', () => {
+    const r = {
+      model: 'gpt-4o',
+      input: 'hi',
+      tools: [{ type: 'function', name: 'get_weather', description: 'd', parameters: {} }],
+      tool_choice: { type: 'function', name: 'get_weather' },
+    };
     const chat = responsesToChatRequest(r);
     expect(chat.tool_choice).toEqual({ type: 'function', function: { name: 'get_weather' } });
 
     const back = chatToResponsesRequest(chat);
     expect(back.tool_choice).toEqual({ type: 'function', name: 'get_weather' });
+  });
+
+  it('chat -> responses：tool_choice "required" 降级为 "auto"（opencode zen 只支持 auto）', () => {
+    const chat = {
+      model: 'muse-spark',
+      messages: [{ role: 'user', content: 'hi' }],
+      tools: [{ type: 'function', function: { name: 'exec_command', description: 'run', parameters: {} } }],
+      tool_choice: 'required',
+    } as any;
+    const r = chatToResponsesRequest(chat);
+    expect(r.tool_choice).toBe('auto');
+  });
+
+  it('chat -> responses：无 tools 时丢弃 tool_choice，避免悬空', () => {
+    const chat = {
+      model: 'muse-spark',
+      messages: [{ role: 'user', content: 'hi' }],
+      tool_choice: 'required',
+    } as any;
+    const r = chatToResponsesRequest(chat);
+    expect(r.tool_choice).toBeUndefined();
+  });
+
+  it('chat -> responses：tool_choice 指向不存在的函数名时降级为 "auto"', () => {
+    const chat = {
+      model: 'muse-spark',
+      messages: [{ role: 'user', content: 'hi' }],
+      tools: [{ type: 'function', function: { name: 'exec_command', description: 'run', parameters: {} } }],
+      tool_choice: { type: 'function', function: { name: 'gone' } },
+    } as any;
+    const r = chatToResponsesRequest(chat);
+    expect(r.tool_choice).toBe('auto');
   });
 
   it('chat -> responses 工具补全 type:"function"', () => {

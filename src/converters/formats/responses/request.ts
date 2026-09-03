@@ -106,7 +106,10 @@ export function chatToResponsesRequest(chat: ChatRequest): any {
   if (instructions) result.instructions = instructions;
   if (chat.previousResponseId) result.previous_response_id = chat.previousResponseId;
   if (chat.tools) result.tools = chat.tools.map((t) => ({ type: 'function', name: t.function.name, description: t.function.description, parameters: t.function.parameters }));
-  if (chat.tool_choice) result.tool_choice = mapChatToolChoiceToResponses(chat.tool_choice);
+  if (chat.tool_choice) {
+    const toolChoice = sanitizeToolChoiceForResponses(chat.tool_choice, chat.tools);
+    if (toolChoice !== undefined) result.tool_choice = toolChoice;
+  }
   if (chat.stream) result.stream = true;
   if (chat.temperature !== undefined) result.temperature = chat.temperature;
   if (chat.max_tokens) result.max_output_tokens = chat.max_tokens;
@@ -129,6 +132,26 @@ function mapChatToolChoiceToResponses(toolChoice: any): any {
     return { type: 'function', name: toolChoice.function?.name };
   }
   return toolChoice;
+}
+
+/**
+ * 发往 Responses 上游前清洗 tool_choice：
+ * - 无 tools 时丢弃，避免悬空 tool_choice 被上游 400；
+ * - 字符串只保留 "auto"，其余（"required"/"none" 等）降级为 "auto"
+ *  （opencode zen 等上游只支持 "auto"）；
+ * - 对象型指向不存在的函数名时降级为 "auto"。
+ */
+function sanitizeToolChoiceForResponses(toolChoice: any, tools?: ChatTool[]): any {
+  if (!tools || tools.length === 0) return undefined;
+  if (typeof toolChoice === 'string') {
+    return toolChoice === 'auto' ? toolChoice : 'auto';
+  }
+  const mapped = mapChatToolChoiceToResponses(toolChoice);
+  if (mapped && mapped.type === 'function') {
+    const names = new Set(tools.map((t) => t.function?.name));
+    if (!mapped.name || !names.has(mapped.name)) return 'auto';
+  }
+  return mapped;
 }
 
 function normalizeInput(input: any): ResponsesInputItem[] {
