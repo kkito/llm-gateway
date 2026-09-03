@@ -600,6 +600,7 @@ export function convertAnthropicStreamEventToOpenAI(
         const outputTokens = event.usage.output_tokens || 0;
         const cacheCreationTokens = event.usage.cache_creation_input_tokens || 0;
         const cacheReadTokens = event.usage.cache_read_input_tokens || 0;
+        const detailsCachedTokens = (event.usage as any).input_tokens_details?.cached_tokens || 0;
         
         usage = {
           prompt_tokens: inputTokens,
@@ -608,9 +609,10 @@ export function convertAnthropicStreamEventToOpenAI(
         };
         
         // 如果有缓存 token，添加详细信息
-        if (cacheCreationTokens > 0 || cacheReadTokens > 0) {
+        const totalCached = cacheCreationTokens + cacheReadTokens + detailsCachedTokens;
+        if (totalCached > 0) {
           usage.prompt_tokens_details = {
-            cached_tokens: cacheCreationTokens + cacheReadTokens
+            cached_tokens: totalCached
           };
         }
       }

@@ -197,7 +197,14 @@ export class ResponsesUpstreamStream implements StreamConverter {
             out.push({ id: cid(), object: 'chat.completion.chunk', created: this.created, model: this.model, choices: [{ index: 0, delta: {}, finish_reason: null }] });
           }
           this.fallbackOpenIndex = null;
-          const usage = respObj.usage ? { prompt_tokens: respObj.usage.input_tokens ?? 0, completion_tokens: respObj.usage.output_tokens ?? 0, total_tokens: (respObj.usage.input_tokens ?? 0) + (respObj.usage.output_tokens ?? 0) } : undefined;
+          const rawUsage = respObj.usage;
+          const cachedTokens = rawUsage?.input_tokens_details?.cached_tokens ?? rawUsage?.prompt_tokens_details?.cached_tokens;
+          const usage = rawUsage ? {
+            prompt_tokens: rawUsage.input_tokens ?? 0,
+            completion_tokens: rawUsage.output_tokens ?? 0,
+            total_tokens: (rawUsage.input_tokens ?? 0) + (rawUsage.output_tokens ?? 0),
+            ...(cachedTokens != null ? { prompt_tokens_details: { cached_tokens: cachedTokens } } : {}),
+          } : undefined;
           out.push({ id: cid(), object: 'chat.completion.chunk', created: this.created, model: this.model, choices: [{ index: 0, delta: {}, finish_reason: stopReason }], usage });
           break;
         }

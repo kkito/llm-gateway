@@ -66,6 +66,21 @@ describe('responses upstream stream', () => {
   });
 });
 
+describe('responses upstream stream usage', () => {
+  it('response.completed 保留 input_tokens_details.cached_tokens', () => {
+    const input = [
+      'event: response.completed',
+      'data: {"type":"response.completed","response":{"status":"completed","usage":{"input_tokens":26059,"output_tokens":409,"total_tokens":26468,"input_tokens_details":{"cached_tokens":14577},"output_tokens_details":{"reasoning_tokens":363}}}}',
+      '',
+    ].join('\n') + '\n\n';
+    const s = new ResponsesUpstreamStream();
+    const chunks = s.transform(input);
+    expect(chunks.length).toBe(1);
+    expect(chunks[0].usage?.prompt_tokens).toBe(26059);
+    expect((chunks[0].usage as any)?.prompt_tokens_details?.cached_tokens).toBe(14577);
+  });
+});
+
 describe('responses downstream stream (chat -> responses)', () => {
   it('reasoning + text 流式带完整 item/part 层次结构（对齐 cc-switch）', () => {
     const chunks: ChatStreamChunk[] = [

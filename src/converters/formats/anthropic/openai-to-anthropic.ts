@@ -670,7 +670,7 @@ export function convertOpenAIStreamChunkToAnthropic(
       const u = chunk.usage as any;
       const inputTokens = (u.prompt_tokens ?? u.input_tokens) || 0;
       const outputTokens = (u.completion_tokens ?? u.output_tokens) || 0;
-      const cacheTokens = u.prompt_tokens_details?.cached_tokens || 0;
+      const cacheTokens = u.prompt_tokens_details?.cached_tokens ?? u.input_tokens_details?.cached_tokens ?? 0;
       
       messageDeltaEvent.usage = {
         input_tokens: inputTokens,

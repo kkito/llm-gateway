@@ -139,6 +139,27 @@ describe('openai-to-anthropic converter - stream event conversion', () => {
     expect(deltaEvent?.usage?.output_tokens).toBe(20);
   });
 
+  it('preserves input_tokens_details.cached_tokens as cache_creation_input_tokens', () => {
+    const state = createState();
+    state.sentMessageStart = true;
+    state.sentContentBlockStart = true;
+    state.sentContentBlockFinish = true;
+    const chunk = {
+      id: 'chatcmpl-123',
+      object: 'chat.completion.chunk' as const,
+      created: 123,
+      model: 'gpt-4',
+      choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
+      usage: {
+        prompt_tokens: 80, completion_tokens: 30, total_tokens: 110,
+        input_tokens_details: { cached_tokens: 50 },
+      },
+    };
+    const result = convertOpenAIStreamChunkToAnthropic(chunk as any, state);
+    const deltaEvent = result.find(e => e.type === 'message_delta');
+    expect(deltaEvent?.usage?.cache_creation_input_tokens).toBe(50);
+  });
+
   it('deduplicates message_stop when upstream sends finish_reason twice', () => {
     const state = createState();
     state.sentMessageStart = true;

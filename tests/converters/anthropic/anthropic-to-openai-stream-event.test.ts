@@ -290,4 +290,14 @@ describe('anthropic-to-openai converter - stream event conversion', () => {
     const result = convertAnthropicStreamEventToOpenAI(event, requestId, model);
     expect(result!.usage!.prompt_tokens_details!.cached_tokens).toBe(5);
   });
+
+  it('preserves input_tokens_details.cached_tokens in message_delta usage', () => {
+    const event: AnthropicStreamEvent = {
+      type: 'message_delta',
+      delta: { stop_reason: 'end_turn' },
+      usage: { input_tokens: 80, output_tokens: 30, input_tokens_details: { cached_tokens: 50 } } as any,
+    };
+    const result = convertAnthropicStreamEventToOpenAI(event, requestId, model);
+    expect(result!.usage!.prompt_tokens_details!.cached_tokens).toBe(50);
+  });
 });
