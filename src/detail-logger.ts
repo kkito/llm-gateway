@@ -21,6 +21,17 @@ export class DetailLogger {
   }
 
   /**
+   * 动态开关详细日志（后台配置变更时调用，无需重启）
+   */
+  setEnabled(enabled: boolean): void {
+    this.enabled = enabled;
+  }
+
+  isEnabled(): boolean {
+    return this.enabled;
+  }
+
+  /**
    * 记录用户请求的完整内容
    */
   logRequest(requestId: string, body: unknown): void {

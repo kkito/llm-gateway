@@ -199,7 +199,8 @@ function main() {
         console.log(`✓ 结构化日志目录：${logPath}`);
 
         // 创建详细日志实例 (输出到 logs/ 目录)
-        const detailLogger = new DetailLogger(ctx.detailLogDir, options.debug || false);
+        // --debug 优先级最高：开启则强制记录，无视后台 detailLogEnabled 开关
+        const detailLogger = new DetailLogger(ctx.detailLogDir, options.debug || config.detailLogEnabled === true);
         if (options.debug) {
           console.log(`✓ 详细日志已启用：${ctx.detailLogDir}/{requestId}_{stage}.log`);
         } else {
@@ -212,7 +213,7 @@ function main() {
 
         // 创建服务器 (确保 timeout 是数字类型)
         const timeoutMs = Number(options.timeout);
-        const app = createServer(config, logger, detailLogger, timeoutMs, ctx.configDir);
+        const app = createServer(config, logger, detailLogger, timeoutMs, ctx.configDir, { cliDebug: options.debug });
         console.log(`✓ 服务器已创建，超时设置：${timeoutMs}ms`);
 
         // 启动服务器

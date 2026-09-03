@@ -11,6 +11,8 @@ interface PrivacySettings {
 
 interface Props {
   settings: PrivacySettings;
+  detailLogEnabled?: boolean;
+  cliDebug?: boolean;
   error?: string;
   success?: string;
 }
@@ -62,6 +64,8 @@ export const PrivacySettingsPage: FC<Props> = (props) => {
 
           <div class="card">
             <form method="post" action="/admin/privacy">
+              {/* 保留日志开关当前值，避免隐私表单提交时覆盖 */}
+              <input type="hidden" name="detailLogEnabled" value={props.detailLogEnabled ? 'on' : 'off'} />
               <div class="toggle-row">
                 <div>
                   <div class="toggle-label">启用隐私保护</div>
@@ -104,6 +108,34 @@ export const PrivacySettingsPage: FC<Props> = (props) => {
 
               <div style="margin-top: 1.5rem;">
                 <button type="submit" class="btn">保存设置</button>
+              </div>
+            </form>
+          </div>
+
+          <h1 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 1.5rem;">日志记录</h1>
+
+          <div class="card">
+            <form method="post" action="/admin/privacy">
+              {/* 保留隐私设置当前值，避免第二块表单提交时覆盖 */}
+              <input type="hidden" name="enabled" value={s.enabled ? 'on' : 'off'} />
+              <input type="hidden" name="stripUserField" value={s.stripUserField ? 'on' : 'off'} />
+              <input type="hidden" name="sanitizeFilePaths" value={s.sanitizeFilePaths ? 'on' : 'off'} />
+              <input type="hidden" name="pathPlaceholder" value={s.pathPlaceholder || DEFAULT_PLACEHOLDER} />
+              <input type="hidden" name="whitelistFilter" value={s.whitelistFilter ? 'on' : 'off'} />
+              <div class="toggle-row">
+                <div>
+                  <div class="toggle-label">记录完整请求/响应日志</div>
+                  <div class="toggle-desc">
+                    开启后记录完整请求/响应内容到文件（{`{requestId}_{stage}.log`}），即时生效、无需重启
+                    {props.cliDebug && '；当前以 --debug 启动，强制记录中'}
+                  </div>
+                </div>
+                <input type="hidden" name="detailLogEnabled" value="off" />
+                <input type="checkbox" name="detailLogEnabled" value="on" checked={props.detailLogEnabled} disabled={props.cliDebug} />
+              </div>
+
+              <div style="margin-top: 1.5rem;">
+                <button type="submit" class="btn" disabled={props.cliDebug}>保存设置</button>
               </div>
             </form>
           </div>

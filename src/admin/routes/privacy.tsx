@@ -13,6 +13,7 @@ interface PrivacySettings {
 interface RouteDeps {
   configPath: string;
   onConfigChange: (config: any) => void;
+  cliDebug?: boolean;
 }
 
 const DEFAULT_SETTINGS: PrivacySettings = {
@@ -24,16 +25,16 @@ const DEFAULT_SETTINGS: PrivacySettings = {
 };
 
 export function createPrivacyRoute(deps: RouteDeps) {
-  const { configPath, onConfigChange } = deps;
+  const { configPath, onConfigChange, cliDebug = false } = deps;
   const app = new Hono();
 
   app.get('/admin/privacy', (c) => {
     try {
       const proxyConfig = loadFullConfig(configPath);
       const settings = proxyConfig.privacySettings || DEFAULT_SETTINGS;
-      return c.html(<PrivacySettingsPage settings={settings} />);
+      return c.html(<PrivacySettingsPage settings={settings} detailLogEnabled={proxyConfig.detailLogEnabled === true} cliDebug={cliDebug} />);
     } catch (error: any) {
-      return c.html(<PrivacySettingsPage settings={DEFAULT_SETTINGS} error={`加载失败：${error.message}`} />);
+      return c.html(<PrivacySettingsPage settings={DEFAULT_SETTINGS} detailLogEnabled={false} cliDebug={cliDebug} error={`加载失败：${error.message}`} />);
     }
   });
 
@@ -51,14 +52,15 @@ export function createPrivacyRoute(deps: RouteDeps) {
       };
 
       proxyConfig.privacySettings = settings;
+      proxyConfig.detailLogEnabled = body.detailLogEnabled === 'on';
       saveConfig(proxyConfig, configPath);
       onConfigChange(proxyConfig);
 
-      return c.html(<PrivacySettingsPage settings={settings} success="设置已保存" />);
+      return c.html(<PrivacySettingsPage settings={settings} detailLogEnabled={proxyConfig.detailLogEnabled} cliDebug={cliDebug} success="设置已保存" />);
     } catch (error: any) {
       const proxyConfig = loadFullConfig(configPath);
       const settings = proxyConfig.privacySettings || DEFAULT_SETTINGS;
-      return c.html(<PrivacySettingsPage settings={settings} error={`保存失败：${error.message}`} />);
+      return c.html(<PrivacySettingsPage settings={settings} detailLogEnabled={proxyConfig.detailLogEnabled === true} cliDebug={cliDebug} error={`保存失败：${error.message}`} />);
     }
   });
 

@@ -103,7 +103,8 @@ export function createServer(
   logger: Logger,
   detailLogger: DetailLogger,
   timeoutMs: number = 300000,
-  configDir?: string
+  configDir?: string,
+  options?: { cliDebug?: boolean }
 ): Hono {
   // 保留原始 configDir 值（用于判断是否是测试环境）
   const isTestEnv = !configDir;
@@ -179,9 +180,15 @@ export function createServer(
   // 可变配置引用，用于后台 API 更新
   let currentConfig = config;
 
+  // --debug 优先级最高：启动参数开启则强制记录，无视后台开关
+  const cliDebug = options?.cliDebug ?? false;
+  const resolveDetailLog = (cfg: ProxyConfig): boolean => cliDebug || cfg.detailLogEnabled === true;
+  detailLogger.setEnabled(resolveDetailLog(currentConfig));
+
   // 配置更新回调（由后台 API 调用）
   const onConfigChange = (newConfig: ProxyConfig) => {
     currentConfig = newConfig;
+    detailLogger.setEnabled(resolveDetailLog(newConfig));
     console.log('✅ 配置已更新，当前模型数量:', newConfig.models.length);
   };
 
@@ -353,7 +360,7 @@ export function createServer(
 
   // 隐私保护路由
   if (!isTestEnv) {
-    app.route('', createPrivacyRoute({ configPath: ctx.configPath, onConfigChange }));
+    app.route('', createPrivacyRoute({ configPath: ctx.configPath, onConfigChange, cliDebug: options?.cliDebug ?? false }));
   }
 
   // 公告管理路由

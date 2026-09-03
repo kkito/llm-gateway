@@ -90,6 +90,7 @@ export interface ProxyConfig {
   userApiKeys?: UserApiKey[];
   privacySettings?: PrivacySettings;
   uiSettings?: UiSettings;  // 新增 UI 设置
+  detailLogEnabled?: boolean; // 后台开关：记录完整请求/响应内容（与 --debug 取 OR，--debug 优先级高）
 }
 
 const REQUIRED_FIELDS = ['customModel', 'realModel', 'apiKey', 'baseUrl', 'provider'] as const;
@@ -284,7 +285,8 @@ export function loadFullConfig(configPath: string): ProxyConfig {
       apiKeys: config.apiKeys || [],
       userApiKeys: config.userApiKeys,
       privacySettings: config.privacySettings,
-      uiSettings: config.uiSettings
+      uiSettings: config.uiSettings,
+      detailLogEnabled: config.detailLogEnabled
     };
   }
 

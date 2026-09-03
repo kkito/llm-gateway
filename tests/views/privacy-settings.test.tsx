@@ -43,4 +43,17 @@ describe('PrivacySettingsPage', () => {
     expect(html).toContain('</body>');
     expect(html).toContain('</html>');
   });
+
+  it('renders 日志记录 block with detailLog checkbox', () => {
+    const html = String(<PrivacySettingsPage settings={allOff} detailLogEnabled={true} />);
+    expect(html).toContain('日志记录');
+    expect(html).toContain('记录完整请求/响应日志');
+    expect(html).toContain('name="detailLogEnabled"');
+  });
+
+  it('disables detailLog controls when started with --debug', () => {
+    const html = String(<PrivacySettingsPage settings={allOff} detailLogEnabled={false} cliDebug={true} />);
+    expect(html).toContain('--debug');
+    expect(html).toContain('disabled');
+  });
 });

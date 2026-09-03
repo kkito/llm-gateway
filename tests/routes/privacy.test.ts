@@ -109,6 +109,40 @@ describe('createPrivacyRoute', () => {
     });
   });
 
+  it('POST /admin/privacy saves detailLogEnabled alongside privacy settings', async () => {
+    const route = createPrivacyRoute({
+      configPath: testConfigPath,
+      onConfigChange: mockOnConfigChange,
+    });
+
+    const formData = new FormData();
+    formData.set('enabled', 'off');
+    formData.set('detailLogEnabled', 'on');
+
+    const res = await route.request('/admin/privacy', {
+      method: 'POST',
+      body: formData,
+    });
+
+    expect(res.status).toBe(200);
+    const savedConfig = loadFullConfig(testConfigPath);
+    expect(savedConfig.detailLogEnabled).toBe(true);
+    expect(mockOnConfigChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('GET /admin/privacy renders saved detailLogEnabled state', async () => {
+    writeFileSync(testConfigPath, JSON.stringify({ ...minimalConfig, detailLogEnabled: true }));
+    const route = createPrivacyRoute({
+      configPath: testConfigPath,
+      onConfigChange: mockOnConfigChange,
+    });
+
+    const res = await route.request('/admin/privacy');
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain('记录完整请求/响应日志');
+  });
+
   it('POST /admin/privacy with empty pathPlaceholder uses default', async () => {
     const route = createPrivacyRoute({
       configPath: testConfigPath,
