@@ -102,3 +102,38 @@ describe('StatsPage — AVG TTFT / TPS header pill', () => {
   });
 });
 
+describe('StatsPage — 模型组列', () => {
+  function renderList(rows: any[]) {
+    return String(
+      <StatsPage
+        stats={baseStats}
+        dateRange="2026-08-29 ~ 2026-08-29"
+        currentType="date"
+        currentValue="2026-08-29"
+        recentRequests={rows}
+        totalItems={rows.length}
+        startDate="2026-08-29"
+        endDate="2026-08-29"
+        timezone="UTC"
+      />,
+    );
+  }
+
+  it('表头包含模型组列', () => {
+    const html = renderList([sampleRow()]);
+    expect(html).toContain('<th>模型组</th>');
+  });
+
+  it('有模型组的行显示组名', () => {
+    const html = renderList([sampleRow({ customModel: 'deepseek-v4', modelGroup: 'local-kkshen-use' })]);
+    expect(html).toContain('title="local-kkshen-use"');
+    expect(html).toContain('>local-kkshen-use</td>');
+  });
+
+  it('无模型组的行显示占位符', () => {
+    const html = renderList([sampleRow({ customModel: 'glm-5.2', modelGroup: null })]);
+    expect(html).toContain('title="glm-5.2"');
+    expect(html).toContain('>—</td>');
+  });
+});
+

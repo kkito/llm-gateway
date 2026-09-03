@@ -1040,6 +1040,7 @@ export const StatsPage: FC<Props> = (props) => {
                       <th>时间</th>
                       <th>用户</th>
                       <th>模型</th>
+                      <th>模型组</th>
                       <th>状态</th>
                       <th>耗时</th>
                       <th>TTFT</th>
@@ -1054,6 +1055,7 @@ export const StatsPage: FC<Props> = (props) => {
                         <td>{new Date(req.timestamp).toLocaleString()}</td>
                         <td>{req.userName || '-'}</td>
                         <td title={req.customModel}>{req.customModel}</td>
+                        <td title={req.modelGroup || ''}>{req.modelGroup || '—'}</td>
                         <td>
                           <span class={`status-badge ${req.statusCode >= 200 && req.statusCode < 300 ? 'status-ok' : 'status-err'}`}>
                             {req.statusCode}
