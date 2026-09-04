@@ -16,7 +16,11 @@ function makeUpstream(overrides?: Partial<UpstreamRequest>): UpstreamRequest {
   }
 }
 
-function makeCtx(overrides?: Partial<UpstreamInterceptorContext>): UpstreamInterceptorContext {
+function makeCtx(
+  overrides?: Partial<UpstreamInterceptorContext>,
+  headers?: Record<string, string>,
+): UpstreamInterceptorContext {
+  const extra = headers ?? {}
   return {
     provider: {
       customModel: 'my-kimi',
@@ -25,7 +29,15 @@ function makeCtx(overrides?: Partial<UpstreamInterceptorContext>): UpstreamInter
       baseUrl: 'https://api.opencode.ai',
       provider: 'openai',
     },
-    c: {} as any,
+    c: {
+      req: {
+        header: (name: string) => {
+          const h: Record<string, string> = { 'user-agent': 'test-ua/1.0', ...extra }
+          return h[name.toLowerCase()] ?? null
+        },
+        raw: { headers: { 'user-agent': 'test-ua/1.0', ...extra } },
+      },
+    } as any,
     currentUser: null,
     clientIp: '192.168.1.1',
     requestId: 'test-001',
@@ -65,18 +77,18 @@ describe('shouldIntercept — 触发条件', () => {
     expect(result).toBe(upstream)
   })
 
-  it('should skip when model does not match kimi/glm', async () => {
+  it('should intercept any model on opencode.ai (no model filter)', async () => {
     const upstream = makeUpstream()
     const ctx = makeCtx({ provider: { ...makeCtx().provider, realModel: 'gpt-4' } as any })
     const result = await opencodeSessionInterceptor(upstream, ctx)
-    expect(result).toBe(upstream)
+    expect(result.headers).toHaveProperty('x-opencode-session')
   })
 
-  it('should skip when baseUrl contains opencode.ai but model is empty', async () => {
+  it('should intercept even when model is empty', async () => {
     const upstream = makeUpstream()
     const ctx = makeCtx({ provider: { ...makeCtx().provider, realModel: '' } as any })
     const result = await opencodeSessionInterceptor(upstream, ctx)
-    expect(result).toBe(upstream)
+    expect(result.headers).toHaveProperty('x-opencode-session')
   })
 
   it('should skip when baseUrl is empty', async () => {
@@ -115,7 +127,7 @@ describe('session 管理', () => {
     const r1 = await opencodeSessionInterceptor(makeUpstream(), ctx)
 
     const originalDateNow = Date.now
-    const fakeNow = Date.now() + 11 * 60 * 1000
+    const fakeNow = Date.now() + 21 * 60 * 1000
     Date.now = () => fakeNow
 
     try {
@@ -133,16 +145,16 @@ describe('session 管理', () => {
     const sessionId1 = r1.headers['x-opencode-session']
 
     const originalDateNow = Date.now
-    let fakeNow = Date.now() + 9 * 60 * 1000
+    let fakeNow = Date.now() + 19 * 60 * 1000
     Date.now = () => fakeNow
 
     try {
-      // 9 分钟后，应该在 TTL 内，复用 session
+      // 19 分钟后，应该在 TTL 内，复用 session
       const r2 = await opencodeSessionInterceptor(makeUpstream(), ctx)
       expect(r2.headers['x-opencode-session']).toBe(sessionId1)
 
-      // 再前进 9 分钟（总共 18 分钟），由于上次续期了，应该还在 TTL 内
-      fakeNow = Date.now() + 9 * 60 * 1000
+      // 再前进 19 分钟（总共 38 分钟），由于上次续期了，应该还在 TTL 内
+      fakeNow = Date.now() + 19 * 60 * 1000
       const r3 = await opencodeSessionInterceptor(makeUpstream(), ctx)
       expect(r3.headers['x-opencode-session']).toBe(sessionId1)
     } finally {
@@ -195,5 +207,61 @@ describe('注入行为', () => {
     await opencodeSessionInterceptor(upstream, makeCtx())
     expect(upstream.headers).toEqual(frozenHeaders)
     expect(upstream.body).toEqual(frozenBody)
+  })
+})
+
+describe('指纹分档', () => {
+  it('同指纹 20 分钟内复用 session', async () => {
+    const ctx = makeCtx()
+    const r1 = await opencodeSessionInterceptor(makeUpstream(), ctx)
+    const r2 = await opencodeSessionInterceptor(makeUpstream(), ctx)
+    expect(r2.headers['x-opencode-session']).toBe(r1.headers['x-opencode-session'])
+  })
+
+  it('不同 realModel 不串 session', async () => {
+    const ctx = makeCtx()
+    const r1 = await opencodeSessionInterceptor(makeUpstream(), ctx)
+    const ctx2 = makeCtx({
+      provider: { ...makeCtx().provider, realModel: 'glm-4' } as any,
+    })
+    const r2 = await opencodeSessionInterceptor(makeUpstream(), ctx2)
+    expect(r2.headers['x-opencode-session']).not.toBe(r1.headers['x-opencode-session'])
+  })
+
+  it('session-id 头第一档：同 user 同头复用，同 IP 不同 user 隔离', async () => {
+    const upstream = makeUpstream()
+    const ctxA1 = makeCtx({ currentUser: { name: 'alice' } }, { 'session-id': 'abc' })
+    const ctxA2 = makeCtx({ currentUser: { name: 'alice' } }, { 'session-id': 'abc' })
+    const ctxB = makeCtx({ currentUser: { name: 'bob' } }, { 'session-id': 'abc' })
+    const rA1 = await opencodeSessionInterceptor(upstream, ctxA1)
+    const rA2 = await opencodeSessionInterceptor(upstream, ctxA2)
+    const rB = await opencodeSessionInterceptor(upstream, ctxB)
+    expect(rA2.headers['x-opencode-session']).toBe(rA1.headers['x-opencode-session'])
+    expect(rB.headers['x-opencode-session']).not.toBe(rA1.headers['x-opencode-session'])
+  })
+
+  it('stainless 第二档：带 x-stainless-* 头加头成功且与无 stainless 隔离', async () => {
+    const stainlessHeaders = {
+      'x-stainless-lang': 'js',
+      'x-stainless-package-version': '1.0.0',
+      'x-stainless-runtime': 'node',
+      'x-stainless-runtime-version': '20.0.0',
+    }
+    const rWith = await opencodeSessionInterceptor(makeUpstream(), makeCtx({}, stainlessHeaders))
+    expect(rWith.headers['x-opencode-session']).toMatch(/^ses_/)
+    const rWithout = await opencodeSessionInterceptor(makeUpstream(), makeCtx())
+    expect(rWithout.headers['x-opencode-session']).not.toBe(rWith.headers['x-opencode-session'])
+  })
+
+  it('同 IP 同 UA 不同 user 隔离', async () => {
+    const r1 = await opencodeSessionInterceptor(
+      makeUpstream(),
+      makeCtx({ currentUser: { name: 'alice' } }),
+    )
+    const r2 = await opencodeSessionInterceptor(
+      makeUpstream(),
+      makeCtx({ currentUser: { name: 'bob' } }),
+    )
+    expect(r2.headers['x-opencode-session']).not.toBe(r1.headers['x-opencode-session'])
   })
 })

@@ -1,4 +1,4 @@
-import { randomBytes } from 'crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import type { UpstreamInterceptor, UpstreamInterceptorContext } from './types.js'
 
 // ============================================================
@@ -11,18 +11,15 @@ import type { UpstreamInterceptor, UpstreamInterceptorContext } from './types.js
  *
  * @param prefix - ID 前缀（ses / msg）
  * @param direction - 时间排序方向
- * @param reuse - 是否复用已生成的 ID（仅对 session 生效）
  */
-function generateOpenCodeId(
-  prefix: string,
-  direction: 'ascending' | 'descending',
-  reuse: boolean = false,
-): string {
-  // session 复用已有值
-  if (reuse && prefix === 'ses' && _currentSessionId) {
-    return _currentSessionId
-  }
+// 生成器的内部状态
+let _requestCounter = 0
+let _lastRequestTimestamp = 0
 
+function generateOpenCodeId(
+  prefix: 'ses' | 'msg',
+  direction: 'ascending' | 'descending',
+): string {
   const currentTimestamp = Date.now()
 
   if (currentTimestamp !== _lastRequestTimestamp) {
@@ -47,23 +44,14 @@ function generateOpenCodeId(
 
   const id = `${prefix}_${hex}${random}`
 
-  if (reuse && prefix === 'ses') {
-    _currentSessionId = id
-  }
-
   return id
 }
 
-// 生成器的内部状态
-let _currentSessionId: string | null = null
-let _requestCounter = 0
-let _lastRequestTimestamp = 0
-
 // ============================================================
-// Session 缓存管理（按 IP 维度，10 分钟滑动过期）
+// Session 缓存管理（按指纹维度，20 分钟滑动过期）
 // ============================================================
 
-const SESSION_TTL_MS = 10 * 60 * 1000 // 10 分钟
+const SESSION_TTL_MS = 20 * 60 * 1000 // 20 分钟
 
 interface SessionEntry {
   sessionId: string
@@ -72,30 +60,108 @@ interface SessionEntry {
 
 const sessionMap = new Map<string, SessionEntry>()
 
+const SESSION_HEADER_BLACKLIST = ['authorization', 'cookie', 'set-cookie', 'apikey', 'token']
+
+function getClientHeader(ctx: UpstreamInterceptorContext, name: string): string | null {
+  try {
+    const v = ctx.c?.req?.header?.(name) ?? ctx.c?.req?.header?.(name.toLowerCase())
+    if (typeof v === 'string' && v.trim()) return v
+  } catch { /* ignore */ }
+  try {
+    const raw = ctx.c?.req?.raw?.headers
+    const get = (k: string) => {
+      if (!raw) return null
+      if (typeof raw.get === 'function') return raw.get(k) ?? raw.get(k.toLowerCase())
+      return raw[k] ?? raw[k.toLowerCase()] ?? null
+    }
+    const v = get(name)
+    if (typeof v === 'string' && v.trim()) return v
+  } catch { /* ignore */ }
+  return null
+}
+
+function listClientHeaderNames(ctx: UpstreamInterceptorContext): string[] {
+  try {
+    const raw = ctx.c?.req?.raw?.headers
+    if (raw && typeof raw.keys === 'function') return [...raw.keys()]
+    if (raw && typeof raw === 'object') return Object.keys(raw)
+  } catch { /* ignore */ }
+  return []
+}
+
+function findSessionHeaderValue(ctx: UpstreamInterceptorContext): string | null {
+  const names = listClientHeaderNames(ctx)
+  const usable = (name: string): string | null => {
+    const lower = name.toLowerCase()
+    if (SESSION_HEADER_BLACKLIST.some(b => lower.includes(b))) return null
+    const v = getClientHeader(ctx, name)
+    return v && v.trim() ? v.trim() : null
+  }
+  // 第一优先级：名含 session-id
+  for (const name of names) {
+    if (!name.toLowerCase().includes('session-id')) continue
+    const v = usable(name)
+    if (v) return v
+  }
+  // 第二优先级：名含 session
+  for (const name of names) {
+    if (!name.toLowerCase().includes('session')) continue
+    const v = usable(name)
+    if (v) return v
+  }
+  return null
+}
+
+function stainlessFingerprint(ctx: UpstreamInterceptorContext): string | null {
+  const parts = ['x-stainless-lang', 'x-stainless-package-version', 'x-stainless-runtime', 'x-stainless-runtime-version']
+    .map(n => getClientHeader(ctx, n) ?? '')
+  return parts.some(p => p) ? parts.join('|') : null
+}
+
+function computeFingerprint(ctx: UpstreamInterceptorContext): string {
+  const ip = ctx.clientIp ?? 'unknown'
+  const user = ctx.currentUser?.name ?? ''
+  const realModel = (ctx.provider.realModel ?? '').toLowerCase()
+  const sessionHead = findSessionHeaderValue(ctx)
+  if (sessionHead) {
+    return createHash('sha256').update([sessionHead, ip, user, realModel].join('\n')).digest('hex')
+  }
+  const ua = getClientHeader(ctx, 'user-agent') ?? ''
+  const stainless = stainlessFingerprint(ctx)
+  const material = stainless
+    ? [stainless, ip, ua, user, realModel].join('\n')
+    : [ip, ua, user, realModel].join('\n')
+  return createHash('sha256').update(material).digest('hex')
+}
+
 /**
- * 惰性清理——遍历 Map，移除过期条目。
- * 每次需要操作 Map 时调用，限制最多检查 50 个 key 避免阻塞。
+ * 惰性清理——顺带移除过期条目，有界扫描避免大 Map 阻塞 event loop。
+ * 每次 getOrCreateSession 调用时触发（命中复用也要触发，不只新建）。
+ * 单次最多扫描 100 个 key（扫描到 100 即 break），删除其中的过期项。
  */
 function lazyCleanup(): void {
   const now = Date.now()
-  let checked = 0
-  for (const [ip, entry] of sessionMap) {
-    if (checked >= 50) break
+  let scanned = 0
+  for (const [key, entry] of sessionMap) {
+    if (scanned >= 100) break
+    scanned++
     if (entry.expiresAt <= now) {
-      sessionMap.delete(ip)
+      sessionMap.delete(key)
     }
-    checked++
   }
 }
 
 /**
- * 获取指定 IP 的 session。
+ * 获取指定指纹的 session。
  * - session 存在且未过期 → 复用并续期
  * - session 过期或不存在 → 生成新 session
  */
-function getOrCreateSession(ip: string): string {
+function getOrCreateSession(key: string): string {
+  // 每次调用都顺带清理（命中复用也要触发），有界扫描开销可控
+  lazyCleanup()
+
   const now = Date.now()
-  const existing = sessionMap.get(ip)
+  const existing = sessionMap.get(key)
 
   if (existing && existing.expiresAt > now) {
     // 续期（滑动窗口）
@@ -105,10 +171,7 @@ function getOrCreateSession(ip: string): string {
 
   // 过期或不存在，生成新 session
   const sessionId = generateOpenCodeId('ses', 'descending')
-  sessionMap.set(ip, { sessionId, expiresAt: now + SESSION_TTL_MS })
-
-  // 惰性清理
-  lazyCleanup()
+  sessionMap.set(key, { sessionId, expiresAt: now + SESSION_TTL_MS })
 
   return sessionId
 }
@@ -118,17 +181,10 @@ function getOrCreateSession(ip: string): string {
 // ============================================================
 
 const OPENCODE_DOMAINS = ['opencode.ai']
-const TARGET_MODELS = ['kimi', 'glm']
 
 function shouldIntercept(ctx: UpstreamInterceptorContext): boolean {
   const baseUrl = ctx.provider.baseUrl?.toLowerCase() ?? ''
-  const realModel = ctx.provider.realModel?.toLowerCase() ?? ''
-
-  const matchDomain = OPENCODE_DOMAINS.some(d => baseUrl.includes(d))
-  if (!matchDomain) return false
-
-  const matchModel = TARGET_MODELS.some(m => realModel.includes(m))
-  return matchModel
+  return OPENCODE_DOMAINS.some(d => baseUrl.includes(d))
 }
 
 // ============================================================
@@ -138,17 +194,16 @@ function shouldIntercept(ctx: UpstreamInterceptorContext): boolean {
 /**
  * OpenCode Session 拦截器。
  *
- * 当 baseUrl 含 "opencode.ai" 且 realModel 小写含 "kimi"/"glm" 时：
+ * 当 baseUrl 含 "opencode.ai" 时（全模型）：
  * - header 添加 x-opencode-session
  * - body 添加 prompt_cache_key
  *
- * Session 按客户端 IP 独立管理，10 分钟滑动过期。
+ * Session 按客户端指纹三档管理（session 头 / stainless / IP+UA+user+realModel），20 分钟滑动过期。
  */
 export const opencodeSessionInterceptor: UpstreamInterceptor = async (upstream, ctx) => {
   if (!shouldIntercept(ctx)) return upstream
 
-  const ip = ctx.clientIp ?? 'unknown'
-  const sessionId = getOrCreateSession(ip)
+  const sessionId = getOrCreateSession(computeFingerprint(ctx))
 
   return {
     ...upstream,
@@ -167,7 +222,6 @@ export const opencodeSessionInterceptor: UpstreamInterceptor = async (upstream, 
 /** @internal 测试用：重置 session 缓存 */
 export function resetSessionCache(): void {
   sessionMap.clear()
-  _currentSessionId = null
   _requestCounter = 0
   _lastRequestTimestamp = 0
 }

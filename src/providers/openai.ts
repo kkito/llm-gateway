@@ -1,5 +1,6 @@
 import { BaseProvider } from './base.js';
 import type { ProviderType } from '../config.js';
+import { VERSION } from '../lib/version.js';
 
 /**
  * OpenAI Provider 实现
@@ -11,7 +12,8 @@ export class OpenAIProvider extends BaseProvider {
   buildHeaders(apiKey: string): Record<string, string> {
     return {
       'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'User-Agent': `kkito-llm-agent/${VERSION}`
     };
   }
 

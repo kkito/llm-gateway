@@ -1,4 +1,5 @@
 import { BaseProvider } from './base.js';
+import { VERSION } from '../lib/version.js';
 
 /**
  * Anthropic Provider 实现
@@ -22,7 +23,8 @@ export class AnthropicProvider extends BaseProvider {
       'X-API-Key': apiKey,
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
-      'anthropic-version': this.version
+      'anthropic-version': this.version,
+      'User-Agent': `kkito-llm-agent/${VERSION}`
     };
 
     if (this.beta) {
