@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { Hono } from 'hono';
-import { buildModelsList, createModelsRoute } from './models.js';
-import type { ProxyConfig } from '../config.js';
+import { buildModelsList, createModelsRoute } from '../../src/routes/models.js';
+import type { ProxyConfig } from '../../src/config.js';
 
 function makeConfig(): ProxyConfig {
   return {

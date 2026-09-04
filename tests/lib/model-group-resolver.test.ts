@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { ModelGroupResolver } from './model-group-resolver.js';
-import { ModelGroupExhaustedError } from './model-group-error.js';
-import type { ModelGroup, ProviderConfig } from '../config.js';
+import { ModelGroupResolver } from '../../src/lib/model-group-resolver.js';
+import { ModelGroupExhaustedError } from '../../src/lib/model-group-error.js';
+import type { ModelGroup, ProviderConfig } from '../../src/config.js';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { existsSync, mkdirSync, rmSync } from 'fs';

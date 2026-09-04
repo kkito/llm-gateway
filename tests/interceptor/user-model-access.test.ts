@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { userModelAccessInterceptor, PermissionError } from './user-model-access.js'
-import type { UpstreamRequest } from '../routes/chat-completions/upstream-request.js'
-import type { UpstreamInterceptorContext } from './types.js'
+import { userModelAccessInterceptor, PermissionError } from '../../src/interceptor/user-model-access.js'
+import type { UpstreamRequest } from '../../src/routes/chat-completions/upstream-request.js'
+import type { UpstreamInterceptorContext } from '../../src/interceptor/types.js'
 
 function makeCtx(overrides?: Partial<UpstreamInterceptorContext>): UpstreamInterceptorContext {
   return {
