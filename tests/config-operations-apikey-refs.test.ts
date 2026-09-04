@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { renameApiKeyRefInConfig, removeApiKeyRefFromConfig } from './config-operations.js';
-import type { ProxyConfig } from './config.js';
+import { renameApiKeyRefInConfig, removeApiKeyRefFromConfig } from '../src/config-operations.js';
+import type { ProxyConfig } from '../src/config.js';
 
 describe('renameApiKeyRefInConfig', () => {
   it('updates $$oldName$$ to $$newName$$ in all models', () => {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { isApiKeyRef, getApiKeyRefName, resolveApiKey, addApiKey, updateApiKey } from '../config.js';
-import type { ApiKey } from '../config.js';
+import { isApiKeyRef, getApiKeyRefName, resolveApiKey, addApiKey, updateApiKey } from '../../src/config.js';
+import type { ApiKey } from '../../src/config.js';
 
 describe('isApiKeyRef', () => {
   it('returns true for $$name$$ format', () => {
