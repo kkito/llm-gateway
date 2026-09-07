@@ -1078,7 +1078,8 @@ export const StatsPage: FC<Props> = (props) => {
                     <a href={`?startDate=${startDate}&endDate=${endDate}&timezone=${encodeURIComponent(timezone)}${selectedUser ? '&userName=' + selectedUser : ''}${selectedModel ? '&model=' + selectedModel : ''}&page=${page - 1}`}>上一页</a>
                   )}
                   {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
-                    const p = i + 1;
+                    const start = totalPages <= 7 ? 1 : Math.max(1, Math.min(page - 3, totalPages - 6));
+                    const p = start + i;
                     return (
                       <a
                         href={`?startDate=${startDate}&endDate=${endDate}&timezone=${encodeURIComponent(timezone)}${selectedUser ? '&userName=' + selectedUser : ''}${selectedModel ? '&model=' + selectedModel : ''}&page=${p}`}

@@ -102,6 +102,48 @@ describe('StatsPage — AVG TTFT / TPS header pill', () => {
   });
 });
 
+describe('StatsPage — 分页窗口', () => {
+  function renderPage(page: number, totalPages: number) {
+    return String(
+      <StatsPage
+        stats={baseStats}
+        dateRange="2026-08-29 ~ 2026-08-29"
+        currentType="date"
+        currentValue="2026-08-29"
+        recentRequests={[sampleRow()]}
+        page={page}
+        totalPages={totalPages}
+        totalItems={totalPages * 20}
+        startDate="2026-08-29"
+        endDate="2026-08-29"
+        timezone="UTC"
+      />,
+    );
+  }
+
+  it('第 8 页时窗口跟随当前页，不再只显示 1-7', () => {
+    const html = renderPage(8, 15);
+    expect(html).toContain('>8</a>');
+    expect(html).toContain('>5</a>');
+    expect(html).toContain('>11</a>');
+    expect(html).not.toContain('>1</a>');
+  });
+
+  it('第 1 页时显示 1-7', () => {
+    const html = renderPage(1, 15);
+    expect(html).toContain('>1</a>');
+    expect(html).toContain('>7</a>');
+    expect(html).not.toContain('>8</a>');
+  });
+
+  it('最后一页时窗口收尾到总页数', () => {
+    const html = renderPage(15, 15);
+    expect(html).toContain('>15</a>');
+    expect(html).toContain('>9</a>');
+    expect(html).not.toContain('>8</a>');
+  });
+});
+
 describe('StatsPage — 模型组列', () => {
   function renderList(rows: any[]) {
     return String(
