@@ -385,4 +385,41 @@ describe('Admin Model Test E2E', () => {
       expect(data.content).toBe('最终答案');
     });
   });
+
+  describe('POST /admin/models/test with opencode.ai baseUrl', () => {
+    it('should inject x-opencode-session header and prompt_cache_key like production path', async () => {
+      let capturedHeaders: Record<string, string> | undefined;
+      let capturedBody: any;
+      globalThis.fetch = async (url: string | URL, init?: RequestInit) => {
+        capturedHeaders = (init as RequestInit).headers as Record<string, string>;
+        capturedBody = JSON.parse((init as RequestInit).body as string);
+        return {
+          ok: true,
+          status: 200,
+          text: async () =>
+            JSON.stringify({
+              model: 'mimo-v2.5',
+              choices: [{ message: { content: 'ok' } }],
+            }),
+        } as Response;
+      };
+
+      const response = await app.request('/admin/models/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'openai',
+          baseUrl: 'https://opencode.ai/zen/go/v1',
+          apiKey: 'sk-opencode-go',
+          realModel: 'mimo-v2.5',
+          message: '你好',
+        }),
+      });
+
+      expect(response.status).toBe(200);
+      expect((await response.json()).success).toBe(true);
+      expect(capturedHeaders?.['x-opencode-session']).toMatch(/^ses_/);
+      expect(capturedBody.prompt_cache_key).toBe(capturedHeaders?.['x-opencode-session']);
+    });
+  });
 });

@@ -12,6 +12,7 @@ import { writeFileSync, mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import { getDetailLogDir } from '../../lib/paths.js';
 import { fetchWithProxy } from '../../lib/proxy.js';
+import { opencodeSessionInterceptor } from '../../interceptor/opencode-session.js';
 
 interface RouteDeps {
   config: ProxyConfig | (() => ProxyConfig);
@@ -89,13 +90,29 @@ async function testModelConnection(
   console.log(`   [Test] Request logged to: ${testLogPath}`);
 
   try {
+    const intercepted = await opencodeSessionInterceptor(
+      {
+        url,
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json',
+        },
+        body: mergedBody,
+      },
+      {
+        provider: { customModel: '', realModel, apiKey, baseUrl, provider: providerType },
+        c: null,
+        currentUser: null,
+        clientIp: null,
+        requestId: `model-test-${Date.now()}`,
+        customModel: '',
+        stream: false,
+      } as any
+    );
     const response = await fetchWithProxy(url, {
       method: 'POST',
-      headers: {
-        ...headers,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(mergedBody),
+      headers: intercepted.headers,
+      body: JSON.stringify(intercepted.body),
       signal: AbortSignal.timeout(60000),
       proxy,
     });
