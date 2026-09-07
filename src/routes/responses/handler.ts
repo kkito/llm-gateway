@@ -112,7 +112,16 @@ export function createResponsesHandler(
             triedModels = fallbackResult.triedModels;
             customModel = actualModel || 'unknown';
             return fallbackResult.response;
-          } catch (_groupError) {
+          } catch (groupError: any) {
+            // 仅当该名字确实不是任何模型组时，才落到下方 Model not found 404；
+            // 若它匹配到组但组内模型解析失败，则透传 resolver 抛出的真实原因。
+            const isNoSuchGroup = groupError?.message?.includes('not found') &&
+              !currentConfig.modelGroups?.some(g => g.name === model);
+            if (!isNoSuchGroup) {
+              return c.json({
+                error: { message: groupError.message || 'Model group resolution failed', type: 'invalid_request_error' }
+              }, 400);
+            }
             // Not a valid modelGroup, fall through to 404 below
           }
         }
