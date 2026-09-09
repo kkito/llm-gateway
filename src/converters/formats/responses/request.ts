@@ -42,12 +42,7 @@ export function responsesToChatRequest(body: any): ChatRequest {
       });
     } else {
       const role = (item.role === 'system') ? 'system' : (item.role === 'user' ? 'user' : 'assistant');
-      let content: string | null = '';
-      if (typeof item.content === 'string') content = item.content;
-      else if (Array.isArray(item.content)) content = item.content.map((c: any) => (typeof c === 'string' ? c : (c?.text ?? ''))).join('');
-      else if (item.content == null) content = '';
-      else content = JSON.stringify(item.content);
-      messages.push({ role, content } as ChatMessage);
+      messages.push({ role, content: convertResponsesContentToChat(item.content) } as ChatMessage);
     }
   }
 
@@ -98,8 +93,7 @@ export function chatToResponsesRequest(chat: ChatRequest): any {
       }
       continue;
     }
-    const content = typeof m.content === 'string' ? m.content : (Array.isArray(m.content) ? m.content.map((c) => c.text ?? '').join('') : '');
-    input.push({ role: m.role, content });
+    input.push({ role: m.role, content: convertChatContentToResponses(m.content) });
   }
 
   const result: any = { model: chat.model, input };
@@ -158,4 +152,58 @@ function normalizeInput(input: any): ResponsesInputItem[] {
   if (typeof input === 'string') return [{ role: 'user', content: input }];
   if (Array.isArray(input)) return input;
   return [];
+}
+
+/**
+ * Responses content part -> canonical chat part。
+ * input_text/output_text 合并为 text；image 转 image_url；
+ * input_audio 按原样透传；input_file 转 file。默认上游具备对应能力。
+ */
+function convertResponsesContentToChat(content: any): ChatMessage['content'] {
+  if (typeof content === 'string' || content == null) return (content ?? '') as string;
+  if (!Array.isArray(content)) return JSON.stringify(content);
+  const parts: any[] = [];
+  let textBuf = '';
+  const flushText = () => {
+    if (textBuf) {
+      parts.push({ type: 'text', text: textBuf });
+      textBuf = '';
+    }
+  };
+  for (const c of content) {
+    if (typeof c === 'string') { textBuf += c; continue; }
+    if (c?.type === 'input_text' || c?.type === 'output_text' || c?.type === 'text') {
+      textBuf += (c.text ?? '');
+    } else if (c?.type === 'input_image' || c?.type === 'image_url') {
+      flushText();
+      const url = typeof c.image_url === 'string' ? c.image_url : (c.image_url?.url ?? '');
+      parts.push({ type: 'image_url', image_url: { url } });
+    } else if (c?.type === 'input_audio') {
+      flushText();
+      parts.push({ type: 'input_audio', input_audio: c.input_audio ?? { data: c.data ?? '', format: c.format ?? 'mp3' } });
+    } else if (c?.type === 'input_file') {
+      flushText();
+      parts.push({ type: 'file', file: { filename: c.filename, file_data: c.file_data, file_id: c.file_id } });
+    } else {
+      textBuf += (c?.text ?? '');
+    }
+  }
+  flushText();
+  if (parts.length === 0) return textBuf;
+  return parts as ChatMessage['content'];
+}
+
+/** canonical chat content -> Responses content part 数组（纯文本退化为字符串） */
+function convertChatContentToResponses(content: ChatMessage['content']): any {
+  if (typeof content === 'string' || content == null) return (content ?? '') as string;
+  if (!Array.isArray(content)) return content;
+  const parts: any[] = [];
+  for (const c of content as any[]) {
+    if (c?.type === 'text') parts.push({ type: 'input_text', text: c.text ?? '' });
+    else if (c?.type === 'image_url') parts.push({ type: 'input_image', image_url: c.image_url?.url ?? '' });
+    else if (c?.type === 'input_audio') parts.push({ type: 'input_audio', input_audio: c.input_audio });
+    else if (c?.type === 'file') parts.push({ type: 'input_file', ...c.file });
+  }
+  if (parts.length === 1 && parts[0].type === 'input_text') return parts[0].text;
+  return parts;
 }

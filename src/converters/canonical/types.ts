@@ -7,9 +7,11 @@
 export type ChatRole = 'system' | 'user' | 'assistant' | 'tool';
 
 export interface ChatContentPart {
-  type: 'text' | 'image_url';
+  type: 'text' | 'image_url' | 'input_audio' | 'file';
   text?: string;
-  image_url?: { url: string };
+  image_url?: { url: string; detail?: string };
+  input_audio?: { data: string; format: string };
+  file?: { filename?: string; file_data?: string; file_id?: string };
 }
 
 export interface ChatToolCall {

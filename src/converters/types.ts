@@ -13,7 +13,7 @@ export * from './canonical/types.js';
 // ==================== Anthropic 类型 ====================
 
 export interface AnthropicContentBlock {
-  type: 'text' | 'image' | 'tool_use' | 'tool_result' | 'thinking';
+  type: 'text' | 'image' | 'document' | 'tool_use' | 'tool_result' | 'thinking';
   text?: string;
   source?: {
     type: 'base64' | 'url';
@@ -102,9 +102,11 @@ export interface AnthropicStreamEvent {
 export interface OpenAIMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
   content: string | Array<{
-    type: 'text' | 'image_url';
+    type: 'text' | 'image_url' | 'input_audio' | 'file';
     text?: string;
-    image_url?: { url: string };
+    image_url?: { url: string; detail?: string };
+    input_audio?: { data: string; format: string };
+    file?: { filename?: string; file_data?: string; file_id?: string };
   }> | null;
   tool_calls?: Array<{
     id: string;

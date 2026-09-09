@@ -61,6 +61,36 @@ function convertImageBlock(block: AnthropicContentBlock): {
 }
 
 /**
+ * 转换 Anthropic document 为 OpenAI file 格式。
+ * 音频 media_type（audio/*）还原为 input_audio，其余按 file 透传。
+ */
+function convertDocumentBlock(block: AnthropicContentBlock): {
+  type: 'input_audio';
+  input_audio: { data: string; format: string };
+} | {
+  type: 'file';
+  file: { filename?: string; file_data?: string; file_id?: string };
+} {
+  const source = block.source;
+  if (!source) {
+    return { type: 'file', file: {} };
+  }
+  const dataUrl = source.type === 'base64'
+    ? `data:${source.media_type};base64,${source.data}`
+    : source.data;
+  if (source.media_type?.startsWith('audio/')) {
+    return {
+      type: 'input_audio',
+      input_audio: { data: source.data, format: source.media_type.slice('audio/'.length) || 'mp3' }
+    };
+  }
+  if (source.type === 'url' && !dataUrl.startsWith('data:')) {
+    return { type: 'file', file: { file_id: dataUrl } };
+  }
+  return { type: 'file', file: { file_data: dataUrl } };
+}
+
+/**
  * 转换 Anthropic tool_use 为 OpenAI tool_calls
  */
 function convertToolUseToToolCalls(
@@ -229,15 +259,20 @@ export function convertAnthropicRequestToOpenAI(
           } else {
             // 多模态：转换每个 block
             const contentParts: Array<{
-              type: 'text' | 'image_url';
+              type: 'text' | 'image_url' | 'input_audio' | 'file';
               text?: string;
               image_url?: { url: string };
+              input_audio?: { data: string; format: string };
+              file?: { filename?: string; file_data?: string; file_id?: string };
             }> = msg.content.map(block => {
               if (block.type === 'text' && block.text) {
                 return { type: 'text' as const, text: block.text };
               }
               if (block.type === 'image' && block.source) {
                 return convertImageBlock(block);
+              }
+              if (block.type === 'document' && block.source) {
+                return convertDocumentBlock(block);
               }
               // 跳过其他类型的 block（如 tool_use, tool_result）
               return { type: 'text' as const, text: '' };

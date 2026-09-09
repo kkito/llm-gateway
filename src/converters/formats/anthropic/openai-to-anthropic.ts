@@ -24,9 +24,10 @@ export { createOpenAIToAnthropicStreamState, type OpenAIToAnthropicStreamState }
 // ==================== 请求转换：OpenAI → Anthropic ====================
 
 /**
- * 解析图片 URL 为 base64
+ * 解析 data: URL 或远程 URL 为 base64，图片/文件/音频共用。
+ * 默认上游具备对应模态能力，不做降级，只做格式搬运。
  */
-async function parseImageUrl(url: string): Promise<{ data: string; mediaType: string }> {
+async function parseDataUrl(url: string, defaultMediaType: string): Promise<{ data: string; mediaType: string }> {
   if (url.startsWith('data:')) {
     // 已经是 base64 格式
     const matches = url.match(/^data:([^;]+);base64,(.+)$/);
@@ -39,9 +40,18 @@ async function parseImageUrl(url: string): Promise<{ data: string; mediaType: st
   const response = await globalThis.fetch(url);
   const arrayBuffer = await response.arrayBuffer();
   const base64 = Buffer.from(arrayBuffer).toString('base64');
-  const mediaType = response.headers.get('content-type') || 'image/jpeg';
+  const mediaType = response.headers.get('content-type') || defaultMediaType;
 
   return { data: base64, mediaType };
+}
+
+/** data:URL 的 base64 负载按 Anthropic media_type/data 拆分（非 base64 则原样透传为 url source） */
+function splitDataUrl(url: string): { type: 'base64' | 'url'; media_type: string; data: string } {
+  const matches = url.match(/^data:([^;]+);base64,(.+)$/);
+  if (matches) {
+    return { type: 'base64', media_type: matches[1], data: matches[2] };
+  }
+  return { type: 'url', media_type: '', data: url };
 }
 
 /**
@@ -63,7 +73,7 @@ async function convertOpenAIContent(
         text: part.text || ''
       });
     } else if (part.type === 'image_url' && part.image_url) {
-      const { data, mediaType } = await parseImageUrl(part.image_url.url);
+      const { data, mediaType } = await parseDataUrl(part.image_url.url, 'image/jpeg');
       blocks.push({
         type: 'image',
         source: {
@@ -72,6 +82,32 @@ async function convertOpenAIContent(
           data
         }
       });
+    } else if (part.type === 'input_audio' && part.input_audio) {
+      // Anthropic 无原生音频 block，按 base64 document 透传，上游自行解释
+      blocks.push({
+        type: 'document',
+        source: {
+          type: 'base64',
+          media_type: `audio/${part.input_audio.format || 'mp3'}`,
+          data: part.input_audio.data
+        }
+      });
+    } else if (part.type === 'file' && part.file) {
+      if (part.file.file_data) {
+        blocks.push({
+          type: 'document',
+          source: splitDataUrl(part.file.file_data)
+        });
+      } else if (part.file.file_id) {
+        blocks.push({
+          type: 'document',
+          source: {
+            type: 'url',
+            media_type: '',
+            data: part.file.file_id
+          }
+        });
+      }
     }
   }
 
