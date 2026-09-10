@@ -19,6 +19,7 @@ import {
 
 import type { OpenAIStreamChunk, AnthropicStreamEvent, StreamConverterState } from './shared/types.js';
 import { mapAnthropicToOpenAIFinishReason, createStreamConverterState } from './shared/index.js';
+import { DEFAULT_TOOL_PARAMETERS } from '../../canonical/tools.js';
 import { SystemLogger, type SystemLogContext } from '../../../lib/system-logger.js';
 export { createStreamConverterState, type StreamConverterState } from './shared/types.js';
 
@@ -123,7 +124,7 @@ function convertAnthropicToolsToOpenAI(
     function: {
       name: tool.name,
       description: tool.description,
-      parameters: tool.input_schema
+      parameters: tool.input_schema ?? { ...DEFAULT_TOOL_PARAMETERS }
     }
   }));
 }

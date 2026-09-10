@@ -146,4 +146,25 @@ describe('buildUpstreamRequest', () => {
       });
     });
   });
+
+  describe('tools normalize (passthrough 兜底)', () => {
+    it('chat->chat 透传：缺 parameters 的 function tool 被补齐', async () => {
+      const body = {
+        ...mockBody,
+        tools: [{ type: 'function', function: { name: 'cron_list', description: 'd' } }],
+      };
+      const result = await buildUpstreamRequest(mockProvider, body, false);
+      expect(result.body.tools[0].function.parameters).toEqual({ type: 'object', properties: {} });
+    });
+
+    it('已有 parameters 的 tool 不被改写', async () => {
+      const params = { type: 'object', properties: { a: { type: 'string' } } };
+      const body = {
+        ...mockBody,
+        tools: [{ type: 'function', function: { name: 'x', description: 'd', parameters: params } }],
+      };
+      const result = await buildUpstreamRequest(mockProvider, body, false);
+      expect(result.body.tools[0].function.parameters).toBe(params);
+    });
+  });
 });

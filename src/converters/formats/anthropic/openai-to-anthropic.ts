@@ -18,6 +18,7 @@ import {
 
 import type { OpenAIStreamChunk, AnthropicStreamEvent, OpenAIToAnthropicStreamState } from './shared/types.js';
 import { mapOpenAIToAnthropicFinishReason } from './shared/finish-reason.js';
+import { DEFAULT_TOOL_PARAMETERS } from '../../canonical/tools.js';
 import { createOpenAIToAnthropicStreamState } from './shared/types.js';
 export { createOpenAIToAnthropicStreamState, type OpenAIToAnthropicStreamState } from './shared/types.js';
 
@@ -139,7 +140,7 @@ function convertOpenAIToolsToAnthropic(
   return tools.map(tool => ({
     name: tool.function.name,
     description: tool.function.description,
-    input_schema: tool.function.parameters
+    input_schema: tool.function.parameters ?? { ...DEFAULT_TOOL_PARAMETERS }
   }));
 }
 

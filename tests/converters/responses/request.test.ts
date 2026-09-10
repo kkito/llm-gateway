@@ -138,4 +138,24 @@ describe('responses request', () => {
     expect(r.tools[0].type).toBe('function');
     expect(r.tools[0].name).toBe('get_weather');
   });
+
+  it('chat -> responses：缺 parameters 的 function tool 补默认空 schema（Qwen deferred tool）', () => {
+    const chat = {
+      model: 'muse-spark',
+      messages: [{ role: 'user', content: 'hi' }],
+      tools: [{ type: 'function', function: { name: 'cron_list', description: 'd' } }],
+    } as any;
+    const r = chatToResponsesRequest(chat);
+    expect(r.tools[0].parameters).toEqual({ type: 'object', properties: {} });
+  });
+
+  it('responses -> chat：缺 parameters 的扁平 function tool 补默认空 schema', () => {
+    const r = {
+      model: 'gpt-4o',
+      tools: [{ type: 'function', name: 'cron_list', description: 'd' }],
+      input: 'hi',
+    };
+    const chat = responsesToChatRequest(r);
+    expect(chat.tools?.[0].function.parameters).toEqual({ type: 'object', properties: {} });
+  });
 });

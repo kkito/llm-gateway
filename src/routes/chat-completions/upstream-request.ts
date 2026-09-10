@@ -4,6 +4,7 @@ import { convertOpenAIRequestToAnthropic } from '../../converters/formats/anthro
 import { mergeModelParams } from '../../lib/params-merger.js';
 import { resolveConverterChain } from '../../converters/router.js';
 import type { FormatName } from '../../converters/format-adapter.js';
+import { ensureToolParameters } from '../../converters/canonical/tools.js';
 import { DetailLogger } from '../../detail-logger.js';
 import { fetchWithProxy } from '../../lib/proxy.js';
 
@@ -53,6 +54,12 @@ export async function buildUpstreamRequest(
 
   const requestHeaders = buildHeaders(effectiveProvider);
   url = buildUrl(effectiveProvider, effectiveProvider.provider === 'response-api' ? 'responses' : 'chat');
+
+  // 发包前统一补齐缺 parameters 的 function tool（Qwen deferred tool 等），
+  // 覆盖 passthrough 透传与转换两条路；返回路径不受影响。
+  if (Array.isArray((requestBody as any)?.tools)) {
+    requestBody = { ...requestBody, tools: ensureToolParameters((requestBody as any).tools) };
+  }
 
   // 合并默认参数（用户参数优先级更高）
   requestBody = mergeModelParams(effectiveProvider.defaultParams, requestBody);

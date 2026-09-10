@@ -5,6 +5,7 @@ import { mergeModelParams } from '../../lib/params-merger.js';
 import { resolveConverterChain } from '../../converters/router.js';
 import type { FormatName } from '../../converters/format-adapter.js';
 import { DetailLogger } from '../../detail-logger.js';
+import { ensureToolParameters } from '../../converters/canonical/tools.js';
 import { fetchWithProxy } from '../../lib/proxy.js';
 
 export interface UpstreamRequest {
@@ -48,6 +49,10 @@ export async function buildMessagesUpstreamRequest(
 
   const requestHeaders = buildHeaders(effectiveProvider);
   const url = buildUrl(effectiveProvider, effectiveProvider.provider === 'response-api' ? 'responses' : 'chat');
+
+  if (Array.isArray((requestBody as any)?.tools)) {
+    requestBody = { ...requestBody, tools: ensureToolParameters((requestBody as any).tools) };
+  }
 
   // 合并默认参数（用户参数优先级更高）
   requestBody = mergeModelParams(effectiveProvider.defaultParams, requestBody);

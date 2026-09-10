@@ -1,5 +1,6 @@
 // src/converters/formats/responses/request.ts
 import type { ChatRequest, ChatMessage, ChatTool } from '../../canonical/types.js';
+import { DEFAULT_TOOL_PARAMETERS, ensureToolParameters } from '../../canonical/tools.js';
 
 interface ResponsesInputItem {
   role?: string;
@@ -56,7 +57,7 @@ export function responsesToChatRequest(body: any): ChatRequest {
       const fn = t.function ?? t;
       return {
         type: 'function',
-        function: { name: fn.name, description: fn.description ?? '', parameters: fn.parameters ?? {} },
+        function: { name: fn.name, description: fn.description ?? '', parameters: fn.parameters ?? fn.input_schema ?? { ...DEFAULT_TOOL_PARAMETERS } },
       };
     });
 
@@ -99,7 +100,7 @@ export function chatToResponsesRequest(chat: ChatRequest): any {
   const result: any = { model: chat.model, input };
   if (instructions) result.instructions = instructions;
   if (chat.previousResponseId) result.previous_response_id = chat.previousResponseId;
-  if (chat.tools) result.tools = chat.tools.map((t) => ({ type: 'function', name: t.function.name, description: t.function.description, parameters: t.function.parameters }));
+  if (chat.tools) result.tools = ensureToolParameters(chat.tools.map((t) => ({ type: 'function', name: t.function.name, description: t.function.description, parameters: t.function.parameters })));
   if (chat.tool_choice) {
     const toolChoice = sanitizeToolChoiceForResponses(chat.tool_choice, chat.tools);
     if (toolChoice !== undefined) result.tool_choice = toolChoice;
