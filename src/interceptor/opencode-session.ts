@@ -122,15 +122,16 @@ function computeFingerprint(ctx: UpstreamInterceptorContext): string {
   const ip = ctx.clientIp ?? 'unknown'
   const user = ctx.currentUser?.name ?? ''
   const realModel = (ctx.provider.realModel ?? '').toLowerCase()
+  const group = ctx.modelGroup ?? ''
   const sessionHead = findSessionHeaderValue(ctx)
   if (sessionHead) {
-    return createHash('sha256').update([sessionHead, ip, user, realModel].join('\n')).digest('hex')
+    return createHash('sha256').update([sessionHead, ip, user, realModel, group].join('\n')).digest('hex')
   }
   const ua = getClientHeader(ctx, 'user-agent') ?? ''
   const stainless = stainlessFingerprint(ctx)
   const material = stainless
-    ? [stainless, ip, ua, user, realModel].join('\n')
-    : [ip, ua, user, realModel].join('\n')
+    ? [stainless, ip, ua, user, realModel, group].join('\n')
+    : [ip, ua, user, realModel, group].join('\n')
   return createHash('sha256').update(material).digest('hex')
 }
 

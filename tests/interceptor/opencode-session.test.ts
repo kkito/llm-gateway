@@ -264,4 +264,16 @@ describe('指纹分档', () => {
     )
     expect(r2.headers['x-opencode-session']).not.toBe(r1.headers['x-opencode-session'])
   })
+
+  it('不同 modelGroup 不串 session', async () => {
+    const r1 = await opencodeSessionInterceptor(makeUpstream(), makeCtx({ modelGroup: 'g1' }))
+    const r2 = await opencodeSessionInterceptor(makeUpstream(), makeCtx({ modelGroup: 'g2' }))
+    expect(r2.headers['x-opencode-session']).not.toBe(r1.headers['x-opencode-session'])
+  })
+
+  it('同 modelGroup 20 分钟内复用 session', async () => {
+    const r1 = await opencodeSessionInterceptor(makeUpstream(), makeCtx({ modelGroup: 'g1' }))
+    const r2 = await opencodeSessionInterceptor(makeUpstream(), makeCtx({ modelGroup: 'g1' }))
+    expect(r2.headers['x-opencode-session']).toBe(r1.headers['x-opencode-session'])
+  })
 })
