@@ -50,8 +50,9 @@ export function createStatsApiRoute() {
         params.push(selectedUser);
       }
       if (selectedModel) {
-        conditions.push('custom_model = ?');
-        params.push(selectedModel);
+        // 组请求 custom_model 存实际命中的单模型，组名在 model_group 列
+        conditions.push('(custom_model = ? OR model_group = ?)');
+        params.push(selectedModel, selectedModel);
       }
 
       const whereClause = conditions.join(' AND ');

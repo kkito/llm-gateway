@@ -418,7 +418,7 @@ export function createServer(
   }
 
   // 统计页面路由
-  app.route('', createStatsRoute());
+  app.route('', createStatsRoute(isTestEnv ? undefined : ctx.configPath));
 
   // 统计 API 路由
   app.route('', createStatsApiRoute());

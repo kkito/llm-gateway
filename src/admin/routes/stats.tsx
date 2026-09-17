@@ -2,8 +2,9 @@ import { Hono } from 'hono';
 import { StatsPage } from '../views/stats.js';
 import { DatabaseManager } from '../../lib/db.js';
 import { localDateToUtcRangeTz, getLocalToday } from '../../lib/time-utils.js';
+import { loadFullConfig } from '../../config.js';
 
-export function createStatsRoute() {
+export function createStatsRoute(configPath?: string) {
   const app = new Hono();
 
   app.get('/admin/stats', async (c) => {
@@ -38,8 +39,10 @@ export function createStatsRoute() {
         params.push(selectedUser);
       }
       if (selectedModel) {
-        conditions.push('custom_model = ?');
-        params.push(selectedModel);
+        // 组请求在 DB 里 custom_model 存的是实际命中的单模型、model_group 存组名，
+        // 所以选组名时必须同时匹配 model_group，否则查出 0 条
+        conditions.push('(custom_model = ? OR model_group = ?)');
+        params.push(selectedModel, selectedModel);
       }
 
       const whereClause = conditions.join(' AND ');
@@ -259,7 +262,7 @@ export function createStatsRoute() {
       `).all() as Array<{ userName: string }>;
       const userNames = userRows.map(r => r.userName);
 
-      // 8. 模型列表（用于筛选按钮）
+      // 8. 模型列表（用于筛选按钮）— 仅 DB 里实际出现过的 custom_model
       const modelRows = db.prepare(`
         SELECT DISTINCT custom_model AS model
         FROM requests
@@ -267,6 +270,20 @@ export function createStatsRoute() {
         ORDER BY custom_model
       `).all() as Array<{ model: string }>;
       const modelNames = modelRows.map(r => r.model);
+
+      // 9. 模型组列表（单独一行展示）— 取自配置，即使当期无请求也能直接查询
+      let groupNames: string[] = [];
+      try {
+        if (configPath) {
+          const fullConfig = loadFullConfig(configPath);
+          groupNames = (fullConfig.modelGroups || [])
+            .map(g => g?.name)
+            .filter((n): n is string => !!n)
+            .sort((a, b) => a.localeCompare(b));
+        }
+      } catch {
+        // 配置读失败时不展示模型组行，不影响统计页渲染
+      }
 
       const stats = {
         totalRequests: overview.totalRequests,
@@ -293,6 +310,7 @@ export function createStatsRoute() {
           totalItems={totalRow.total}
           userNames={userNames}
           modelNames={modelNames}
+          groupNames={groupNames}
           selectedUser={selectedUser}
           selectedModel={selectedModel}
           startDate={startDate}

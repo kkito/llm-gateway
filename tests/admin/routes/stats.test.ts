@@ -79,6 +79,21 @@ describe('Admin Stats Route — AVG TTFT / TPS', () => {
     expect(html).not.toContain('平均 TPS');
   });
 
+  it('should match model_group when filtering by group name', async () => {
+    const db = DatabaseManager.getExistingInstance()!.getDb();
+    // 组请求：custom_model 存实际命中的单模型，组名在 model_group 列
+    db.prepare(`
+      INSERT INTO requests
+        (request_id, timestamp, created_at, user_name, custom_model, model_group, real_model, provider,
+         status_code, duration_ms, is_streaming, prompt_tokens, completion_tokens, total_tokens)
+      VALUES ('g1', '2026-08-29T02:00:00.000Z', ?, 'alice', 'gpt-4-actual', 'my-group', 'gpt-4', 'openai', 200, 1000, 0, 10, 5, 15)
+    `).run(Date.now());
+
+    const res = await app.request('/admin/stats?startDate=2026-08-29&endDate=2026-08-29&timezone=UTC&model=my-group');
+    const html = await res.text();
+    expect(html).toContain('共 1 条');
+  });
+
   it('should respect user filter when averaging', async () => {
     const db = DatabaseManager.getExistingInstance()!.getDb();
     insertStreaming(db, 'a1', '2026-08-29T02:00:00.000Z', 100, 10, 1);

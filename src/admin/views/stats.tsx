@@ -65,6 +65,7 @@ interface Props {
   totalItems?: number;
   userNames?: string[];
   modelNames?: string[];
+  groupNames?: string[];
   selectedUser?: string;
   selectedModel?: string;
   startDate?: string;
@@ -86,7 +87,7 @@ export const StatsPage: FC<Props> = (props) => {
   const {
     stats, dateRange, currentType, currentValue,
     recentRequests = [], page = 1, totalPages = 1, totalItems = 0,
-    userNames = [], modelNames = [], selectedUser = '', selectedModel = '',
+    userNames = [], modelNames = [], groupNames = [], selectedUser = '', selectedModel = '',
     startDate = '', endDate = '', tzOffset = 0, timezone = 'UTC',
     avgTtftMs = null, avgTps = null,
   } = props;
@@ -837,6 +838,16 @@ export const StatsPage: FC<Props> = (props) => {
                 <a href={`${buildBaseUrl(startDate, endDate, timezone, selectedUser, '')}`} class={`model-filter-btn ${!selectedModel ? 'active' : ''}`}>全部模型</a>
                 {modelNames.map(m => (
                   <a href={`${buildBaseUrl(startDate, endDate, timezone, selectedUser, m)}`} class={`model-filter-btn ${m === selectedModel ? 'active' : ''}`}>{m}</a>
+                ))}
+              </div>
+            )}
+
+            {/* 模型组筛选（单独一行，取自配置） */}
+            {groupNames.length > 0 && (
+              <div class="model-filter-bar">
+                <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', alignSelf: 'center' }}>模型组：</span>
+                {groupNames.map(g => (
+                  <a href={`${buildBaseUrl(startDate, endDate, timezone, selectedUser, g)}`} class={`model-filter-btn ${g === selectedModel ? 'active' : ''}`}>{g}</a>
                 ))}
               </div>
             )}
