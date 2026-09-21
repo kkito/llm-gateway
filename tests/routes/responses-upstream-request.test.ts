@@ -115,4 +115,14 @@ describe('buildResponsesUpstreamRequest — OpenAI Chat 白名单防御', () => 
     // defaultParams 不混入透传请求
     expect(body.reasoning_effort).toBeUndefined();
   });
+
+  it('convert 路径流式请求补 stream_options.include_usage（保证 completed usage 非零）', async () => {
+    const result = await buildResponsesUpstreamRequest(openaiProvider, { model: 'm', input: 'hi' }, true);
+    expect(result.body.stream_options).toEqual({ include_usage: true });
+  });
+
+  it('convert 路径非流式请求不加 stream_options', async () => {
+    const result = await buildResponsesUpstreamRequest(openaiProvider, { model: 'm', input: 'hi' }, false);
+    expect(result.body.stream_options).toBeUndefined();
+  });
 });

@@ -44,6 +44,10 @@ export interface ChatRequest {
   max_tokens?: number;
   stream?: boolean;
   temperature?: number;
+  top_p?: number;
+  parallel_tool_calls?: boolean;
+  /** 来源 Responses text.format，落到 chat 端点为 response_format */
+  response_format?: any;
   stream_options?: { include_reasoning: boolean };
   /** [FIDELITY-SLOT] 来源 Responses previous_response_id，多轮对话延续 */
   previousResponseId?: string;

@@ -159,6 +159,121 @@ describe('responses downstream stream (chat -> responses)', () => {
   });
 });
 
+describe('responses downstream stream — tool call 完整生命周期（P0）', () => {
+  function parse(lines: string[]): any[] {
+    return lines.map((line) => {
+      const m = line.match(/^data: (.*)$/m);
+      return m ? JSON.parse(m[1]) : null;
+    }).filter(Boolean);
+  }
+  function run(chunks: ChatStreamChunk[]): any[] {
+    const s = new ResponsesDownstreamStream();
+    const events = chunks.flatMap((c) => parse(s.transform(c)));
+    events.push(...parse(s.flush()));
+    return events;
+  }
+  function chunk(delta: any, finish_reason: any = null, usage?: any): ChatStreamChunk {
+    return {
+      id: 'chatcmpl_tool', object: 'chat.completion.chunk', created: 1783650022, model: 'm',
+      choices: [{ index: 0, delta, finish_reason }],
+      ...(usage ? { usage } : {}),
+    } as ChatStreamChunk;
+  }
+
+  it('function_call 有完整 added/delta/done/item.done，并进入 completed.output', () => {
+    const events = run([
+      chunk({ role: 'assistant' }),
+      chunk({ tool_calls: [{ index: 0, id: 'call_1', type: 'function', function: { name: 'get_weather', arguments: '' } }] }),
+      chunk({ tool_calls: [{ index: 0, type: 'function', function: { arguments: '{"city":' } }] }),
+      chunk({ tool_calls: [{ index: 0, type: 'function', function: { arguments: '"Tokyo"}' } }] }),
+      chunk({}, 'tool_calls'),
+      { id: 'chatcmpl_tool', object: 'chat.completion.chunk', created: 1783650022, model: 'm', choices: [], usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 } } as any,
+    ]);
+    const types = events.map((e) => e.type);
+
+    expect(types).toContain('response.output_item.added');
+    expect(types).toContain('response.function_call_arguments.delta');
+    expect(types).toContain('response.function_call_arguments.done');
+    expect(types).toContain('response.output_item.done');
+
+    // done 在最后一个 delta 之后、completed 之前，且只出现一次
+    const doneIdx = types.indexOf('response.function_call_arguments.done');
+    const lastDeltaIdx = types.lastIndexOf('response.function_call_arguments.delta');
+    const completedIdx = types.indexOf('response.completed');
+    expect(doneIdx).toBeGreaterThan(lastDeltaIdx);
+    expect(doneIdx).toBeLessThan(completedIdx);
+
+    // arguments.done 带完整参数（官方字段）
+    const argsDone = events.find((e) => e.type === 'response.function_call_arguments.done');
+    expect(argsDone.arguments).toBe('{"city":"Tokyo"}');
+
+    // output_item.done 的 function_call item 完整
+    const itemDone = events.find((e) => e.type === 'response.output_item.done' && e.item.type === 'function_call');
+    expect(itemDone.item).toMatchObject({ type: 'function_call', status: 'completed', call_id: 'call_1', name: 'get_weather', arguments: '{"city":"Tokyo"}' });
+
+    // completed.output 含 function_call（客户端据此驱动工具循环）
+    const completed = events.find((e) => e.type === 'response.completed');
+    expect(completed.response.output).toHaveLength(1);
+    expect(completed.response.output[0]).toMatchObject({ type: 'function_call', status: 'completed', call_id: 'call_1', name: 'get_weather', arguments: '{"city":"Tokyo"}' });
+
+    // usage 取自后到的 usage chunk，不被 finalize 提前丢掉
+    expect(completed.response.usage).toMatchObject({ input_tokens: 10, output_tokens: 5, total_tokens: 15 });
+    expect(types[types.length - 1]).toBe('response.completed');
+  });
+
+  it('text + function_call：output_index 连续，completed 带 response 元字段', () => {
+    const events = run([
+      chunk({ role: 'assistant' }),
+      chunk({ content: 'Sure' }),
+      chunk({ tool_calls: [{ index: 0, id: 'call_9', type: 'function', function: { name: 'f', arguments: '{}' } }] }),
+      chunk({}, 'tool_calls', { prompt_tokens: 1, completion_tokens: 2, total_tokens: 3 }),
+    ]);
+    const dones = events.filter((e) => e.type === 'response.output_item.done');
+    expect(dones.map((e) => e.output_index)).toEqual([0, 1]);
+
+    const completed = events.find((e) => e.type === 'response.completed');
+    expect(completed.response.output.map((i: any) => i.type)).toEqual(['message', 'function_call']);
+    expect(completed.response.object).toBe('response');
+    expect(completed.response.created_at).toBe(1783650022);
+    expect(completed.response.error).toBeNull();
+    expect(completed.response.incomplete_details).toBeNull();
+    expect(completed.response.id.startsWith('resp_')).toBe(true);
+  });
+
+  it('finish_reason=length -> completed status incomplete + incomplete_details', () => {
+    const events = run([
+      chunk({ role: 'assistant' }),
+      chunk({ content: 'partial' }),
+      chunk({}, 'length', { prompt_tokens: 1, completion_tokens: 2, total_tokens: 3 }),
+    ]);
+    const completed = events.find((e) => e.type === 'response.completed');
+    expect(completed.response.status).toBe('incomplete');
+    expect(completed.response.incomplete_details).toEqual({ reason: 'max_output_tokens' });
+  });
+
+  it('response.in_progress 在 created 之后发射', () => {
+    const events = run([
+      chunk({ role: 'assistant' }),
+      chunk({ content: 'x' }),
+      chunk({}, 'stop', { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 }),
+    ]);
+    const types = events.map((e) => e.type);
+    expect(types[0]).toBe('response.created');
+    expect(types[1]).toBe('response.in_progress');
+  });
+
+  it('无 usage chunk 时 flush 兜底 finalize，usage 补 0', () => {
+    const events = run([
+      chunk({ role: 'assistant' }),
+      chunk({ content: 'x' }),
+      chunk({}, 'stop'),
+    ]);
+    const completed = events.find((e) => e.type === 'response.completed');
+    expect(completed).toBeTruthy();
+    expect(completed.response.usage).toMatchObject({ input_tokens: 0, output_tokens: 0, total_tokens: 0 });
+  });
+});
+
 describe('responses 端到端 SSE 转换（基于真实日志 efa5e4f2）', () => {
   // 上游 openai chat 原始 chunk（来自 raw_stream_response.log），保留关键 delta
   const rawChunks = [

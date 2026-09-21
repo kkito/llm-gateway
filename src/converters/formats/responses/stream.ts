@@ -245,6 +245,8 @@ export class ResponsesUpstreamStream implements StreamConverter {
 export class ResponsesDownstreamStream implements StreamConverter {
   private responseId = '';
   private seq = 0;
+  private created = Math.floor(Date.now() / 1000);
+  private createdEmitted = false;
   private reasoningAdded = false;
   private reasoningItemId = '';
   private reasoningIndex = 0;
@@ -253,19 +255,45 @@ export class ResponsesDownstreamStream implements StreamConverter {
   private textItemId = '';
   private textIndex = 0;
   private textText = '';
+  /** chat tool index -> 追踪状态，toolOrder 记录首次出现顺序 */
+  private toolOrder: number[] = [];
+  private tools = new Map<number, { outIdx: number; itemId: string; callId: string; name: string; args: string; started: boolean }>();
+  /** finish_reason 已到但 usage 未到（OpenAI include_usage 时 usage chunk 后到），延迟 finalize */
+  private pendingFinish: ChatStreamChunk | null = null;
   private finalized = false;
 
   private nextSeq(): number { return ++this.seq; }
+
+  private toResponseId(id: string): string {
+    if (!id) return `resp_${Date.now()}`;
+    if (id.startsWith('resp_')) return id;
+    if (id.startsWith('chatcmpl_')) return `resp_${id.slice('chatcmpl_'.length)}`;
+    return `resp_${id}`;
+  }
+
+  /** 非 tool output item 数量（reasoning + message），function_call 的 output_index 从其后顺延 */
+  private baseOutputIndex(): number {
+    return (this.reasoningAdded ? 1 : 0) + (this.textAdded ? 1 : 0);
+  }
+
+  private ensureCreated(chunk: ChatStreamChunk): string[] {
+    if (this.createdEmitted) return [];
+    this.createdEmitted = true;
+    const resp = { id: this.responseId, object: 'response', created_at: this.created, model: chunk.model, status: 'in_progress', output: [], usage: null };
+    return [
+      `event: response.created\ndata: ${JSON.stringify({ type: 'response.created', response: resp, sequence_number: this.nextSeq() })}\n\n`,
+      `event: response.in_progress\ndata: ${JSON.stringify({ type: 'response.in_progress', response: resp, sequence_number: this.nextSeq() })}\n\n`,
+    ];
+  }
 
   transform(chunk: ChatStreamChunk): string[] {
     const out: string[] = [];
     const choice = chunk.choices?.[0];
     const delta = choice?.delta;
-    if (chunk.id) this.responseId = chunk.id.replace(/^chatcmpl_/, '');
+    if (chunk.id) this.responseId = this.toResponseId(chunk.id);
+    if (chunk.created) this.created = chunk.created;
 
-    if (delta?.role) {
-      out.push(`event: response.created\ndata: ${JSON.stringify({ type: 'response.created', response: { id: this.responseId, model: chunk.model, status: 'in_progress', output: [] }, sequence_number: this.nextSeq() })}\n\n`);
-    }
+    out.push(...this.ensureCreated(chunk));
 
     if (delta?.reasoning_content || delta?.reasoning) {
       const t = delta.reasoning_content ?? delta.reasoning ?? '';
@@ -293,22 +321,53 @@ export class ResponsesDownstreamStream implements StreamConverter {
 
     if (delta?.tool_calls) {
       for (const tc of delta.tool_calls) {
-        if (tc.id || tc.function?.name) {
-          const callId = tc.id || `call_${tc.index}`;
-          out.push(`event: response.output_item.added\ndata: ${JSON.stringify({ type: 'response.output_item.added', output_index: tc.index, item: { id: `fc_${tc.index}`, type: 'function_call', status: 'in_progress', call_id: callId, name: tc.function?.name, arguments: '' }, sequence_number: this.nextSeq() })}\n\n`);
+        let st = this.tools.get(tc.index);
+        if (!st) {
+          st = {
+            outIdx: this.baseOutputIndex() + this.toolOrder.length,
+            itemId: '',
+            callId: tc.id || `call_${tc.index}`,
+            name: '',
+            args: '',
+            started: false,
+          };
+          this.tools.set(tc.index, st);
+          this.toolOrder.push(tc.index);
         }
-        if (tc.function?.arguments) {
-          out.push(`event: response.function_call_arguments.delta\ndata: ${JSON.stringify({ type: 'response.function_call_arguments.delta', item_id: `fc_${tc.index}`, output_index: tc.index, delta: tc.function.arguments, sequence_number: this.nextSeq() })}\n\n`);
-          out.push(`event: response.function_call_arguments.done\ndata: ${JSON.stringify({ type: 'response.function_call_arguments.done', item_id: `fc_${tc.index}`, output_index: tc.index, sequence_number: this.nextSeq() })}\n\n`);
+        if (tc.id) st.callId = tc.id;
+        if (tc.function?.name) st.name = tc.function.name;
+        st.itemId = `fc_${st.outIdx}`;
+        if (!st.started && (tc.id || tc.function?.name)) {
+          st.started = true;
+          out.push(`event: response.output_item.added\ndata: ${JSON.stringify({ type: 'response.output_item.added', output_index: st.outIdx, item: { id: st.itemId, type: 'function_call', status: 'in_progress', call_id: st.callId, name: st.name, arguments: '' }, sequence_number: this.nextSeq() })}\n\n`);
+        }
+        const argsDelta = tc.function?.arguments;
+        if (argsDelta) {
+          if (!st.started) {
+            st.started = true;
+            out.push(`event: response.output_item.added\ndata: ${JSON.stringify({ type: 'response.output_item.added', output_index: st.outIdx, item: { id: st.itemId, type: 'function_call', status: 'in_progress', call_id: st.callId, name: st.name, arguments: '' }, sequence_number: this.nextSeq() })}\n\n`);
+          }
+          st.args += argsDelta;
+          out.push(`event: response.function_call_arguments.delta\ndata: ${JSON.stringify({ type: 'response.function_call_arguments.delta', item_id: st.itemId, output_index: st.outIdx, delta: argsDelta, sequence_number: this.nextSeq() })}\n\n`);
         }
       }
     }
 
     if (choice?.finish_reason) {
-      out.push(...this.finalize(chunk));
+      // usage 可能随后到的 usage chunk 补（include_usage），此时不 finalize
+      this.pendingFinish = chunk;
+      if (chunk.usage) out.push(...this.finalize(chunk));
+    } else if (chunk.usage && this.pendingFinish) {
+      this.pendingFinish = { ...this.pendingFinish, usage: chunk.usage };
+      out.push(...this.finalize(this.pendingFinish));
     }
 
     return out;
+  }
+
+  flush(): string[] {
+    if (this.pendingFinish && !this.finalized) return this.finalize(this.pendingFinish);
+    return [];
   }
 
   private finalize(chunk: ChatStreamChunk): string[] {
@@ -316,15 +375,15 @@ export class ResponsesDownstreamStream implements StreamConverter {
     this.finalized = true;
     const out: string[] = [];
     const choice = chunk.choices?.[0];
-    const u = chunk.usage ?? {};
+    const u: any = chunk.usage ?? {};
     // chat.completion usage -> Responses usage（客户端要求 input_tokens/output_tokens）
-    const inputTokens = (u as any).prompt_tokens ?? (u as any).input_tokens ?? 0;
-    const outputTokens = (u as any).completion_tokens ?? (u as any).output_tokens ?? 0;
-    const totalTokens = (u as any).total_tokens ?? (inputTokens + outputTokens);
-    const outputDetails = (u as any).completion_tokens_details ?? (u as any).output_tokens_details;
-    const inputDetails = (u as any).prompt_tokens_details ?? (u as any).input_tokens_details;
+    const inputTokens = u.prompt_tokens ?? u.input_tokens ?? 0;
+    const outputTokens = u.completion_tokens ?? u.output_tokens ?? 0;
+    const totalTokens = u.total_tokens ?? (inputTokens + outputTokens);
+    const outputDetails = u.completion_tokens_details ?? u.output_tokens_details;
+    const inputDetails = u.prompt_tokens_details ?? u.input_tokens_details;
     const cached = inputDetails?.cached_tokens ?? 0;
-    const cacheWrite = inputDetails?.cache_write_tokens ?? (u as any).cache_creation_input_tokens ?? 0;
+    const cacheWrite = inputDetails?.cache_write_tokens ?? u.cache_creation_input_tokens ?? 0;
     const usage: any = {
       input_tokens: inputTokens,
       input_tokens_details: cacheWrite > 0
@@ -355,11 +414,33 @@ export class ResponsesDownstreamStream implements StreamConverter {
       out.push(`event: response.output_item.done\ndata: ${JSON.stringify({ type: 'response.output_item.done', output_index: this.textIndex, item, sequence_number: this.nextSeq() })}\n\n`);
     }
 
-    // completed.response.output 必须包含最终 item（与 cc-switch 一致），客户端据此组装结果
+    // function_call 完整收尾：arguments.done（带完整参数，官方字段）+ output_item.done，
+    // 并进入 completed.response.output —— 客户端据此组装工具调用并驱动下一轮。
+    for (const idx of this.toolOrder) {
+      const st = this.tools.get(idx)!;
+      out.push(`event: response.function_call_arguments.done\ndata: ${JSON.stringify({ type: 'response.function_call_arguments.done', item_id: st.itemId, output_index: st.outIdx, arguments: st.args, sequence_number: this.nextSeq() })}\n\n`);
+      const item = { id: st.itemId, type: 'function_call', status: 'completed', call_id: st.callId, name: st.name, arguments: st.args };
+      outputItems.push(item);
+      out.push(`event: response.output_item.done\ndata: ${JSON.stringify({ type: 'response.output_item.done', output_index: st.outIdx, item, sequence_number: this.nextSeq() })}\n\n`);
+    }
+
+    const incomplete = choice?.finish_reason === 'length';
     const output = [...outputItems].sort((a, b) => (a.type === 'reasoning' ? 0 : 1) - (b.type === 'reasoning' ? 0 : 1));
-    out.push(`event: response.completed\ndata: ${JSON.stringify({ type: 'response.completed', response: { id: this.responseId, model: chunk.model, status: 'completed', output, usage }, sequence_number: this.nextSeq() })}\n\n`);
+    out.push(`event: response.completed\ndata: ${JSON.stringify({
+      type: 'response.completed',
+      response: {
+        id: this.responseId,
+        object: 'response',
+        created_at: this.created,
+        status: incomplete ? 'incomplete' : 'completed',
+        error: null,
+        incomplete_details: incomplete ? { reason: 'max_output_tokens' } : null,
+        model: chunk.model,
+        output,
+        usage,
+      },
+      sequence_number: this.nextSeq(),
+    })}\n\n`);
     return out;
   }
-
-  flush(): string[] { return []; }
 }

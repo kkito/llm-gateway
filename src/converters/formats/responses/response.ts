@@ -46,24 +46,41 @@ export function responsesToChatResponse(body: any): ChatResponse {
   return resp;
 }
 
+/** chat id（chatcmpl_xxx / 任意）规范化为 Responses 的 resp_ 前缀 */
+function toResponseId(id: string | undefined): string {
+  if (!id) return `resp_${Date.now()}`;
+  if (id.startsWith('resp_')) return id;
+  if (id.startsWith('chatcmpl_')) return `resp_${id.slice('chatcmpl_'.length)}`;
+  return `resp_${id}`;
+}
+
 /** canonical chat 响应 -> Responses 响应 */
 export function chatToResponsesResponse(chat: ChatResponse): any {
   const choice = chat.choices?.[0];
   const msg = choice?.message;
   const output: any[] = [];
 
-  if (msg?.tool_calls?.length) {
-    for (const tc of msg.tool_calls) {
-      output.push({ type: 'function_call', call_id: tc.id, name: tc.function.name, arguments: tc.function.arguments });
-    }
-  } else {
-    output.push({ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: msg?.content ?? '' }] });
+  if (msg?.reasoning) {
+    output.push({ id: `rs_${toResponseId(chat.id)}`, type: 'reasoning', summary: [{ type: 'summary_text', text: msg.reasoning }] });
   }
 
+  if (msg?.tool_calls?.length) {
+    for (const tc of msg.tool_calls) {
+      output.push({ type: 'function_call', call_id: tc.id, name: tc.function.name, arguments: tc.function.arguments, status: 'completed' });
+    }
+  } else {
+    output.push({ type: 'message', role: 'assistant', status: 'completed', content: [{ type: 'output_text', text: msg?.content ?? '' }] });
+  }
+
+  const incomplete = choice?.finish_reason === 'length';
   const result: any = {
-    id: chat.id,
+    id: toResponseId(chat.id),
+    object: 'response',
+    created_at: chat.created ?? Math.floor(Date.now() / 1000),
+    status: incomplete ? 'incomplete' : 'completed',
+    error: null,
+    incomplete_details: incomplete ? { reason: 'max_output_tokens' } : null,
     model: chat.model,
-    status: choice?.finish_reason === 'tool_calls' ? 'completed' : 'completed',
     output,
   };
   if (chat.usage) {

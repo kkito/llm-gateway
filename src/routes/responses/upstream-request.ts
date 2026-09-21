@@ -44,6 +44,11 @@ export async function buildResponsesUpstreamRequest(
   } else {
     const chat = plan.sourceAdapter.toChatRequest(body);
     requestBody = { ...plan.providerAdapter.fromChatRequest(chat), model: effectiveProvider.realModel };
+    // chat 端点流式默认不回 usage，显式要 include_usage，
+    // 否则转换后的 response.completed 用量全 0。
+    if (_stream) {
+      requestBody = { ...requestBody, stream_options: { include_usage: true } };
+    }
   }
 
   const requestHeaders = buildHeaders(effectiveProvider);

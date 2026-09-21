@@ -159,3 +159,77 @@ describe('responses request', () => {
     expect(chat.tools?.[0].function.parameters).toEqual({ type: 'object', properties: {} });
   });
 });
+
+describe('responses request — 连续 function_call 合并与保真（P2）', () => {
+  it('连续 function_call 合并为一个 assistant 消息（并行工具调用）', () => {
+    const r = {
+      model: 'm',
+      input: [
+        { type: 'function_call', call_id: 'c1', name: 'f1', arguments: '{}' },
+        { type: 'function_call', call_id: 'c2', name: 'f2', arguments: '{"a":1}' },
+        { type: 'function_call_output', call_id: 'c1', output: 'r1' },
+        { type: 'function_call_output', call_id: 'c2', output: 'r2' },
+      ],
+    };
+    const chat = responsesToChatRequest(r);
+    expect(chat.messages).toHaveLength(3);
+    expect(chat.messages[0].role).toBe('assistant');
+    expect(chat.messages[0].tool_calls).toHaveLength(2);
+    expect(chat.messages[1]).toMatchObject({ role: 'tool', tool_call_id: 'c1' });
+    expect(chat.messages[2]).toMatchObject({ role: 'tool', tool_call_id: 'c2' });
+  });
+
+  it('function_call 携带的 reasoning_content 回传到 assistant 消息', () => {
+    const r = {
+      model: 'm',
+      input: [
+        { type: 'function_call', call_id: 'c1', name: 'f1', arguments: '{}', reasoning_content: 'think hard' },
+        { type: 'function_call_output', call_id: 'c1', output: 'r1' },
+      ],
+    };
+    const chat = responsesToChatRequest(r);
+    expect(chat.messages[0].reasoning).toBe('think hard');
+  });
+
+  it('assistant(tool_calls) 与 tool 消息之间注入的 system 消息被前移', () => {
+    const r = {
+      model: 'm',
+      input: [
+        { role: 'user', content: 'go' },
+        { type: 'function_call', call_id: 'c1', name: 'f1', arguments: '{}' },
+        { type: 'message', role: 'system', content: 'approval notice' },
+        { type: 'function_call_output', call_id: 'c1', output: 'r1' },
+      ],
+    };
+    const chat = responsesToChatRequest(r);
+    expect(chat.messages.map((m) => m.role)).toEqual(['user', 'system', 'assistant', 'tool']);
+  });
+
+  it('developer role 映射为 system（Codex 系统消息）', () => {
+    const r = { model: 'm', input: [{ type: 'message', role: 'developer', content: 'sys' }] };
+    const chat = responsesToChatRequest(r);
+    expect(chat.messages[0].role).toBe('system');
+  });
+
+  it('top_p / parallel_tool_calls / text.format 透传', () => {
+    const r = { model: 'm', input: 'hi', top_p: 0.5, parallel_tool_calls: true, text: { format: { type: 'json_object' } } };
+    const chat = responsesToChatRequest(r);
+    expect(chat.top_p).toBe(0.5);
+    expect(chat.parallel_tool_calls).toBe(true);
+    expect(chat.response_format).toEqual({ type: 'json_object' });
+  });
+
+  it('chat -> responses：response_format/top_p/parallel_tool_calls 反向映射', () => {
+    const chat = {
+      model: 'm',
+      messages: [{ role: 'user', content: 'hi' }],
+      response_format: { type: 'json_object' },
+      top_p: 0.5,
+      parallel_tool_calls: true,
+    } as any;
+    const r = chatToResponsesRequest(chat);
+    expect(r.text).toEqual({ format: { type: 'json_object' } });
+    expect(r.top_p).toBe(0.5);
+    expect(r.parallel_tool_calls).toBe(true);
+  });
+});

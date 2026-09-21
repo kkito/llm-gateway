@@ -1,5 +1,5 @@
 // src/converters/formats/responses/request.ts
-import type { ChatRequest, ChatMessage, ChatTool } from '../../canonical/types.js';
+import type { ChatRequest, ChatMessage, ChatTool, ChatToolCall } from '../../canonical/types.js';
 import { DEFAULT_TOOL_PARAMETERS, ensureToolParameters } from '../../canonical/tools.js';
 
 interface ResponsesInputItem {
@@ -11,6 +11,8 @@ interface ResponsesInputItem {
   arguments?: string;
   tool_call_id?: string;
   output?: any;
+  /** 思考模型（DeepSeek thinking 等）在 function_call/message item 上回传的思考过程 */
+  reasoning_content?: string;
 }
 
 /** Responses 请求 -> canonical chat 请求 */
@@ -22,19 +24,31 @@ export function responsesToChatRequest(body: any): ChatRequest {
   }
 
   const input = normalizeInput(body.input);
+  // 连续的 function_call 先累积，合并为一个 assistant 消息（并行工具调用），
+  // 严格上游（DeepSeek 等）要求 tool_calls 与随后的 tool 消息相邻。
+  const pendingToolCalls: ChatToolCall[] = [];
+  let pendingReasoning = '';
+  const flushToolCalls = () => {
+    if (pendingToolCalls.length === 0) return;
+    const msg: ChatMessage = { role: 'assistant', content: null, tool_calls: [...pendingToolCalls] };
+    // 思考模型（DeepSeek thinking）要求 function_call 上的 reasoning_content 随 assistant 消息回传
+    if (pendingReasoning) msg.reasoning = pendingReasoning;
+    messages.push(msg);
+    pendingToolCalls.length = 0;
+    pendingReasoning = '';
+  };
+
   for (const item of input) {
     if (item.type === 'function_call') {
-      messages.push({
-        role: 'assistant',
-        content: null,
-        tool_calls: [{
-          id: item.call_id || '',
-          type: 'function',
-          function: { name: item.name || '', arguments: item.arguments || '{}' },
-        }],
+      pendingToolCalls.push({
+        id: item.call_id || '',
+        type: 'function',
+        function: { name: item.name || '', arguments: item.arguments || '{}' },
       });
+      if (item.reasoning_content && !pendingReasoning) pendingReasoning = item.reasoning_content;
     } else if (item.type === 'function_call_output') {
       // Responses API 的 function_call_output 使用 `output` 字段
+      flushToolCalls();
       const toolOutput = item.output ?? item.content;
       messages.push({
         role: 'tool',
@@ -42,10 +56,18 @@ export function responsesToChatRequest(body: any): ChatRequest {
         tool_call_id: item.call_id || '',
       });
     } else {
-      const role = (item.role === 'system') ? 'system' : (item.role === 'user' ? 'user' : 'assistant');
-      messages.push({ role, content: convertResponsesContentToChat(item.content) } as ChatMessage);
+      flushToolCalls();
+      const role = (item.role === 'system' || item.role === 'developer') ? 'system' : (item.role === 'user' ? 'user' : 'assistant');
+      const msg: ChatMessage = { role, content: convertResponsesContentToChat(item.content) } as ChatMessage;
+      if (item.reasoning_content && role === 'assistant') msg.reasoning = item.reasoning_content;
+      messages.push(msg);
     }
   }
+  flushToolCalls();
+
+  // Codex 会在 assistant(tool_calls) 与 tool 消息之间注入系统消息（审批通知等），
+  // 严格上游要求 tool 消息紧跟 assistant，这里把注入的 system 消息前移。
+  const ordered = reorderToolMessages(messages);
 
   // OpenAI Responses 的 tools 可能是多种类型：
   // - function（扁平 {type,name,...} 或嵌套 {type,function:{name,...}}）→ 转 openai function tool
@@ -61,9 +83,9 @@ export function responsesToChatRequest(body: any): ChatRequest {
       };
     });
 
-  return {
+  const req: ChatRequest = {
     model: body.model,
-    messages,
+    messages: ordered,
     tools,
     tool_choice: body.tool_choice ? mapToolChoiceToChat(body.tool_choice) : undefined,
     max_tokens: body.max_output_tokens,
@@ -72,6 +94,43 @@ export function responsesToChatRequest(body: any): ChatRequest {
     previousResponseId: body.previous_response_id,
     responseInstructions: body.instructions,
   };
+  if (body.top_p !== undefined) req.top_p = body.top_p;
+  if (body.parallel_tool_calls !== undefined) req.parallel_tool_calls = body.parallel_tool_calls;
+  if (body.text?.format) req.response_format = body.text.format;
+  return req;
+}
+
+/** 把 assistant(tool_calls) 与其 tool 消息之间插入的 system 消息前移到 assistant 之前 */
+function reorderToolMessages(messages: ChatMessage[]): ChatMessage[] {
+  const reordered: ChatMessage[] = [];
+  let i = 0;
+  while (i < messages.length) {
+    const msg = messages[i];
+    if (msg.role === 'assistant' && msg.tool_calls?.length) {
+      const expectedIds = new Set(msg.tool_calls.map((tc) => tc.id));
+      const toolMsgs: ChatMessage[] = [];
+      const movedSystem: ChatMessage[] = [];
+      let j = i + 1;
+      while (j < messages.length && expectedIds.size > 0) {
+        const nxt = messages[j];
+        if (nxt.role === 'tool' && nxt.tool_call_id && expectedIds.has(nxt.tool_call_id)) {
+          expectedIds.delete(nxt.tool_call_id);
+          toolMsgs.push(nxt);
+        } else if (nxt.role === 'system') {
+          movedSystem.push(nxt);
+        } else {
+          break;
+        }
+        j++;
+      }
+      reordered.push(...movedSystem, msg, ...toolMsgs);
+      i = j;
+    } else {
+      reordered.push(msg);
+      i++;
+    }
+  }
+  return reordered;
 }
 
 /** canonical chat 请求 -> Responses 请求 */
@@ -108,6 +167,9 @@ export function chatToResponsesRequest(chat: ChatRequest): any {
   if (chat.stream) result.stream = true;
   if (chat.temperature !== undefined) result.temperature = chat.temperature;
   if (chat.max_tokens) result.max_output_tokens = chat.max_tokens;
+  if (chat.top_p !== undefined) result.top_p = chat.top_p;
+  if (chat.parallel_tool_calls !== undefined) result.parallel_tool_calls = chat.parallel_tool_calls;
+  if (chat.response_format) result.text = { format: chat.response_format };
   return result;
 }
 
