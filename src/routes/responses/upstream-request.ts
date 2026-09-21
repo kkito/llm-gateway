@@ -35,6 +35,11 @@ export async function buildResponsesUpstreamRequest(
 
   let requestBody: any;
   if (plan.passthrough) {
+    // 同构 passthrough（responses <-> response-api）：请求体逐字节透传，
+    // 只替换 model。Responses 字段（input/instructions/tools/tool_choice/
+    // reasoning/store/include/text/parallel_tool_calls 等）一个不动。
+    // 之前走 responses->chat->responses 重组会丢字段（developer role、
+    // tool_choice、reasoning、store、include 等），导致模型行为异常。
     requestBody = { ...body, model: effectiveProvider.realModel };
   } else {
     const chat = plan.sourceAdapter.toChatRequest(body);
@@ -45,12 +50,16 @@ export async function buildResponsesUpstreamRequest(
   const endpoint = effectiveProvider.provider === 'response-api' ? 'responses' : 'chat';
   const url = buildUrl(effectiveProvider, endpoint);
 
-  if (Array.isArray((requestBody as any)?.tools)) {
+  // 非 passthrough 路径才做 tool schema 兜底；passthrough 逐字节透传不动 tools。
+  if (!plan.passthrough && Array.isArray((requestBody as any)?.tools)) {
     requestBody = { ...requestBody, tools: ensureToolParameters((requestBody as any).tools) };
   }
 
-  // 合并默认参数（用户参数优先级更高）
-  requestBody = mergeModelParams(effectiveProvider.defaultParams, requestBody);
+  // 合并默认参数（用户参数优先级更高）。
+  // passthrough 路径跳过：defaultParams 是 chat 形状，混入 Responses 请求体会污染透传。
+  if (!plan.passthrough) {
+    requestBody = mergeModelParams(effectiveProvider.defaultParams, requestBody);
+  }
 
   // 仅对 openai-compatible chat 端点收敛为白名单字段，防止 Responses 保真字段
   // （previous_response_id/instructions）或 provider 自定义 defaultParams

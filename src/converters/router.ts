@@ -12,9 +12,11 @@ const REGISTRY: Record<string, FormatAdapter> = {
   'response-api': responsesAdapter,
 };
 
-/** openai 与 chat 是同一 canonical 格式的不同命名，归一化后再比较 */
+/** responses 与 response-api 是同一 Responses 协议的不同命名，归一化后再比较 */
 function normalizeFormat(format: FormatName): FormatName {
-  return format === 'openai' ? 'chat' : format;
+  if (format === 'openai') return 'chat';
+  if (format === 'response-api') return 'responses';
+  return format;
 }
 
 export interface ChainPlan {

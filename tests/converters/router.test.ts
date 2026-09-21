@@ -12,9 +12,9 @@ describe('router', () => {
     expect(plan.source).toBe('anthropic');
     expect(plan.provider).toBe('openai');
   });
-  it('responses->response-api 走 chat 中转', () => {
+  it('responses->response-api 透传（同 Responses 协议，不做 convert）', () => {
     const plan = resolveConverterChain('responses', 'response-api');
-    expect(plan.passthrough).toBe(false);
+    expect(plan.passthrough).toBe(true);
   });
   it('openai->anthropic 走 chat 中转', () => {
     const plan = resolveConverterChain('openai', 'anthropic');

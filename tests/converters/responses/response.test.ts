@@ -22,6 +22,33 @@ describe('responses response', () => {
     expect(chat.choices[0].message.tool_calls?.[0].function.name).toBe('f');
     expect(chat.choices[0].finish_reason).toBe('tool_calls');
   });
+  it('chat usage 无 details 时补 reasoning_tokens/cached_tokens 默认 0', () => {
+    const chat = {
+      id: 'resp_4', model: 'm',
+      choices: [{ message: { role: 'assistant', content: 'x' }, finish_reason: 'stop' }],
+      usage: { prompt_tokens: 4, completion_tokens: 6, total_tokens: 10 },
+    } as any;
+    const r = chatToResponsesResponse(chat);
+    expect(r.usage).toMatchObject({
+      input_tokens: 4, output_tokens: 6, total_tokens: 10,
+      input_tokens_details: { cached_tokens: 0 },
+      output_tokens_details: { reasoning_tokens: 0 },
+    });
+  });
+  it('chat usage 有 details 时透传并补齐 reasoning_tokens', () => {
+    const chat = {
+      id: 'resp_5', model: 'm',
+      choices: [{ message: { role: 'assistant', content: 'x' }, finish_reason: 'stop' }],
+      usage: {
+        prompt_tokens: 4, completion_tokens: 6, total_tokens: 10,
+        prompt_tokens_details: { cached_tokens: 2 },
+        completion_tokens_details: { accepted_prediction_tokens: 5 },
+      },
+    } as any;
+    const r = chatToResponsesResponse(chat);
+    expect(r.usage.output_tokens_details).toMatchObject({ accepted_prediction_tokens: 5, reasoning_tokens: 0 });
+    expect(r.usage.input_tokens_details).toMatchObject({ cached_tokens: 2 });
+  });
   it('chat -> responses 保留 encrypted_content 保真槽', () => {
     const chat = {
       id: 'resp_3', model: 'gpt-4o',

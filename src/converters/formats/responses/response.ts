@@ -66,7 +66,28 @@ export function chatToResponsesResponse(chat: ChatResponse): any {
     status: choice?.finish_reason === 'tool_calls' ? 'completed' : 'completed',
     output,
   };
-  if (chat.usage) result.usage = { input_tokens: chat.usage.prompt_tokens, output_tokens: chat.usage.completion_tokens };
+  if (chat.usage) {
+    const u: any = chat.usage;
+    const inDetails = u.prompt_tokens_details ?? u.input_tokens_details;
+    const cached = inDetails?.cached_tokens ?? 0;
+    const cacheWrite = inDetails?.cache_write_tokens ?? u.cache_creation_input_tokens ?? 0;
+    const outDetails = u.completion_tokens_details ?? u.output_tokens_details;
+    const result2: any = {
+      input_tokens: u.prompt_tokens,
+      input_tokens_details: cacheWrite > 0
+        ? { cached_tokens: cached, cache_write_tokens: cacheWrite }
+        : { cached_tokens: cached },
+      output_tokens: u.completion_tokens,
+      total_tokens: u.total_tokens ?? (u.prompt_tokens ?? 0) + (u.completion_tokens ?? 0),
+    };
+    if (outDetails && typeof outDetails === 'object' && Object.keys(outDetails).length > 0) {
+      result2.output_tokens_details = { ...outDetails };
+      if (result2.output_tokens_details.reasoning_tokens == null) result2.output_tokens_details.reasoning_tokens = 0;
+    } else {
+      result2.output_tokens_details = { reasoning_tokens: 0 };
+    }
+    result.usage = result2;
+  }
   if ((chat as any).responsesEncryptedContent) result.encrypted_content = (chat as any).responsesEncryptedContent;
   return result;
 }

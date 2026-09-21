@@ -199,11 +199,13 @@ export class ResponsesUpstreamStream implements StreamConverter {
           this.fallbackOpenIndex = null;
           const rawUsage = respObj.usage;
           const cachedTokens = rawUsage?.input_tokens_details?.cached_tokens ?? rawUsage?.prompt_tokens_details?.cached_tokens;
+          const reasoningTokens = rawUsage?.output_tokens_details?.reasoning_tokens ?? rawUsage?.completion_tokens_details?.reasoning_tokens;
           const usage = rawUsage ? {
             prompt_tokens: rawUsage.input_tokens ?? 0,
             completion_tokens: rawUsage.output_tokens ?? 0,
             total_tokens: (rawUsage.input_tokens ?? 0) + (rawUsage.output_tokens ?? 0),
             ...(cachedTokens != null ? { prompt_tokens_details: { cached_tokens: cachedTokens } } : {}),
+            ...(reasoningTokens != null ? { completion_tokens_details: { reasoning_tokens: reasoningTokens } } : {}),
           } : undefined;
           out.push({ id: cid(), object: 'chat.completion.chunk', created: this.created, model: this.model, choices: [{ index: 0, delta: {}, finish_reason: stopReason }], usage });
           break;
@@ -319,14 +321,24 @@ export class ResponsesDownstreamStream implements StreamConverter {
     const inputTokens = (u as any).prompt_tokens ?? (u as any).input_tokens ?? 0;
     const outputTokens = (u as any).completion_tokens ?? (u as any).output_tokens ?? 0;
     const totalTokens = (u as any).total_tokens ?? (inputTokens + outputTokens);
-    const outputDetails = (u as any).completion_tokens_details ?? (u as any).output_tokens_details ?? {};
-    const usage = {
+    const outputDetails = (u as any).completion_tokens_details ?? (u as any).output_tokens_details;
+    const inputDetails = (u as any).prompt_tokens_details ?? (u as any).input_tokens_details;
+    const cached = inputDetails?.cached_tokens ?? 0;
+    const cacheWrite = inputDetails?.cache_write_tokens ?? (u as any).cache_creation_input_tokens ?? 0;
+    const usage: any = {
       input_tokens: inputTokens,
-      input_tokens_details: (u as any).prompt_tokens_details ?? (u as any).input_tokens_details,
+      input_tokens_details: cacheWrite > 0
+        ? { cached_tokens: cached, cache_write_tokens: cacheWrite }
+        : { cached_tokens: cached },
       output_tokens: outputTokens,
-      output_tokens_details: outputDetails,
       total_tokens: totalTokens,
     };
+    if (outputDetails && typeof outputDetails === 'object' && Object.keys(outputDetails).length > 0) {
+      usage.output_tokens_details = { ...outputDetails };
+      if (usage.output_tokens_details.reasoning_tokens == null) usage.output_tokens_details.reasoning_tokens = 0;
+    } else {
+      usage.output_tokens_details = { reasoning_tokens: 0 };
+    }
 
     const outputItems: any[] = [];
 

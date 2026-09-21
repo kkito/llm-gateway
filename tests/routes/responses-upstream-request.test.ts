@@ -77,23 +77,42 @@ describe('buildResponsesUpstreamRequest — OpenAI Chat 白名单防御', () => 
     expect(body.responseInstructions).toBeUndefined();
   });
 
-  it('response-api passthrough 路径应保留完整 Responses 字段，不过滤', async () => {
+  it('response-api passthrough 路径请求体逐字节透传（只换 model，不混 defaultParams）', async () => {
     const provider = {
       ...responseApiProvider,
       defaultParams: { reasoning_effort: null }
     } as unknown as ProviderConfig;
 
-    const result = await buildResponsesUpstreamRequest(
-      provider,
-      { model: 'm', input: 'hi', previous_response_id: 'resp_123', instructions: 'be terse' },
-      true
-    );
+    const clientBody = {
+      model: 'm',
+      input: [{ type: 'message', id: 'msg_1', role: 'developer', content: [{ type: 'input_text', text: 'sys' }] }],
+      instructions: 'be terse',
+      tools: [],
+      tool_choice: 'auto',
+      parallel_tool_calls: true,
+      reasoning: { effort: 'low', summary: 'auto' },
+      store: false,
+      include: ['reasoning.encrypted_content'],
+      text: { verbosity: 'low' },
+      stream: true,
+      previous_response_id: 'resp_123',
+    };
+    const result = await buildResponsesUpstreamRequest(provider, clientBody, true);
 
     expect(result.url).toBe('https://api.example.com/responses');
-    // passthrough：原样合并 defaultParams 后保留所有字段
-    expect(result.body.previous_response_id).toBe('resp_123');
-    expect(result.body.instructions).toBe('be terse');
-    expect(result.body.reasoning_effort).toBeNull();
-    expect(result.body.model).toBe('gpt-4o');
+    const body = result.body;
+    expect(body.model).toBe('gpt-4o');
+    // Responses 字段一个不动
+    expect(body.tool_choice).toBe('auto');
+    expect(body.parallel_tool_calls).toBe(true);
+    expect(body.reasoning).toEqual({ effort: 'low', summary: 'auto' });
+    expect(body.store).toBe(false);
+    expect(body.include).toEqual(['reasoning.encrypted_content']);
+    expect(body.text).toEqual({ verbosity: 'low' });
+    expect(body.previous_response_id).toBe('resp_123');
+    expect(body.instructions).toBe('be terse');
+    expect(body.input).toEqual(clientBody.input);
+    // defaultParams 不混入透传请求
+    expect(body.reasoning_effort).toBeUndefined();
   });
 });

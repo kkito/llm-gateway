@@ -11,6 +11,8 @@ export interface NonStreamResult {
 
 /**
  * 非流式响应还原：provider 格式 -> canonical chat -> responses 客户端格式。
+ * 同构 passthrough（responses -> responses）时上游 JSON 原样返回，
+ * 避免重组丢失 output item、encrypted_content 等字段。
  */
 export async function handleResponsesNonStream(
   response: Response,
@@ -35,6 +37,24 @@ export async function handleResponsesNonStream(
   }
 
   const plan = resolveConverterChain('responses', provider.provider as any);
+
+  // 同构 passthrough：上游 JSON 原样返回，仅从中提取用量记费
+  if (plan.passthrough) {
+    const usage = (responseData as any)?.usage;
+    if (usage) {
+      logEntry.promptTokens = usage.input_tokens;
+      logEntry.completionTokens = usage.output_tokens;
+      logEntry.totalTokens = usage.total_tokens ?? (usage.input_tokens ?? 0) + (usage.output_tokens ?? 0);
+      logEntry.cachedTokens = usage.input_tokens_details?.cached_tokens;
+    }
+    logEntry.responseMetadata = JSON.stringify((responseData as any)?.usage ?? {});
+
+    detailLogger.logUpstreamResponse(requestId + '_converted', responseData);
+    logger.log({ ...logEntry, message: 'Passthrough upstream Responses response' });
+
+    return { responseData, logEntry };
+  }
+
   const chat = plan.providerAdapter.toChatResponse(responseData);
   const converted = plan.sourceAdapter.fromChatResponse(chat);
   responseData = converted;

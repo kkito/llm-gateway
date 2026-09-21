@@ -79,6 +79,22 @@ describe('responses upstream stream usage', () => {
     expect(chunks[0].usage?.prompt_tokens).toBe(26059);
     expect((chunks[0].usage as any)?.prompt_tokens_details?.cached_tokens).toBe(14577);
   });
+
+  it('response.completed 透传 output_tokens_details.reasoning_tokens（passthrough 链路不断流）', () => {
+    const input = [
+      'event: response.completed',
+      'data: {"type":"response.completed","response":{"status":"completed","usage":{"input_tokens":3719,"output_tokens":416,"total_tokens":4135,"input_tokens_details":{"cached_tokens":0},"output_tokens_details":{"reasoning_tokens":402}}}}',
+      '',
+    ].join('\n') + '\n\n';
+    const s = new ResponsesUpstreamStream();
+    const chunks = s.transform(input);
+    expect(chunks.length).toBe(1);
+    expect((chunks[0].usage as any)?.completion_tokens_details?.reasoning_tokens).toBe(402);
+
+    const events = feedDownstream(chunks);
+    const completed = events.find((e) => e.type === 'response.completed');
+    expect(completed.response.usage.output_tokens_details).toMatchObject({ reasoning_tokens: 402 });
+  });
 });
 
 describe('responses downstream stream (chat -> responses)', () => {
@@ -123,6 +139,23 @@ describe('responses downstream stream (chat -> responses)', () => {
 
     const completed = events.find((e) => e.type === 'response.completed');
     expect(completed.response.status).toBe('completed');
+    // usage 恒带 details（对齐 cc-switch）：无上游 details 时补 0，避免前端严格解析断流
+    expect(completed.response.usage).toMatchObject({
+      input_tokens: 1, output_tokens: 2, total_tokens: 3,
+      input_tokens_details: { cached_tokens: 0 },
+      output_tokens_details: { reasoning_tokens: 0 },
+    });
+  });
+
+  it('下游 usage 透传 completion_tokens_details 并补齐 reasoning_tokens', () => {
+    const chunks: ChatStreamChunk[] = [
+      { id: 'chatcmpl_x', object: 'chat.completion.chunk', created: 0, model: 'm', choices: [{ index: 0, delta: { role: 'assistant' }, finish_reason: null }] },
+      { id: 'chatcmpl_x', object: 'chat.completion.chunk', created: 0, model: 'm', choices: [{ index: 0, delta: {}, finish_reason: 'stop' }], usage: { prompt_tokens: 4, completion_tokens: 6, total_tokens: 10, prompt_tokens_details: { cached_tokens: 2 }, completion_tokens_details: { accepted_prediction_tokens: 5 } as any } },
+    ];
+    const events = feedDownstream(chunks);
+    const completed = events.find((e) => e.type === 'response.completed');
+    expect(completed.response.usage.output_tokens_details).toMatchObject({ accepted_prediction_tokens: 5, reasoning_tokens: 0 });
+    expect(completed.response.usage.input_tokens_details).toMatchObject({ cached_tokens: 2 });
   });
 });
 
