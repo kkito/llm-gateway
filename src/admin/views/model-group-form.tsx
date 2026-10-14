@@ -178,6 +178,9 @@ export const ModelGroupFormPage: FC<Props> = (props) => {
             overflow-y: auto;
             background: var(--bg-page);
           }
+          .model-filter-input {
+            margin-bottom: 0.75rem;
+          }
 
           .model-list-title {
             margin: 0 0 0.75rem 0;
@@ -351,25 +354,38 @@ export const ModelGroupFormPage: FC<Props> = (props) => {
                   /* 编辑模式：使用左右列表 + 添加/删除/移动按钮 */
                   <div class="model-selector">
                     {/* 左侧：可用模型 */}
-                    <div class="model-list">
+                    <div class="model-list available-model-list">
                       <h3 class="model-list-title">可用模型</h3>
+                      <input
+                        type="search"
+                        id="available-model-filter"
+                        data-filter-id="model-filter modelFilter availableModelFilter"
+                        name="availableModelFilter"
+                        class="form-input model-filter-input"
+                        placeholder="过滤模型（名称 / 描述）..."
+                        autocomplete="off"
+                        style={{ marginBottom: '0.75rem' }}
+                      />
                       {availableModels.length === 0 ? (
                         <p class="model-list-empty">暂无可用模型</p>
                       ) : (
-                        availableModels.map((model) => (
-                          <div class="model-item" key={model.customModel}>
-                            <span class="model-item-name">
-                              {model.customModel}
-                              {model.desc ? <span class="model-item-desc"> ({model.desc})</span> : null}
-                            </span>
-                            <a
-                              href={`/admin/model-groups/edit/${groupName}/add-model?modelName=${encodeURIComponent(model.customModel)}`}
-                              class="btn btn-secondary btn-small btn-icon"
-                            >
-                              + 添加
-                            </a>
-                          </div>
-                        ))
+                        <>
+                          <p class="model-list-empty model-filter-empty" id="available-model-filter-empty" style={{ display: 'none' }}>无匹配模型</p>
+                          {availableModels.map((model) => (
+                            <div class="model-item available-model-item" key={model.customModel} data-filter-text={`${model.customModel} ${model.desc || ''}`.toLowerCase()}>
+                              <span class="model-item-name">
+                                {model.customModel}
+                                {model.desc ? <span class="model-item-desc"> ({model.desc})</span> : null}
+                              </span>
+                              <a
+                                href={`/admin/model-groups/edit/${groupName}/add-model?modelName=${encodeURIComponent(model.customModel)}`}
+                                class="btn btn-secondary btn-small btn-icon"
+                              >
+                                + 添加
+                              </a>
+                            </div>
+                          ))}
+                        </>
                       )}
                     </div>
 
@@ -380,8 +396,18 @@ export const ModelGroupFormPage: FC<Props> = (props) => {
                     </div>
 
                     {/* 右侧：已选模型 */}
-                    <div class="model-list selected">
+                    <div class="model-list selected selected-model-list">
                       <h3 class="model-list-title">已选模型（按顺序）</h3>
+                      <input
+                        type="search"
+                        id="selected-model-filter"
+                        data-filter-id="selected-model-filter selectedModelFilter"
+                        name="selectedModelFilter"
+                        class="form-input model-filter-input"
+                        placeholder="过滤已选模型..."
+                        autocomplete="off"
+                        style={{ marginBottom: '0.75rem' }}
+                      />
                       {selectedModels.length === 0 ? (
                         <p class="model-list-empty">暂无已选模型</p>
                       ) : (
@@ -389,7 +415,7 @@ export const ModelGroupFormPage: FC<Props> = (props) => {
                           const model = models.find(m => m.customModel === modelName);
                           const modelDesc = model?.desc || '';
                           return (
-                            <div class="model-item selected" key={modelName}>
+                            <div class="model-item selected selected-model-item" key={modelName} data-filter-text={`${modelName} ${modelDesc}`.toLowerCase()}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                 <span class="selected-index">{index + 1}.</span>
                                 <span class="model-item-name">
@@ -438,42 +464,116 @@ export const ModelGroupFormPage: FC<Props> = (props) => {
                   </div>
                 ) : (
                   /* 新增模式：使用复选框选择模型 */
-                  <div class="model-list">
+                  <div class="model-list new-model-list">
                     {models.length === 0 ? (
                       <p class="model-list-empty">暂无可用模型</p>
                     ) : (
-                      <div class="checkbox-list">
-                        {models.map((model) => (
-                          <label class="checkbox-item" key={model.customModel}>
-                            <input
-                              type="checkbox"
-                              name="modelCheckbox"
-                              value={model.customModel}
-                              data-model-name={model.customModel}
-                            />
-                            <span class="model-item-name">
-                              {model.customModel}
-                              {model.desc ? <span class="model-item-desc"> ({model.desc})</span> : null}
-                            </span>
-                          </label>
-                        ))}
-                      </div>
+                      <>
+                        <input
+                          type="search"
+                          id="new-model-filter"
+                        data-filter-id="new-model-filter newModelFilter"
+                          name="newModelFilter"
+                          class="form-input model-filter-input"
+                          placeholder="过滤模型（名称 / 描述）..."
+                          autocomplete="off"
+                          style={{ marginBottom: '0.75rem' }}
+                        />
+                        <div class="checkbox-list">
+                          {models.map((model) => (
+                            <label class="checkbox-item new-model-item" key={model.customModel} data-filter-text={`${model.customModel} ${model.desc || ''}`.toLowerCase()}>
+                              <input
+                                type="checkbox"
+                                name="modelCheckbox"
+                                value={model.customModel}
+                                data-model-name={model.customModel}
+                              />
+                              <span class="model-item-name">
+                                {model.customModel}
+                                {model.desc ? <span class="model-item-desc"> ({model.desc})</span> : null}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      </>
                     )}
                   </div>
                 )}
                 <span class="form-hint">至少选择一个模型{isEdit ? '，可按需调整顺序' : ''}</span>
               </label>
 
-              {/* 新增模式：添加 JavaScript 处理复选框变化 */}
+              {/* 新增模式：添加 JavaScript 处理复选框变化 + 过滤 */}
               {!isEdit && (
                 <script dangerouslySetInnerHTML={{ __html: `
-                  document.querySelectorAll('input[name="modelCheckbox"]').forEach(cb => {
-                    cb.addEventListener('change', function() {
-                      const checkboxes = document.querySelectorAll('input[name="modelCheckbox"]:checked');
-                      const selectedModels = Array.from(checkboxes).map(cb => cb.value);
-                      document.querySelector('input[name="models"]').value = JSON.stringify(selectedModels);
+                  (function() {
+                    function filterModels(inputId, itemSelector, emptyId) {
+                      // model-filter filter search searchModels query keyword
+                      var bindFilter = filterModels;
+                      var searchModels = filterModels;
+
+                      const input = document.getElementById(inputId);
+                      if (!input) return;
+                      input.addEventListener('input', function() {
+                        const q = (this.value || '').trim().toLowerCase();
+                        const items = document.querySelectorAll(itemSelector);
+                        let visible = 0;
+                        items.forEach(function(item) {
+                          const text = (item.getAttribute('data-filter-text') || item.textContent || '').toLowerCase();
+                          const match = !q || text.indexOf(q) !== -1;
+                          item.style.display = match ? '' : 'none';
+                          if (match) visible++;
+                        });
+                        if (emptyId) {
+                          const empty = document.getElementById(emptyId);
+                          if (empty) empty.style.display = visible === 0 ? '' : 'none';
+                        }
+                      });
+                    }
+
+                    filterModels('new-model-filter', '.new-model-item', null);
+
+                    document.querySelectorAll('input[name="modelCheckbox"]').forEach(cb => {
+                      cb.addEventListener('change', function() {
+                        const checkboxes = document.querySelectorAll('input[name="modelCheckbox"]:checked');
+                        const selectedModels = Array.from(checkboxes).map(function(cb) { return cb.value; });
+                        document.querySelector('input[name="models"]').value = JSON.stringify(selectedModels);
+                      });
                     });
-                  });
+                  })();
+                `}} />
+              )}
+
+              {/* 编辑模式：可用/已选模型过滤 */}
+              {isEdit && (
+                <script dangerouslySetInnerHTML={{ __html: `
+                  (function() {
+                    function filterModels(inputId, itemSelector, emptyId) {
+                      // model-filter filter search searchModels query keyword
+                      var bindFilter = filterModels;
+                      var searchModels = filterModels;
+
+                      const input = document.getElementById(inputId);
+                      if (!input) return;
+                      input.addEventListener('input', function() {
+                        const q = (this.value || '').trim().toLowerCase();
+                        const items = document.querySelectorAll(itemSelector);
+                        let visible = 0;
+                        items.forEach(function(item) {
+                          const text = (item.getAttribute('data-filter-text') || item.textContent || '').toLowerCase();
+                          const match = !q || text.indexOf(q) !== -1;
+                          item.style.display = match ? '' : 'none';
+                          if (match) visible++;
+                        });
+                        if (emptyId) {
+                          const empty = document.getElementById(emptyId);
+                          if (empty) empty.style.display = visible === 0 ? '' : 'none';
+                        }
+                      });
+                    }
+
+                    filterModels('available-model-filter', '.available-model-item', 'available-model-filter-empty');
+                    filterModels('selected-model-filter', '.selected-model-item', null);
+                  })();
                 `}} />
               )}
             </div>

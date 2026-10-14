@@ -23,7 +23,12 @@ export function createModelGroupFormRoute(deps: RouteDeps) {
   app.get('/admin/model-groups/new', (c) => {
     try {
       const proxyConfig = loadFullConfig(configPath);
-      return c.html(<ModelGroupFormPage models={getVisibleModels(proxyConfig)} />);
+      const filter = c.req.query('filter') || c.req.query('q') || c.req.query('search') || '';
+      const models = getVisibleModels(proxyConfig);
+      const filtered = filter
+        ? models.filter(m => `${m.customModel} ${m.desc || ''} ${m.provider || ''} ${m.realModel || ''}`.toLowerCase().includes(filter.toLowerCase()))
+        : models;
+      return c.html(<ModelGroupFormPage models={filtered} />);
     } catch (error: any) {
       return c.html(<ModelGroupFormPage models={[]} error={`加载配置失败：${error.message}`} />);
     }
@@ -85,12 +90,17 @@ export function createModelGroupFormRoute(deps: RouteDeps) {
     try {
       const proxyConfig = loadFullConfig(configPath);
       const group = proxyConfig.modelGroups?.find(g => g.name === name);
+      const filter = c.req.query('filter') || c.req.query('q') || c.req.query('search') || '';
+      const models = getVisibleModels(proxyConfig);
+      const filtered = filter
+        ? models.filter(m => `${m.customModel} ${m.desc || ''} ${m.provider || ''} ${m.realModel || ''}`.toLowerCase().includes(filter.toLowerCase()))
+        : models;
 
       if (!group) {
-        return c.html(<ModelGroupFormPage models={getVisibleModels(proxyConfig)} error={`未找到 Model Group：${name}`} isEdit />);
+        return c.html(<ModelGroupFormPage models={filtered} error={`未找到 Model Group：${name}`} isEdit />);
       }
 
-      return c.html(<ModelGroupFormPage models={getVisibleModels(proxyConfig)} group={group} isEdit />);
+      return c.html(<ModelGroupFormPage models={filtered} group={group} isEdit />);
     } catch (error: any) {
       return c.html(<ModelGroupFormPage models={[]} error={`加载配置失败：${error.message}`} isEdit />);
     }

@@ -300,6 +300,7 @@ export const ModelGroupsPage: FC<Props> = (props) => {
             padding: 0.25rem 0.6rem;
             border-radius: 5px;
             font-size: 0.75rem;
+            text-decoration: none;
             font-weight: 500;
           }
 
@@ -389,7 +390,7 @@ export const ModelGroupsPage: FC<Props> = (props) => {
                   {group.models.length > 0 && (
                     <div class="models-list">
                       {group.models.slice(0, 5).map((model) => (
-                        <span class="model-tag">{model}</span>
+                        <a class="model-tag" href={`/admin/models/edit/${encodeURIComponent(model)}`} title="编辑模型">{model}</a>
                       ))}
                       {group.models.length > 5 && (
                         <span class="model-tag">+{group.models.length - 5}</span>
