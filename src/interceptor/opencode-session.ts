@@ -197,7 +197,7 @@ function shouldIntercept(ctx: UpstreamInterceptorContext): boolean {
  *
  * 当 baseUrl 含 "opencode.ai" 时（全模型）：
  * - header 添加 x-opencode-session
- * - body 添加 prompt_cache_key
+ * - body 添加 prompt_cache_key（anthropic provider 除外：/v1/messages 严格校验，顶层多字段直接 400）
  *
  * Session 按客户端指纹三档管理（session 头 / stainless / IP+UA+user+realModel），20 分钟滑动过期。
  */
@@ -206,16 +206,19 @@ export const opencodeSessionInterceptor: UpstreamInterceptor = async (upstream, 
 
   const sessionId = getOrCreateSession(computeFingerprint(ctx))
 
+  // provider 类型决定出站 body 格式：anthropic 走 /v1/messages 格式，不支持 prompt_cache_key
+  const body =
+    ctx.provider.provider === 'anthropic'
+      ? upstream.body
+      : { ...upstream.body, prompt_cache_key: sessionId }
+
   return {
     ...upstream,
     headers: {
       ...upstream.headers,
       'x-opencode-session': sessionId,
     },
-    body: {
-      ...upstream.body,
-      prompt_cache_key: sessionId,
-    },
+    body,
   }
 }
 

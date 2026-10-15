@@ -210,6 +210,18 @@ describe('注入行为', () => {
   })
 })
 
+describe('anthropic provider 不注入 body', () => {
+  it('anthropic provider：只加 header，不加 prompt_cache_key', async () => {
+    const ctx = makeCtx({
+      provider: { ...makeCtx().provider, provider: 'anthropic', realModel: 'claude-haiku-5-5' } as any,
+    })
+    const upstream = makeUpstream({ url: 'https://opencode.ai/zen/go/v1/messages' })
+    const result = await opencodeSessionInterceptor(upstream, ctx)
+    expect(result.headers).toHaveProperty('x-opencode-session')
+    expect(result.body).not.toHaveProperty('prompt_cache_key')
+  })
+})
+
 describe('指纹分档', () => {
   it('同指纹 20 分钟内复用 session', async () => {
     const ctx = makeCtx()
