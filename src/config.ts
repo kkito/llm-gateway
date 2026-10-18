@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
+import { markSelfWrite } from './lib/config-watcher.js';
 
 export type ProviderType = 'openai' | 'anthropic' | 'response-api';
 
@@ -308,6 +309,7 @@ export function saveConfig(config: ProxyConfig, configPath: string): void {
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
   }
+  markSelfWrite();
   writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
 }
 

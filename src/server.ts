@@ -35,6 +35,7 @@ import { loadFullConfig } from './config.js';
 import { UsageTracker } from './lib/usage-tracker.js';
 
 import { createConfigContext } from './lib/config-context.js';
+import { watchConfigFile } from './lib/config-watcher.js';
 import { interceptors } from './interceptor/index.js'
 import { anthropicBillingCleaner } from './interceptor/anthropic-billing-cleaner.js'
 import { claudeCodeCache } from './interceptor/claude-code-cache.js'
@@ -76,6 +77,9 @@ export let cleanupInterval: ReturnType<typeof setInterval> | null = null;
 let sigintHandler: (() => void) | null = null;
 let sigtermHandler: (() => void) | null = null;
 
+// 配置文件热加载 watcher 的停止函数（非测试环境下挂载）
+let stopConfigWatcher: () => void = () => {};
+
 // 测试辅助函数：重置全局状态
 export function resetServerGlobalState(): void {
   hasSetupSignalHandlers = false;
@@ -96,6 +100,7 @@ export function resetServerGlobalState(): void {
   resetUsageApiTracker();
   DatabaseManager.resetInstance();
   RequestLogger.resetInstance();
+  stopConfigWatcher();
 }
 
 export function createServer(
@@ -191,6 +196,15 @@ export function createServer(
     detailLogger.setEnabled(resolveDetailLog(newConfig));
     console.log('✅ 配置已更新，当前模型数量:', newConfig.models.length);
   };
+
+  // 监听 config.json，支持手动改文件后热加载（仅非测试环境）
+  if (!isTestEnv) {
+    if (!existsSync(ctx.configPath)) {
+      stopConfigWatcher = () => {};
+    } else {
+      stopConfigWatcher = watchConfigFile(ctx.configPath, onConfigChange);
+    }
+  }
 
   // CORS 配置
   app.use('*', cors());
