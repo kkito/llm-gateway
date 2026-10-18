@@ -373,7 +373,7 @@ export function createServer(
 
   // API Keys 管理路由
   if (!isTestEnv) {
-    app.route('', createApiKeysRoute({ configPath: ctx.configPath }));
+    app.route('', createApiKeysRoute({ configPath: ctx.configPath, onConfigChange }));
   }
 
   // 模型列表 JSON 接口（OpenAI 兼容，/models 与 /v1/models）
@@ -428,7 +428,7 @@ export function createServer(
 
   // 用户管理路由
   if (!isTestEnv) {
-    app.route('', createUsersRoute(ctx.configPath));
+    app.route('', createUsersRoute({ configPath: ctx.configPath, onConfigChange }));
   }
 
   // 用户首页路由

@@ -80,7 +80,7 @@ describe('API Key management', () => {
       // 创建测试路由
       const app = new Hono();
       // 路由注册在 / 路径，因为路由文件内部已经定义了 /admin/api-keys
-      app.route('/', createApiKeysRoute({ configPath: testConfigPath }));
+      app.route('/', createApiKeysRoute({ configPath: testConfigPath, onConfigChange: () => {} }));
 
       // 模拟表单提交，不包含 provider 字段
       const formData = new URLSearchParams();

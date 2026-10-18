@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { loadFullConfig, getConfigPath, saveConfig } from '../../config.js';
+import type { ProxyConfig } from '../../config.js';
 import { generateUserApiKey } from '../../lib/apikey.js';
 import { UsersPage } from '../views/users.js';
 import { UserFormPage } from '../views/user-form.js';
@@ -7,7 +8,13 @@ import { UserFormPage } from '../views/user-form.js';
 // 存储禁用前的用户配置，用于恢复
 let disabledUserApiKeys: any[] = [];
 
-export function createUsersRoute(configPath?: string) {
+interface RouteDeps {
+  configPath?: string;
+  onConfigChange: (newConfig: ProxyConfig) => void;
+}
+
+export function createUsersRoute(deps: RouteDeps) {
+  const { configPath, onConfigChange } = deps;
   const app = new Hono();
 
   // 每次创建路由时重置状态（用于测试隔离）
@@ -100,6 +107,7 @@ export function createUsersRoute(configPath?: string) {
     }
     config.userApiKeys.push(newUser);
     saveConfig(config, getConfig());
+    onConfigChange(config);
 
     return c.redirect('/admin/users');
   });
@@ -120,6 +128,7 @@ export function createUsersRoute(configPath?: string) {
 
     config.userApiKeys.splice(index, 1);
     saveConfig(config, getConfig());
+    onConfigChange(config);
 
     return c.redirect('/admin/users');
   });
@@ -191,6 +200,7 @@ export function createUsersRoute(configPath?: string) {
     };
 
     saveConfig(config, getConfig());
+    onConfigChange(config);
     return c.redirect('/admin/users');
   });
 
@@ -213,6 +223,7 @@ export function createUsersRoute(configPath?: string) {
     }
 
     saveConfig(config, getConfig());
+    onConfigChange(config);
     return c.redirect('/admin/users');
   });
 

@@ -7,6 +7,7 @@ import { isPasswordConfigured, sessions } from '../middleware/auth.js';
 
 interface RouteDeps {
   configPath: string;
+  onConfigChange: (newConfig: ProxyConfig) => void;
 }
 
 // 认证检查辅助函数
@@ -29,7 +30,7 @@ function checkAuth(c: any): boolean {
 }
 
 export function createApiKeysRoute(deps: RouteDeps) {
-  const { configPath } = deps;
+  const { configPath, onConfigChange } = deps;
   const app = new Hono();
 
   // 需要认证的路由包装器
@@ -69,7 +70,9 @@ export function createApiKeysRoute(deps: RouteDeps) {
       const newKey = addApiKey(proxyConfig.apiKeys || [], name, key);
       const apiKeys = [...(proxyConfig.apiKeys || []), newKey];
 
-      saveConfig({ ...proxyConfig, apiKeys }, configPath);
+      const updatedConfig: ProxyConfig = { ...proxyConfig, apiKeys };
+      saveConfig(updatedConfig, configPath);
+      onConfigChange(updatedConfig);
 
       const updatedApiKeys = getApiKeyOptions(apiKeys);
       return c.html(<ApiKeysPage apiKeys={updatedApiKeys} success="API Key 添加成功" />);
@@ -138,6 +141,7 @@ export function createApiKeysRoute(deps: RouteDeps) {
       }
 
       saveConfig(updatedConfig, configPath);
+      onConfigChange(updatedConfig);
 
       const updatedApiKeys = getApiKeyOptions(apiKeys);
       return c.html(<ApiKeysPage apiKeys={updatedApiKeys} success="API Key 更新成功" />);
@@ -167,6 +171,7 @@ export function createApiKeysRoute(deps: RouteDeps) {
       }
 
       saveConfig(updatedConfig, configPath);
+      onConfigChange(updatedConfig);
 
       const updatedApiKeys = getApiKeyOptions(apiKeys);
       return c.html(<ApiKeysPage apiKeys={updatedApiKeys} success="API Key 已删除" />);
