@@ -6,6 +6,15 @@ import { join } from 'path';
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+// 轮询等待条件成立（fs.watch 在高负载下事件投递可能延迟，固定 sleep 易 flake）
+const waitFor = async (cond: () => boolean, timeoutMs = 5000, intervalMs = 100) => {
+  const start = Date.now();
+  while (!cond()) {
+    if (Date.now() - start > timeoutMs) break;
+    await wait(intervalMs);
+  }
+};
+
 describe('config-watcher', () => {
   const dir = join(tmpdir(), 'lgw-watcher-test-' + Date.now());
   const configPath = join(dir, 'config.json');
@@ -32,7 +41,7 @@ describe('config-watcher', () => {
     }, () => {});
 
     writeConfig('external');
-    await wait(700);
+    await waitFor(() => seen.includes('external'));
     stop();
 
     expect(seen).toContain('external');
@@ -56,7 +65,7 @@ describe('config-watcher', () => {
     const stop = watchConfigFile(configPath, () => { calls++; }, msg => warnings.push(msg));
 
     writeFileSync(configPath, '{ not valid json', 'utf-8');
-    await wait(700);
+    await waitFor(() => warnings.length > 0);
     stop();
 
     expect(calls).toBe(0);
