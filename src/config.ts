@@ -443,10 +443,26 @@ export function getApiKey(config: ApiKey[], id: string): ApiKey | null {
 }
 
 /**
- * 获取下拉选项（不返回 key 本身）
+ * API Key 列表/选项展示类型（不返回 key 明文，只返回脱敏提示）
  */
-export function getApiKeyOptions(config: ApiKey[]): Omit<ApiKey, 'key'>[] {
-  return config.map(({ key, ...rest }) => rest);
+export interface ApiKeyOption extends Omit<ApiKey, 'key'> {
+  keyHint: string;
+}
+
+/**
+ * 脱敏显示 API Key：前面显示 *****，只露出最后 4 位
+ */
+export function maskApiKey(key: string): string {
+  if (!key) return '*****';
+  const last4 = key.slice(-4);
+  return `*****${last4}`;
+}
+
+/**
+ * 获取下拉选项/列表展示（不返回 key 本身，只返回 keyHint 脱敏提示）
+ */
+export function getApiKeyOptions(config: ApiKey[]): ApiKeyOption[] {
+  return config.map(({ key, ...rest }) => ({ ...rest, keyHint: maskApiKey(key) }));
 }
 
 export function isApiKeyRef(apiKey: string): boolean {

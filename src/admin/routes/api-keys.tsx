@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { loadFullConfig, saveConfig, addApiKey, updateApiKey, deleteApiKey, getApiKey, getApiKeyOptions, type ApiKey } from '../../config.js';
+import { loadFullConfig, saveConfig, addApiKey, updateApiKey, deleteApiKey, getApiKey, getApiKeyOptions, maskApiKey, type ApiKey } from '../../config.js';
 import { renameApiKeyRefInConfig, removeApiKeyRefFromConfig } from '../../config-operations.js';
 import type { ProxyConfig } from '../../config.js';
 import { ApiKeysPage } from '../views/api-keys.js';
@@ -96,8 +96,8 @@ export function createApiKeysRoute(deps: RouteDeps) {
       }
 
       const apiKeys = getApiKeyOptions(proxyConfig.apiKeys || []);
-      const { key: _removed, ...editingKey } = apiKey;
-      return c.html(<ApiKeysPage apiKeys={apiKeys} editingKey={editingKey} />);
+      const { key, ...rest } = apiKey;
+      return c.html(<ApiKeysPage apiKeys={apiKeys} editingKey={{ ...rest, keyHint: maskApiKey(key) }} />);
     } catch (error: any) {
       const proxyConfig = loadFullConfig(configPath);
       const apiKeys = getApiKeyOptions(proxyConfig.apiKeys || []);
@@ -119,8 +119,8 @@ export function createApiKeysRoute(deps: RouteDeps) {
       if (!name) {
         const apiKeys = getApiKeyOptions(proxyConfig.apiKeys || []);
         if (currentApiKey) {
-          const { key: _removed, ...editingKey } = currentApiKey;
-          return c.html(<ApiKeysPage apiKeys={apiKeys} editingKey={editingKey} error="请填写所有必填字段" />);
+          const { key: _k, ...rest } = currentApiKey;
+          return c.html(<ApiKeysPage apiKeys={apiKeys} editingKey={{ ...rest, keyHint: maskApiKey(_k) }} error="请填写所有必填字段" />);
         }
         return c.html(<ApiKeysPage apiKeys={apiKeys} error="请填写所有必填字段" />);
       }
@@ -128,6 +128,7 @@ export function createApiKeysRoute(deps: RouteDeps) {
       const oldName = currentApiKey?.name;
 
       const updates: Partial<ApiKey> = { name };
+      // 编辑时输入框为空（hint 仅展示不回填），留空即不修改
       if (key) {
         updates.key = key;
       }

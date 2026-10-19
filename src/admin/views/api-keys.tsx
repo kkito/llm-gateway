@@ -1,12 +1,12 @@
 import { FC } from 'hono/jsx';
 import { TopbarNav } from '../components/TopbarNav.js';
-import type { ApiKey } from '../../config.js';
+import type { ApiKeyOption } from '../../config.js';
 
 interface Props {
-  apiKeys: Omit<ApiKey, 'key'>[];
+  apiKeys: ApiKeyOption[];
   error?: string;
   success?: string;
-  editingKey?: Omit<ApiKey, 'key'>;
+  editingKey?: Omit<ApiKeyOption, 'key'>;
 }
 
 export const ApiKeysPage: FC<Props> = (props) => {
@@ -390,6 +390,7 @@ export const ApiKeysPage: FC<Props> = (props) => {
                           <div class="key-icon">🔑</div>
                           <div class="key-name-block">
                             <div class="key-name">{key.name}</div>
+                            <div class="key-value" style="font-family: ui-monospace, monospace; font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.25rem;">{key.keyHint}</div>
                             <div class="key-date">创建于 {new Date(key.createdAt).toLocaleDateString('zh-CN', {year: 'numeric', month: '2-digit', day: '2-digit'})}</div>
                           </div>
                         </div>
@@ -442,15 +443,16 @@ export const ApiKeysPage: FC<Props> = (props) => {
 
                 <div class="form-group">
                   <label class="form-label" for="key">API Key</label>
+                  {isEditing && <span class="form-hint" style="margin-bottom: 0.4rem;">当前密钥：{props.editingKey?.keyHint}（仅显示后 4 位）</span>}
                   <input
                     class="form-input"
                     id="key"
                     name="key"
                     type="password"
-                    placeholder={isEditing ? '留空则保持原密钥不变' : '请输入 API Key'}
+                    placeholder={isEditing ? '留空则保持不变，输入新值即替换' : '请输入 API Key'}
                     required={!isEditing}
                   />
-                  {isEditing && <span class="form-hint">留空则保持原密钥不变</span>}
+                  {isEditing && <span class="form-hint">留空提交则不修改</span>}
                 </div>
 
                 <div class="form-actions">

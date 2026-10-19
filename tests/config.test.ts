@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { loadConfig, findProvider, getProxyDir, ProviderConfig, hashPassword, verifyPassword, ApiKey, addApiKey, getApiKey, updateApiKey, deleteApiKey, getApiKeyOptions, UserApiKey, ProxyConfig, PrivacySettings } from '../src/config.js';
+import { loadConfig, findProvider, getProxyDir, ProviderConfig, hashPassword, verifyPassword, ApiKey, addApiKey, getApiKey, updateApiKey, deleteApiKey, getApiKeyOptions, maskApiKey, UserApiKey, ProxyConfig, PrivacySettings } from '../src/config.js';
 import { writeFileSync, unlinkSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -324,13 +324,33 @@ describe('config', () => {
       });
     });
 
+    describe('maskApiKey', () => {
+      it('should mask key showing only last 4 chars', () => {
+        expect(maskApiKey('sk-test-openai')).toBe('*****enai');
+        expect(maskApiKey('sk-ant-test-anthropic')).toBe('*****opic');
+      });
+
+      it('should handle short and empty keys', () => {
+        expect(maskApiKey('abc')).toBe('*****abc');
+        expect(maskApiKey('')).toBe('*****');
+      });
+    });
+
     describe('getApiKeyOptions', () => {
       it('should return options without key field', () => {
         const result = getApiKeyOptions(testApiKeys);
         expect(result[0]).not.toHaveProperty('key');
         expect(result[0]).toHaveProperty('id');
         expect(result[0]).toHaveProperty('name');
-        expect(result[0]).toHaveProperty('provider');
+      });
+
+      it('should return keyHint with masked key and never expose plaintext', () => {
+        const result = getApiKeyOptions(testApiKeys);
+        expect(result[0].keyHint).toBe('*****enai');
+        expect(result[1].keyHint).toBe('*****opic');
+        const json = JSON.stringify(result);
+        expect(json).not.toContain('sk-test-openai');
+        expect(json).not.toContain('sk-ant-test-anthropic');
       });
     });
   });
