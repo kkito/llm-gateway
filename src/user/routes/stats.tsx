@@ -3,7 +3,10 @@ import { StatsView } from '../views/stats.js';
 import { getCurrentUser } from '../middleware/auth.js';
 import { loadFullConfig } from '../../config.js';
 import { DatabaseManager } from '../../lib/db.js';
-import { localDateToUtcRangeTz, getLocalToday } from '../../lib/time-utils.js';
+import { localDateToUtcRangeTz, getLocalToday, localDateToUtcMs, utcToLocalDate, addLocalDays } from '../../lib/time-utils.js';
+
+/** 每日 Token 热力图覆盖的天数（含今天），与 admin 端保持一致 */
+export const HEATMAP_DAYS = 182;
 
 export { StatsView };
 
@@ -127,6 +130,52 @@ export function createStatsRoute(configPath?: string) {
       totalTokens: number;
     }>;
 
+    // 3.5 每日 Token 热力图：过去 HEATMAP_DAYS 天的本地日粒度聚合
+    // 按小时查全量再用 utcToLocalDate 归并到用户本地日期，避免 UTC 按天 GROUP BY 的跨天偏移
+    const heatmapStartLocal = addLocalDays(localToday, -(HEATMAP_DAYS - 1));
+    const heatmapUtcStart = new Date(localDateToUtcMs(heatmapStartLocal, timezone)).toISOString();
+    const heatmapBaseParams = selectedModel
+      ? [userName, heatmapUtcStart, utcEnd, selectedModel]
+      : [userName, heatmapUtcStart, utcEnd];
+    const byDateHourRows = db.prepare(`
+      SELECT
+        strftime('%Y-%m-%d %H:00', timestamp) AS hour,
+        COUNT(*) AS requests,
+        COALESCE(SUM(total_tokens), 0) AS totalTokens
+      FROM requests
+      WHERE user_name = ?
+        AND timestamp >= ? AND timestamp <= ?
+        ${modelCondition}
+      GROUP BY hour
+      ORDER BY hour ASC
+    `).all(...heatmapBaseParams) as Array<{
+      hour: string;
+      requests: number;
+      totalTokens: number;
+    }>;
+    const heatmapTotals = new Map<string, { requests: number; totalTokens: number }>();
+    for (const row of byDateHourRows) {
+      const localDate = utcToLocalDate(row.hour.replace(' ', 'T') + ':00.000Z', timezone);
+      const entry = heatmapTotals.get(localDate) || { requests: 0, totalTokens: 0 };
+      entry.requests += row.requests;
+      entry.totalTokens += row.totalTokens;
+      heatmapTotals.set(localDate, entry);
+    }
+    const byDate: Array<{
+      date: string;
+      requests: number;
+      successful: number;
+      failed: number;
+      inputTokens: number;
+      outputTokens: number;
+      totalTokens: number;
+    }> = [];
+    for (let i = 0; i < HEATMAP_DAYS; i++) {
+      const date = addLocalDays(heatmapStartLocal, i);
+      const entry = heatmapTotals.get(date);
+      byDate.push({ date, requests: entry?.requests || 0, successful: 0, failed: 0, inputTokens: 0, outputTokens: 0, totalTokens: entry?.totalTokens || 0 });
+    }
+
     // 4. 分页列表
     const recentRequests = db.prepare(`
       SELECT
@@ -190,6 +239,7 @@ export function createStatsRoute(configPath?: string) {
       overview={overview}
       byModel={byModel}
       byHour={byHour}
+      byDate={byDate}
       recentRequests={recentRequests}
       userName={userName}
       startDate={displayStart}

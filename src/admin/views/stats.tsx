@@ -54,8 +54,14 @@ interface RecentRequestEntry {
   errorMessage: string | null;
 }
 
+interface HeatmapDay {
+  date: string;
+  requests: number;
+  totalTokens: number;
+}
+
 interface Props {
-  stats: Stats;
+  stats: Stats & { dailyHeatmap?: HeatmapDay[]; heatmapStart?: string; heatmapEnd?: string };
   dateRange: string;
   currentType: 'today' | 'date' | 'week' | 'month';
   currentValue: string;
@@ -416,6 +422,32 @@ export const StatsPage: FC<Props> = (props) => {
             font-size: 0.8rem;
             color: var(--text-secondary);
             margin-top: 0.15rem;
+          }
+
+          /* ───── 每日热力图 ───── */
+          .heatmap-scroll { overflow-x: auto; padding-bottom: 0.5rem; }
+          .heatmap-grid { display: flex; gap: 3px; width: 100%; }
+          .heatmap-col { display: flex; flex-direction: column; gap: 3px; flex: 1 1 0; min-width: 0; }
+          .heatmap-months { display: flex; gap: 3px; width: 100%; }
+          .heatmap-months > span { flex: 1 1 0; min-width: 0; overflow: hidden; white-space: nowrap; }
+          .heatmap-cell {
+            width: 100%; aspect-ratio: 1 / 1; border-radius: 2px;
+            background: #ebedf0;
+            min-width: 0; display: block;
+          }
+          .heatmap-legend {
+            display: flex; align-items: center; gap: 4px;
+            font-size: 0.75rem; color: var(--text-secondary);
+            margin-top: 0.75rem;
+          }
+          .heatmap-legend .heatmap-cell { width: 11px; height: 11px; flex: none; aspect-ratio: auto; }
+          .heatmap-tip {
+            position: fixed; z-index: 9999; pointer-events: none;
+            background: #1a1d26; color: #fff;
+            font-size: 0.75rem; font-weight: 500; line-height: 1.5;
+            padding: 0.35rem 0.6rem; border-radius: 6px;
+            white-space: nowrap; display: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
           }
 
           /* ───── 统计表格卡片 ───── */
@@ -912,6 +944,70 @@ export const StatsPage: FC<Props> = (props) => {
             </div>
           </div>
 
+          {/* 每日 Token 热力图（GitHub 风格） */}
+          {stats.dailyHeatmap && stats.dailyHeatmap.length > 0 && (() => {
+            const days = stats.dailyHeatmap!;
+            const maxTokens = Math.max(1, ...days.map(d => d.totalTokens));
+            const levelOf = (t: number) => t <= 0 ? 0 : t < maxTokens * 0.25 ? 1 : t < maxTokens * 0.5 ? 2 : t < maxTokens * 0.75 ? 3 : 4;
+            const colors = ['#ebedf0', '#9be9a8', '#40c463', '#30a14e', '#216e39'];
+            const start = new Date(stats.heatmapStart + 'T00:00:00');
+            // 首列补齐到周日（GitHub 列=周，行=周日..周六）
+            const leadBlanks = start.getDay();
+            const cells: Array<{ key: string; date?: string; requests?: number; totalTokens?: number }> = [];
+            for (let i = 0; i < leadBlanks; i++) cells.push({ key: `blank-${i}` });
+            days.forEach(d => cells.push({ key: d.date, date: d.date, requests: d.requests, totalTokens: d.totalTokens }));
+            // 按周分列：每列 7 天（行=周日..周六），列数自适应、flex 均分撑满宽度
+            const weeks: Array<typeof cells> = [];
+            for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+            const monthLabels: Array<{ col: number; label: string }> = [];
+            let lastMonth = '';
+            weeks.forEach((week, col) => {
+              const first = week.find(c => c.date);
+              if (!first?.date) return;
+              const m = first.date.slice(0, 7);
+              if (m !== lastMonth) { lastMonth = m; monthLabels.push({ col, label: `${Number(first.date.slice(5, 7))}月` }); }
+            });
+            const totalHeatTokens = days.reduce((s, d) => s + d.totalTokens, 0);
+            return (
+              <div class="stats-section-card">
+                <h2 class="stats-section-title">🗓️ 每日 Token 消耗</h2>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+                  过去 {days.length} 天 · 共 {formatNumber(totalHeatTokens)} tokens{stats.heatmapStart && stats.heatmapEnd ? ` · ${stats.heatmapStart} ~ ${stats.heatmapEnd}` : ''}
+                </div>
+                <div class="heatmap-scroll" data-heatmap-scroll>
+                  <div class="heatmap-months" style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginBottom: '2px' }}>
+                    {weeks.map((_, col) => {
+                      const lbl = monthLabels.find(l => l.col === col);
+                      return <span key={col}>{lbl ? lbl.label : ''}</span>;
+                    })}
+                  </div>
+                  <div class="heatmap-grid" data-heatmap-grid>
+                    {weeks.map((week, col) => (
+                      <div class="heatmap-col" key={col}>
+                        {week.map(c => c.date ? (
+                          <span
+                            class="heatmap-cell"
+                            data-tip={`${c.date} · ${c.requests} 次请求 · ${formatNumber(c.totalTokens!)} tokens`}
+                            style={{ background: colors[levelOf(c.totalTokens!)] }}
+                          />
+                        ) : (
+                          <span class="heatmap-cell" style={{ visibility: 'hidden' }} />
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                  <div class="heatmap-legend">
+                    <span>Less</span>
+                    {colors.map(c => <span class="heatmap-cell" style={{ background: c }} />)}
+                    <span>More</span>
+                    <span style={{ marginLeft: '0.5rem' }}>深浅按当日 token 量相对最大值划分</span>
+                  </div>
+                </div>
+                <div style={{ display: 'none' }} data-heatmap-max={maxTokens} data-heatmap-days={days.length}>heatmap:{days.filter(d => d.totalTokens > 0).length}/{days.length} active days, peak {formatNumber(maxTokens)} tokens</div>
+              </div>
+            );
+          })()}
+
           {/* 按模型统计 - 卡片列表 */}
           <div class="stats-section-card">
             <h2 class="stats-section-title">🤖 按模型统计</h2>
@@ -1165,7 +1261,27 @@ export const StatsPage: FC<Props> = (props) => {
     return false;
   };
 
-  // ─── 3. 将按小时分布的 UTC 时间重新聚合为本地时间 ───
+  // ─── 3. 热力图：自适应撑满宽度 + 自定义 tooltip ───
+  var heatGrid = document.querySelector('[data-heatmap-grid]');
+  if (heatGrid) {
+    var tip = document.createElement('div');
+    tip.className = 'heatmap-tip';
+    document.body.appendChild(tip);
+    heatGrid.addEventListener('mousemove', function(e) {
+      var t = e.target.closest ? e.target.closest('[data-tip]') : null;
+      if (!t) { tip.style.display = 'none'; return; }
+      tip.textContent = t.getAttribute('data-tip');
+      tip.style.display = 'block';
+      var x = Math.min(e.clientX + 12, window.innerWidth - tip.offsetWidth - 8);
+      var y = e.clientY - tip.offsetHeight - 10;
+      if (y < 0) y = e.clientY + 14;
+      tip.style.left = x + 'px';
+      tip.style.top = y + 'px';
+    });
+    heatGrid.addEventListener('mouseleave', function() { tip.style.display = 'none'; });
+  }
+
+  // ─── 4. 将按小时分布的 UTC 时间重新聚合为本地时间 ───
   var hourBars = document.querySelectorAll('[data-hour-utc]');
   if (hourBars.length > 0) {
     var localBuckets = {};
