@@ -198,6 +198,45 @@ export function createStatsApiRoute() {
         };
       }
 
+      // 按日期分布（UTC 日期分组）
+      const byDateRows = db.prepare(`
+        SELECT
+          strftime('%Y-%m-%d', timestamp) AS date,
+          COUNT(*) AS requests,
+          COALESCE(SUM(CASE WHEN status_code >= 200 AND status_code < 300 THEN 1 ELSE 0 END), 0) AS successful,
+          COALESCE(SUM(CASE WHEN status_code >= 400 THEN 1 ELSE 0 END), 0) AS failed,
+          COALESCE(SUM(prompt_tokens), 0) AS inputTokens,
+          COALESCE(SUM(completion_tokens), 0) AS outputTokens,
+          COALESCE(SUM(total_tokens), 0) AS totalTokens,
+          COALESCE(SUM(cached_tokens), 0) AS cachedTokens
+        FROM requests
+        WHERE ${whereClause}
+        GROUP BY date
+        ORDER BY date ASC
+      `).all(...params) as Array<{
+        date: string;
+        requests: number;
+        successful: number;
+        failed: number;
+        inputTokens: number;
+        outputTokens: number;
+        totalTokens: number;
+        cachedTokens: number;
+      }>;
+
+      const byDate: Record<string, any> = {};
+      for (const row of byDateRows) {
+        byDate[row.date] = {
+          requests: row.requests,
+          successful: row.successful,
+          failed: row.failed,
+          inputTokens: row.inputTokens,
+          outputTokens: row.outputTokens,
+          totalTokens: row.totalTokens,
+          cachedTokens: row.cachedTokens,
+        };
+      }
+
       const stats = {
         totalRequests: overview.totalRequests,
         successfulRequests: overview.successfulRequests,
@@ -209,6 +248,7 @@ export function createStatsApiRoute() {
         totalTokens: overview.totalTokens,
         totalCachedTokens: overview.totalCachedTokens,
         byHour,
+        byDate,
       };
 
       return c.json({

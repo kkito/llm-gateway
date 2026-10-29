@@ -24,6 +24,16 @@ export interface ModelStatsEntry {
   avgDuration: number;
 }
 
+export interface DayStatsEntry {
+  date: string;
+  requests: number;
+  successful: number;
+  failed: number;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+}
+
 export interface HourStatsEntry {
   hour: string;
   requests: number;
@@ -57,6 +67,7 @@ export interface StatsViewProps {
   overview: OverviewStats;
   byModel: ModelStatsEntry[];
   byHour: HourStatsEntry[];
+  byDate?: DayStatsEntry[];
   recentRequests: RecentRequestEntry[];
   userName: string;
   startDate: string;

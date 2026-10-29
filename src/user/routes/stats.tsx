@@ -127,6 +127,32 @@ export function createStatsRoute(configPath?: string) {
       totalTokens: number;
     }>;
 
+    // 3.5 按日期分布（UTC 日期分组；视图内客户端 JS 会按本地时区重聚合并渲染热力图）
+    const byDate = db.prepare(`
+      SELECT
+        strftime('%Y-%m-%d', timestamp) AS date,
+        COUNT(*) AS requests,
+        SUM(CASE WHEN status_code >= 200 AND status_code < 300 THEN 1 ELSE 0 END) AS successful,
+        SUM(CASE WHEN status_code >= 400 THEN 1 ELSE 0 END) AS failed,
+        COALESCE(SUM(prompt_tokens), 0) AS inputTokens,
+        COALESCE(SUM(completion_tokens), 0) AS outputTokens,
+        COALESCE(SUM(total_tokens), 0) AS totalTokens
+      FROM requests
+      WHERE user_name = ?
+        AND timestamp >= ? AND timestamp <= ?
+        ${modelCondition}
+      GROUP BY date
+      ORDER BY date ASC
+    `).all(...baseParams) as Array<{
+      date: string;
+      requests: number;
+      successful: number;
+      failed: number;
+      inputTokens: number;
+      outputTokens: number;
+      totalTokens: number;
+    }>;
+
     // 4. 分页列表
     const recentRequests = db.prepare(`
       SELECT
@@ -190,6 +216,7 @@ export function createStatsRoute(configPath?: string) {
       overview={overview}
       byModel={byModel}
       byHour={byHour}
+      byDate={byDate}
       recentRequests={recentRequests}
       userName={userName}
       startDate={displayStart}
