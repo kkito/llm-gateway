@@ -1,8 +1,11 @@
 import { Hono } from 'hono';
 import { StatsPage } from '../views/stats.js';
 import { DatabaseManager } from '../../lib/db.js';
-import { localDateToUtcRangeTz, getLocalToday } from '../../lib/time-utils.js';
+import { localDateToUtcRangeTz, getLocalToday, localDateToUtcMs, utcToLocalDate, addLocalDays } from '../../lib/time-utils.js';
 import { loadFullConfig } from '../../config.js';
+
+/** 每日 Token 热力图覆盖的天数（含今天，GitHub 风格约半年） */
+export const HEATMAP_DAYS = 182;
 
 export function createStatsRoute(configPath?: string) {
   const app = new Hono();
@@ -188,7 +191,7 @@ export function createStatsRoute(configPath?: string) {
         };
       }
 
-      // 4.5 按日期分布（UTC 日期分组；视图内客户端 JS 会按本地时区重聚合并渲染热力图）
+      // 4.5 按日期分布（UTC 日期分组；仅供当前筛选范围内的日期表格使用）
       const byDateRows = db.prepare(`
         SELECT
           strftime('%Y-%m-%d', timestamp) AS date,
@@ -225,6 +228,47 @@ export function createStatsRoute(configPath?: string) {
           totalTokens: row.totalTokens,
           cachedTokens: row.cachedTokens,
         };
+      }
+
+      // 4.6 每日 Token 热力图：过去 HEATMAP_DAYS 天（含今天）的本地日粒度聚合
+      // 按小时查全量再用 utcToLocalDate 归并到用户本地日期，避免 UTC 按天 GROUP BY 的跨天偏移
+      const heatmapConditions: string[] = ['timestamp >= ?', 'timestamp <= ?'];
+      const heatmapParams: any[] = [];
+      const heatmapStartLocal = addLocalDays(localToday, -(HEATMAP_DAYS - 1));
+      const heatmapUtcStart = new Date(localDateToUtcMs(heatmapStartLocal, timezone)).toISOString();
+      heatmapParams.push(heatmapUtcStart, utcEnd);
+      if (selectedUser) {
+        heatmapConditions.push('user_name = ?');
+        heatmapParams.push(selectedUser);
+      }
+      if (selectedModel) {
+        heatmapConditions.push('(custom_model = ? OR model_group = ?)');
+        heatmapParams.push(selectedModel, selectedModel);
+      }
+      const heatmapWhere = heatmapConditions.join(' AND ');
+      const heatmapHourRows = db.prepare(`
+        SELECT
+          strftime('%Y-%m-%d %H:00', timestamp) AS hour,
+          COUNT(*) AS requests,
+          COALESCE(SUM(total_tokens), 0) AS totalTokens
+        FROM requests
+        WHERE ${heatmapWhere}
+        GROUP BY hour
+        ORDER BY hour ASC
+      `).all(...heatmapParams) as Array<{ hour: string; requests: number; totalTokens: number }>;
+      const heatmapTotals = new Map<string, { requests: number; totalTokens: number }>();
+      for (const row of heatmapHourRows) {
+        const localDate = utcToLocalDate(row.hour.replace(' ', 'T') + ':00.000Z', timezone);
+        const entry = heatmapTotals.get(localDate) || { requests: 0, totalTokens: 0 };
+        entry.requests += row.requests;
+        entry.totalTokens += row.totalTokens;
+        heatmapTotals.set(localDate, entry);
+      }
+      const dailyHeatmap: Array<{ date: string; requests: number; totalTokens: number }> = [];
+      for (let i = 0; i < HEATMAP_DAYS; i++) {
+        const date = addLocalDays(heatmapStartLocal, i);
+        const entry = heatmapTotals.get(date);
+        dailyHeatmap.push({ date, requests: entry?.requests || 0, totalTokens: entry?.totalTokens || 0 });
       }
 
       // 5. 分页请求列表
@@ -336,6 +380,9 @@ export function createStatsRoute(configPath?: string) {
         totalCachedTokens: overview.totalCachedTokens,
         byHour,
         byDate,
+        dailyHeatmap,
+        heatmapStart: heatmapStartLocal,
+        heatmapEnd: localToday,
       };
 
       return c.html(

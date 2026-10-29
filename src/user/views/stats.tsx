@@ -397,6 +397,26 @@ const styles = `
 .model-card-failed { color: #dc2626; }
 .model-card-tokens { color: var(--text-secondary); }
 
+/* ───── 每日热力图 ───── */
+.heatmap-scroll { overflow-x: auto; padding-bottom: 0.5rem; }
+.heatmap-grid { display: flex; gap: 3px; width: 100%; }
+.heatmap-col { display: flex; flex-direction: column; gap: 3px; flex: 1 1 0; min-width: 0; }
+.heatmap-cell { width: 100%; aspect-ratio: 1 / 1; border-radius: 2px; background: #ebedf0; min-width: 0; display: block; }
+.heatmap-legend {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 0.75rem; color: var(--text-secondary);
+  margin-top: 0.75rem;
+}
+.heatmap-legend .heatmap-cell { width: 11px; height: 11px; flex: none; aspect-ratio: auto; }
+.heatmap-tip {
+  position: fixed; z-index: 9999; pointer-events: none;
+  background: #1a1d26; color: #fff;
+  font-size: 0.75rem; font-weight: 500; line-height: 1.5;
+  padding: 0.35rem 0.6rem; border-radius: 6px;
+  white-space: nowrap; display: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+}
+
 /* ───── 小时分布 ───── */
 .hour-item {
   display: flex;
@@ -665,6 +685,52 @@ export const StatsView: FC<StatsViewProps> = (props) => {
             )}
           </div>
 
+          {/* 每日 Token 热力图（GitHub 风格） */}
+          {props.byDate && props.byDate.length > 0 && (() => {
+            const days = [...props.byDate!].sort((a, b) => a.date.localeCompare(b.date));
+            const maxTokens = Math.max(1, ...days.map(d => d.totalTokens));
+            const levelOf = (t: number) => t <= 0 ? 0 : t < maxTokens * 0.25 ? 1 : t < maxTokens * 0.5 ? 2 : t < maxTokens * 0.75 ? 3 : 4;
+            const colors = ['#ebedf0', '#9be9a8', '#40c463', '#30a14e', '#216e39'];
+            const start = new Date(days[0].date + 'T00:00:00');
+            const leadBlanks = start.getDay();
+            const cells: Array<{ key: string; date?: string; requests?: number; totalTokens?: number }> = [];
+            for (let i = 0; i < leadBlanks; i++) cells.push({ key: `blank-${i}` });
+            days.forEach(d => cells.push({ key: d.date, date: d.date, requests: d.requests, totalTokens: d.totalTokens }));
+            const weeks: Array<typeof cells> = [];
+            for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+            const totalHeatTokens = days.reduce((s, d) => s + d.totalTokens, 0);
+            return (
+              <div class="section-card">
+                <h2 class="section-card-title">🗓️ 每日 Token 消耗</h2>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+                  过去 {days.length} 天 · 共 {formatNumber(totalHeatTokens)} tokens
+                </div>
+                <div class="heatmap-scroll" data-heatmap-scroll>
+                  <div class="heatmap-grid" data-heatmap-grid>
+                    {weeks.map((week, col) => (
+                      <div class="heatmap-col" key={col}>
+                        {week.map(c => c.date ? (
+                          <span
+                            class="heatmap-cell"
+                            data-tip={`${c.date} · ${c.requests} 次请求 · ${formatNumber(c.totalTokens!)} tokens`}
+                            style={{ background: colors[levelOf(c.totalTokens!)] }}
+                          />
+                        ) : (
+                          <span class="heatmap-cell" style={{ visibility: 'hidden' }} />
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                  <div class="heatmap-legend">
+                    <span>Less</span>
+                    {colors.map(c => <span class="heatmap-cell" style={{ background: c }} />)}
+                    <span>More</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* 小时分布 */}
           <div class="section-card">
             <h2 class="section-card-title">🕐 小时分布</h2>
@@ -840,6 +906,26 @@ export const StatsView: FC<StatsViewProps> = (props) => {
     if (isNaN(d.getTime())) return;
     el.textContent = pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
   });
+
+  // ─── 3.5 热力图：自适应撑满宽度 + 自定义 tooltip ───
+  var heatGrid = document.querySelector('[data-heatmap-grid]');
+  if (heatGrid) {
+    var tip = document.createElement('div');
+    tip.className = 'heatmap-tip';
+    document.body.appendChild(tip);
+    heatGrid.addEventListener('mousemove', function(e) {
+      var t = e.target.closest ? e.target.closest('[data-tip]') : null;
+      if (!t) { tip.style.display = 'none'; return; }
+      tip.textContent = t.getAttribute('data-tip');
+      tip.style.display = 'block';
+      var x = Math.min(e.clientX + 12, window.innerWidth - tip.offsetWidth - 8);
+      var y = e.clientY - tip.offsetHeight - 10;
+      if (y < 0) y = e.clientY + 14;
+      tip.style.left = x + 'px';
+      tip.style.top = y + 'px';
+    });
+    heatGrid.addEventListener('mouseleave', function() { tip.style.display = 'none'; });
+  }
 
   // ─── 4. Re-aggregate hour distribution by local hour ───
   var hourBars = document.querySelectorAll('[data-hour-utc]');

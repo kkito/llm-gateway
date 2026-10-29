@@ -173,6 +173,32 @@ export function localDateToUtcMs(localDate: string, timeZone: string): number {
 }
 
 /**
+ * 将 UTC ISO 时间戳转为指定 IANA 时区的本地日期 "YYYY-MM-DD"
+ *
+ * 用于服务端按本地天聚合（如每日 Token 热力图）：把 UTC 小时桶
+ * 精确归属到用户本地日期，避免按 UTC 日期 GROUP BY 导致的跨天偏移。
+ *
+ * @param utcIso UTC ISO 字符串（如 "2026-08-29T02:00:00.000Z"，小时桶传整点即可）
+ * @param timeZone IANA 时区名，无效时退回到 "UTC"
+ */
+export function utcToLocalDate(utcIso: string, timeZone: string): string {
+  const tz = isValidTimeZone(timeZone) ? timeZone : 'UTC';
+  const [y, m, d] = formatTzDate(new Date(utcIso).getTime(), getTzFormat(tz));
+  return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
+/**
+ * 将本地日期加减天数（纯日历运算，不涉及时区）
+ */
+export function addLocalDays(localDate: string, days: number): string {
+  const [y, m, d] = localDate.split('-').map(Number);
+  const ms = Date.UTC(y, m - 1, d) + days * 86400000;
+  const dt = new Date(ms);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth() + 1)}-${pad(dt.getUTCDate())}`;
+}
+
+/**
  * 将 IANA 时区下的本地日期转为 UTC 日期范围
  *
  * @param localDate 本地日期 "YYYY-MM-DD"
