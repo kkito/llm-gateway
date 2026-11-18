@@ -6,6 +6,7 @@ import type { RequestLogger } from '../../lib/request-logger.js';
 import { handleMessagesNonStream } from './non-stream-handler.js';
 import { handleStream as handleMessagesStream } from './stream-handler.js';
 import { restorePaths } from '../../privacy/sanitizer.js';
+import { getClientIp } from '../../lib/client-ip.js';
 
 export interface ProcessMsgResponseOptions {
   c: any;
@@ -60,7 +61,8 @@ export async function processMessagesSuccess(options: ProcessMsgResponseOptions)
     statusCode: response.status,
     durationMs: Date.now() - startTime,
     isStreaming: stream,
-    userName: currentUser?.name
+    userName: currentUser?.name,
+    clientIp: getClientIp(c)
   };
 
   // Auth check

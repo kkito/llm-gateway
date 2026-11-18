@@ -6,6 +6,7 @@ import type { RequestLogger } from '../../lib/request-logger.js';
 import { handleResponsesNonStream } from './non-stream-handler.js';
 import { handleStream as handleResponsesStream } from './stream-handler.js';
 import { restorePaths } from '../../privacy/sanitizer.js';
+import { getClientIp } from '../../lib/client-ip.js';
 
 export interface ProcessResponsesOptions {
   c: any;
@@ -60,7 +61,8 @@ export async function processResponsesSuccess(options: ProcessResponsesOptions):
     statusCode: response.status,
     durationMs: Date.now() - startTime,
     isStreaming: stream,
-    userName: currentUser?.name
+    userName: currentUser?.name,
+    clientIp: getClientIp(c)
   };
 
   // Auth check

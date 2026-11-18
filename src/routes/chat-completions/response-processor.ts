@@ -6,6 +6,7 @@ import type { RequestLogger } from '../../lib/request-logger.js';
 import { handleNonStream } from './non-stream-handler.js';
 import { handleStream } from './stream-handler.js';
 import { restorePaths } from '../../privacy/sanitizer.js';
+import { getClientIp } from '../../lib/client-ip.js';
 
 export async function processSuccessfulResponse(
   c: any,
@@ -39,7 +40,8 @@ export async function processSuccessfulResponse(
     statusCode: response.status,
     durationMs: Date.now() - startTime,
     isStreaming: stream,
-    userName: currentUser?.name
+    userName: currentUser?.name,
+    clientIp: getClientIp(c)
   };
 
   // Auth check
