@@ -17,6 +17,7 @@ export interface LogEntry {
   totalTokens?: number;
   cachedTokens?: number;
   userName?: string;
+  clientIp?: string | null;
   modelGroup?: string;       // 新增：请求的模型组名
   actualModel?: string;      // 新增：实际使用的模型
   triedModels?: Array<{      // 新增：尝试过的模型列表
