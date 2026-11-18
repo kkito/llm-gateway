@@ -91,4 +91,18 @@ describe('SQLite request logging integration', () => {
 
     requestLogger.stop();
   });
+  it('should create client_ip column and index via migration', () => {
+    const dbManager = DatabaseManager.getInstance(testDir);
+    dbManager.initialize();
+
+    const db = dbManager.getDb();
+    const cols = db.prepare('PRAGMA table_info(requests)').all() as Array<{ name: string }>;
+    expect(cols.map(c => c.name)).toContain('client_ip');
+
+    const indexes = db.prepare('PRAGMA index_list(requests)').all() as Array<{ name: string }>;
+    expect(indexes.map(i => i.name)).toContain('idx_client_ip');
+
+    dbManager.close();
+  });
+
 });

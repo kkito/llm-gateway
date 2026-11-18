@@ -7,6 +7,7 @@ export const requests = sqliteTable('requests', {
   createdAt: integer('created_at').notNull(),
 
   userName: text('user_name'),
+  clientIp: text('client_ip'),
 
   customModel: text('custom_model'),
   realModel: text('real_model'),
@@ -33,6 +34,7 @@ export const requests = sqliteTable('requests', {
 }, (t) => [
   index('idx_timestamp').on(t.timestamp),
   index('idx_user_name').on(t.userName),
+  index('idx_client_ip').on(t.clientIp),
   index('idx_custom_model').on(t.customModel),
   index('idx_created_at').on(t.createdAt),
 ]);

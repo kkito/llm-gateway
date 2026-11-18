@@ -85,6 +85,7 @@ export class DatabaseManager {
           timestamp TEXT NOT NULL,
           created_at INTEGER NOT NULL,
           user_name TEXT,
+          client_ip TEXT,
           custom_model TEXT,
           real_model TEXT,
           provider TEXT,
@@ -108,6 +109,7 @@ export class DatabaseManager {
       this.db.exec(`
         CREATE INDEX IF NOT EXISTS idx_timestamp ON requests(timestamp);
         CREATE INDEX IF NOT EXISTS idx_user_name ON requests(user_name);
+        CREATE INDEX IF NOT EXISTS idx_client_ip ON requests(client_ip);
         CREATE INDEX IF NOT EXISTS idx_custom_model ON requests(custom_model);
         CREATE INDEX IF NOT EXISTS idx_created_at ON requests(created_at);
       `);
@@ -121,6 +123,8 @@ export class DatabaseManager {
       const names = new Set(cols.map(c => c.name));
       if (!names.has('ttft_ms')) this.db.exec('ALTER TABLE requests ADD COLUMN ttft_ms INTEGER');
       if (!names.has('tps')) this.db.exec('ALTER TABLE requests ADD COLUMN tps REAL');
+      if (!names.has('client_ip')) this.db.exec('ALTER TABLE requests ADD COLUMN client_ip TEXT');
+      this.db.exec('CREATE INDEX IF NOT EXISTS idx_client_ip ON requests(client_ip)');
     } catch {
       // ignore
     }
