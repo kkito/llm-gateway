@@ -397,7 +397,6 @@ export function createChatCompletionsHandler(
         durationMs: Date.now() - startTime,
         isStreaming: false,
         userName: currentUser?.name,
-        clientIp,
         error: { message: error.message || 'Internal error', type: error.name }
       });
       if (requestLogger) {

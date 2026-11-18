@@ -268,7 +268,6 @@ function handleConvertedStream(options: StreamHandlerOptions, plan: ReturnType<t
               requestLogger.log({
                 requestId: logEntry.requestId,
                 clientIp: logEntry.clientIp,
-            clientIp: logEntry.clientIp,
                 timestamp: logEntry.timestamp,
                 userName: currentUser?.name ?? undefined,
                 customModel: logEntry.customModel,

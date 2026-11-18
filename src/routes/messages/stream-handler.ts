@@ -135,7 +135,6 @@ export function handleStream(options: StreamHandlerOptions): Response {
               requestLogger.log({
                 requestId: logEntry.requestId,
                 clientIp: logEntry.clientIp,
-            clientIp: logEntry.clientIp,
                 timestamp: logEntry.timestamp,
                 userName: currentUser?.name ?? undefined,
                 customModel: logEntry.customModel,
