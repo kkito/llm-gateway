@@ -1,13 +1,8 @@
 # 记录客户端来源 IP — 设计文档
 
-日期：2026-11-18
-状态：已与用户确认设计
+## 需求
 
-## 背景
-
-线上 macmini 部署（4000 端口）的 LLM Gateway 没有记录客户端 IP。2026-11-17 出现大量 `deepseek-v4.1-flash` 请求时，`proxy-2026-11-17.log` 和 `gateway.db` 均无法回答请求来自哪个 IP，只能从入口侧（frp/Cloudflare）排查。
-
-现有代码在拦截器上下文中已经计算 `clientIp`（`x-forwarded-for` → `x-real-ip`），但只用于 opencode session 指纹，没有落盘。
+网关需要记录每次代理请求的客户端来源 IP，以便后续追溯请求来源。
 
 ## 目标
 
@@ -20,7 +15,7 @@
 非目标：
 
 - 不记录到 detail logger（`detailLogEnabled=false` 时无详细日志）。
-- 不引入可信代理白名单配置（当前部署直接信任代理头）。
+- 不引入可信代理白名单配置（直接信任代理头）。
 - 不回填历史数据（历史行 `client_ip` 为 NULL）。
 
 ## 架构与组件
@@ -101,7 +96,7 @@ export function getClientIp(c: any): string | null
 
 ## 部署步骤
 
-1. 备份线上 DB：`cp ~/.llm-gateway/logs/proxy/gateway.db ~/.llm-gateway/logs/proxy/gateway.db.bak`
-2. 发布新版本到 macmini（或本地 build 后替换 dist）。
-3. 重启 gateway 进程；启动时自动执行 migration。
+1. 升级前先备份数据库文件。
+2. 发布新版本（构建后替换 dist）。
+3. 重启网关进程；启动时自动执行 migration。
 4. 发一条测试请求，确认 DB 和 proxy 日志出现 `client_ip` / `clientIp`。
