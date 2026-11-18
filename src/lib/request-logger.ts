@@ -8,6 +8,7 @@ export interface RequestLogEntry {
   requestId: string;
   timestamp: string;
   userName?: string;
+  clientIp?: string | null;
   customModel?: string;
   realModel?: string;
   provider?: string;
@@ -94,6 +95,7 @@ export class RequestLogger {
           timestamp: e.timestamp,
           createdAt: Date.now(),
           userName: e.userName ?? null,
+          clientIp: e.clientIp ?? null,
           customModel: e.customModel ?? null,
           realModel: e.realModel ?? null,
           provider: e.provider ?? null,
@@ -128,7 +130,7 @@ export class RequestLogger {
     const stmt = db.prepare(`
       INSERT OR IGNORE INTO requests (
         request_id, timestamp, created_at,
-        user_name, custom_model, real_model, provider,
+        user_name, client_ip, custom_model, real_model, provider,
         model_group, actual_model,
         endpoint, status_code, duration_ms, is_streaming,
         ttft_ms, tps,
@@ -136,7 +138,7 @@ export class RequestLogger {
         error_message, error_type, response_metadata
       ) VALUES (
         @requestId, @timestamp, @createdAt,
-        @userName, @customModel, @realModel, @provider,
+        @userName, @clientIp, @customModel, @realModel, @provider,
         @modelGroup, @actualModel,
         @endpoint, @statusCode, @durationMs, @isStreaming,
         @ttftMs, @tps,
@@ -156,6 +158,7 @@ export class RequestLogger {
           timestamp: e.timestamp,
           createdAt: Date.now(),
           userName: e.userName ?? null,
+          clientIp: e.clientIp ?? null,
           customModel: e.customModel ?? null,
           realModel: e.realModel ?? null,
           provider: e.provider ?? null,

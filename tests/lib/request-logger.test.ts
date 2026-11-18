@@ -117,4 +117,17 @@ describe('RequestLogger', () => {
     expect(row.ttft_ms).toBeNull();
     expect(row.tps).toBeNull();
   });
+  it('should persist clientIp to the database', async () => {
+    requestLogger.start();
+    const entry = createEntry({ clientIp: '203.0.113.9' });
+    requestLogger.log(entry);
+
+    await new Promise(r => setTimeout(r, 200));
+
+    const row = dbManager.getDb()
+      .prepare('SELECT client_ip FROM requests WHERE request_id = ?')
+      .get(entry.requestId) as { client_ip: string | null };
+    expect(row.client_ip).toBe('203.0.113.9');
+  });
+
 });
