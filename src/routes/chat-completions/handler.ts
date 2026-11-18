@@ -14,6 +14,7 @@ import { restorePaths } from '../../privacy/sanitizer.js';
 import { interceptors } from '../../interceptor/index.js';
 import { DatabaseManager } from '../../lib/db.js';
 import { RequestLogger } from '../../lib/request-logger.js';
+import { getClientIp } from '../../lib/client-ip.js';
 
 export function createChatCompletionsHandler(
   config: ProxyConfig | (() => ProxyConfig),
@@ -27,6 +28,7 @@ export function createChatCompletionsHandler(
   return async (c: any, endpoint: string) => {
     const startTime = Date.now();
     const requestId = uuidv4();
+    const clientIp = getClientIp(c);
     let customModel = 'unknown';
     let modelGroup: string | undefined;
     let actualModel: string | undefined;
@@ -147,6 +149,7 @@ export function createChatCompletionsHandler(
           logger.log({
             timestamp: new Date().toISOString(),
             requestId,
+            clientIp,
             customModel: model,
             endpoint,
             method: 'POST',
@@ -159,6 +162,7 @@ export function createChatCompletionsHandler(
           if (requestLogger) {
             requestLogger.log({
               requestId,
+              clientIp,
               timestamp: new Date().toISOString(),
               userName: currentUser?.name ?? null,
               customModel: model,
@@ -196,7 +200,7 @@ export function createChatCompletionsHandler(
         provider,
         c,
         currentUser,
-        clientIp: c.req.header('x-forwarded-for') ?? c.req.header('x-real-ip') ?? null,
+        clientIp,
         requestId,
         customModel,
         stream,
@@ -220,7 +224,8 @@ export function createChatCompletionsHandler(
         statusCode: response.status,
         durationMs: Date.now() - startTime,
         isStreaming: !!stream,
-        userName: currentUser?.name
+        userName: currentUser?.name,
+        clientIp,
       };
 
       // Auth check
@@ -228,6 +233,7 @@ export function createChatCompletionsHandler(
         logger.log({
           timestamp: new Date().toISOString(),
           requestId,
+          clientIp,
           customModel: model_group ? actualModel! : model,
           modelGroup: model_group,
           endpoint,
@@ -241,6 +247,7 @@ export function createChatCompletionsHandler(
         if (requestLogger) {
           requestLogger.log({
             requestId: logEntry.requestId,
+            clientIp,
             timestamp: logEntry.timestamp,
             userName: currentUser?.name ?? null,
             customModel: logEntry.customModel,
@@ -274,6 +281,7 @@ export function createChatCompletionsHandler(
           if (requestLogger) {
             requestLogger.log({
               requestId: result.logEntry.requestId,
+              clientIp,
               timestamp: result.logEntry.timestamp,
               userName: currentUser?.name ?? null,
               customModel: result.logEntry.customModel,
@@ -308,6 +316,7 @@ export function createChatCompletionsHandler(
         if (requestLogger) {
           requestLogger.log({
             requestId: logEntry.requestId,
+            clientIp,
             timestamp: logEntry.timestamp,
             userName: currentUser?.name ?? null,
             customModel: logEntry.customModel,
@@ -346,6 +355,7 @@ export function createChatCompletionsHandler(
       if (requestLogger) {
         requestLogger.log({
           requestId: logEntry.requestId,
+          clientIp,
           timestamp: logEntry.timestamp,
           userName: currentUser?.name ?? null,
           customModel: logEntry.customModel,
@@ -378,6 +388,7 @@ export function createChatCompletionsHandler(
       logger.log({
         timestamp: new Date().toISOString(),
         requestId,
+        clientIp,
         customModel: modelGroup ? actualModel! : (body.model as string),
         modelGroup: modelGroup,
         endpoint,
@@ -386,11 +397,13 @@ export function createChatCompletionsHandler(
         durationMs: Date.now() - startTime,
         isStreaming: false,
         userName: currentUser?.name,
+        clientIp,
         error: { message: error.message || 'Internal error', type: error.name }
       });
       if (requestLogger) {
         requestLogger.log({
           requestId: logEntry?.requestId ?? requestId,
+          clientIp,
           timestamp: logEntry?.timestamp ?? new Date().toISOString(),
           userName: currentUser?.name ?? null,
           customModel: logEntry?.customModel,

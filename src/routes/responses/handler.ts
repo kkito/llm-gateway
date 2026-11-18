@@ -14,6 +14,7 @@ import { tryResponsesFallback } from './fallback.js';
 import { interceptors } from '../../interceptor/index.js';
 import { DatabaseManager } from '../../lib/db.js';
 import { RequestLogger } from '../../lib/request-logger.js';
+import { getClientIp } from '../../lib/client-ip.js';
 
 export function createResponsesHandler(
   config: ProxyConfig | (() => ProxyConfig),
@@ -27,6 +28,7 @@ export function createResponsesHandler(
   return async (c: any, endpoint: string) => {
     const startTime = Date.now();
     const requestId = uuidv4();
+    const clientIp = getClientIp(c);
     let customModel = 'unknown';
     let modelGroup: string | undefined;
     let actualModel: string | undefined;
@@ -131,6 +133,7 @@ export function createResponsesHandler(
           logger.log({
             timestamp: new Date().toISOString(),
             requestId,
+            clientIp,
             customModel: model,
             endpoint,
             method: 'POST',
@@ -143,6 +146,7 @@ export function createResponsesHandler(
           if (requestLogger) {
             requestLogger.log({
               requestId, timestamp: new Date().toISOString(),
+              clientIp,
               userName: currentUser?.name ?? null,
               customModel: model, endpoint, statusCode: 404,
               durationMs: Date.now() - startTime, isStreaming: !!stream,
@@ -173,7 +177,7 @@ export function createResponsesHandler(
         provider,
         c,
         currentUser,
-        clientIp: c.req.header('x-forwarded-for') ?? c.req.header('x-real-ip') ?? null,
+        clientIp,
         requestId,
         customModel,
         stream,
@@ -196,13 +200,15 @@ export function createResponsesHandler(
         statusCode: response.status,
         durationMs: Date.now() - startTime,
         isStreaming: !!stream,
-        userName: currentUser?.name
+        userName: currentUser?.name,
+        clientIp,
       };
 
       if ((c as any).userAuthEnabled && !currentUser) {
         logger.log({
           timestamp: new Date().toISOString(),
           requestId,
+          clientIp,
           customModel: model_group ? actualModel! : model,
           modelGroup: model_group,
           endpoint,
@@ -216,6 +222,7 @@ export function createResponsesHandler(
         if (requestLogger) {
           requestLogger.log({
             requestId, timestamp: new Date().toISOString(),
+            clientIp,
             userName: currentUser?.name ?? null,
             customModel: model_group ? actualModel! : model, endpoint,
             statusCode: 401, durationMs: Date.now() - startTime,
@@ -235,6 +242,7 @@ export function createResponsesHandler(
           if (requestLogger) {
             requestLogger.log({
               requestId: result.logEntry.requestId,
+              clientIp,
               timestamp: result.logEntry.timestamp,
               userName: currentUser?.name ?? null,
               customModel: result.logEntry.customModel,
@@ -267,6 +275,7 @@ export function createResponsesHandler(
       if (requestLogger) {
         requestLogger.log({
           requestId: logEntry.requestId,
+          clientIp,
           timestamp: logEntry.timestamp,
           userName: currentUser?.name ?? null,
           customModel: logEntry.customModel,
@@ -314,6 +323,7 @@ export function createResponsesHandler(
       logger.log({
         timestamp: new Date().toISOString(),
         requestId,
+        clientIp,
         customModel: modelGroup ? actualModel! : (body.model as string),
         modelGroup: modelGroup,
         endpoint,
@@ -322,11 +332,13 @@ export function createResponsesHandler(
         durationMs: Date.now() - startTime,
         isStreaming: false,
         userName: currentUser?.name,
+        clientIp,
         error: { message: error.message || 'Internal error', type: error.name }
       });
       if (requestLogger) {
         requestLogger.log({
           requestId, timestamp: new Date().toISOString(),
+          clientIp,
           userName: currentUser?.name ?? null,
           customModel: modelGroup ? actualModel! : (body.model as string),
           endpoint, statusCode: 500,

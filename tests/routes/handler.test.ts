@@ -593,5 +593,35 @@ describe('createChatCompletionsHandler', () => {
       vi.doUnmock('../../src/lib/request-logger.js');
     });
 
+
+    it('should include clientIp in requestLogger.log entries from x-forwarded-for', async () => {
+      const mockRequestLogger = { log: vi.fn(), start: vi.fn(), stop: vi.fn() };
+      vi.resetModules();
+      vi.doMock('../../src/lib/db.js', () => ({
+        DatabaseManager: { getExistingInstance: vi.fn(() => ({ getDrizzle: vi.fn() })) }
+      }));
+      vi.doMock('../../src/lib/request-logger.js', () => ({
+        RequestLogger: { getInstance: vi.fn(() => mockRequestLogger) }
+      }));
+      const { createChatCompletionsHandler: freshHandler } = await import('../../src/routes/chat-completions/handler.js');
+      const provider = {
+        customModel: 'gpt-4', realModel: 'gpt-4-real', apiKey: 'k',
+        baseUrl: 'https://api.openai.com', provider: 'openai' as const
+      };
+      const handler = freshHandler({ models: [provider] }, createMockLogger() as any, createMockDetailLogger() as any, 30000, '/tmp/test');
+      const { sendUpstreamRequest } = await import('../../src/routes/chat-completions/upstream-request.js');
+      vi.mocked(sendUpstreamRequest as any).mockResolvedValue(new Response(JSON.stringify({ choices: [] })));
+      const c = createMockC();
+      c.req.header = vi.fn((name: string) => name === 'x-forwarded-for' ? '203.0.113.10, 10.0.0.1' : undefined);
+      c.req.json = vi.fn(async () => ({ model: 'gpt-4', messages: [{ role: 'user', content: 'hi' }] }));
+
+      await handler(c, '/v1/chat/completions');
+
+      expect(mockRequestLogger.log).toHaveBeenCalled();
+      expect(mockRequestLogger.log.mock.calls[0][0].clientIp).toBe('203.0.113.10');
+
+      vi.doUnmock('../../src/lib/db.js');
+      vi.doUnmock('../../src/lib/request-logger.js');
+    });
   });
 });

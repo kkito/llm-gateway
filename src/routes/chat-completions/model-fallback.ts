@@ -1,3 +1,4 @@
+import { getClientIp } from '../../lib/client-ip.js';
 import type { ProviderConfig, PrivacySettings, ApiKey } from '../../config.js';
 import type { Logger } from '../../logger.js';
 import type { DetailLogger } from '../../detail-logger.js';
@@ -119,7 +120,8 @@ export async function tryModelGroupWithFallback(ctx: FallbackContext): Promise<F
     statusCode: lastErrorStatus,
     durationMs: Date.now() - startTime,
     isStreaming: stream,
-    userName: currentUser?.name
+    userName: currentUser?.name,
+    clientIp: getClientIp(c)
   });
 
   return {
